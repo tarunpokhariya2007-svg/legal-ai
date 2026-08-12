@@ -22,8 +22,8 @@ export default function Login() {
     try {
 
         const endpoint = isSignup
-            ? "http://localhost:5001/api/auth/signup"
-            : "http://localhost:5001/api/auth/login";
+            ? "https://legal-ai-z7vb.onrender.com/api/auth/signup"
+            : "https://legal-ai-z7vb.onrender.com/api/auth/login";
 
         const response = await fetch(endpoint, {
             method: "POST",

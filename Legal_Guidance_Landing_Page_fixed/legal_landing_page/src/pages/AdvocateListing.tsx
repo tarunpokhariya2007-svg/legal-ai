@@ -20,7 +20,7 @@ export default function AdvocateListing() {
   const [advocates, setAdvocates] = useState<any[]>([]);
 
   useEffect(() => {
-      fetch("http://localhost:5001/api/lawyers")
+      fetch("https://legal-ai-z7vb.onrender.com/api/lawyers")
       .then(res => res.json())
       .then(data => {
     console.log(data);

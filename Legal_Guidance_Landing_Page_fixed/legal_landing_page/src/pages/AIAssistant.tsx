@@ -96,7 +96,7 @@ const loadConversations = async () => {
     if (!token) return;
 
     const res = await fetch(
-      "http://localhost:5001/api/chat/conversations",
+      "https://legal-ai-z7vb.onrender.com/api/chat/conversations",
       {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -140,7 +140,7 @@ const loadConversation = async (id: string) => {
     }
 
     const res = await fetch(
-      `http://localhost:5001/api/chat/conversations/${id}/messages`,
+      `https://legal-ai-z7vb.onrender.com/api/chat/conversations/${id}/messages`,
       {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -190,7 +190,7 @@ useEffect(() => {
   token: string
 ) => {
   const res = await fetch(
-    `http://localhost:5001/api/chat/conversations/${conversationId}/messages`,
+    `https://legal-ai-z7vb.onrender.com/api/chat/conversations/${conversationId}/messages`,
     {
       method: "POST",
       headers: {
@@ -256,7 +256,7 @@ const sendMessage = async (text: string) => {
 
 if (!currentConversationId) {
   const conversationRes = await fetch(
-    "http://localhost:5001/api/chat/conversations",
+    "https://legal-ai-z7vb.onrender.com/api/chat/conversations",
     {
       method: "POST",
       headers: {
@@ -288,7 +288,7 @@ if (currentConversationId !== null) {
     token
   );
 }
-       const res = await fetch("http://localhost:5001/analyze", {
+       const res = await fetch("https://legal-ai-z7vb.onrender.com/analyze", {
           method: "POST",
           headers: {
              "Content-Type": "application/json",
@@ -425,7 +425,7 @@ if (currentConversationId !== null) {
       formData.append('audio', audioBlob, 'recording.webm')
       formData.append('language_code', 'unknown') // auto-detect Hindi/Punjabi/English etc.
 
-      const res = await fetch('http://localhost:5001/api/voice/stt', {
+      const res = await fetch('https://legal-ai-z7vb.onrender.com/api/voice/stt', {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
         body: formData,
@@ -477,7 +477,7 @@ if (currentConversationId !== null) {
     setLoadingSpeechId(messageId)
     try {
       const token = localStorage.getItem('token')
-      const res = await fetch('http://localhost:5001/api/voice/tts', {
+      const res = await fetch('https://legal-ai-z7vb.onrender.com/api/voice/tts', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

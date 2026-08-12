@@ -42,7 +42,7 @@ export default function Documents() {
         }
 
         const response = await fetch(
-          "http://localhost:5001/api/documents",
+          "https://legal-ai-z7vb.onrender.com/api/documents",
           {
             method: "GET",
             headers: {
@@ -164,7 +164,7 @@ export default function Documents() {
       console.log("Size:", file.size);
 
       const response = await fetch(
-        "http://localhost:5001/api/upload",
+        "https://legal-ai-z7vb.onrender.com/api/upload",
         {
           method: "POST",
 
@@ -276,7 +276,7 @@ const remove = async (id?: number, name?: string) => {
     console.log("Deleting document ID:", id);
 
     const response = await fetch(
-      `http://localhost:5001/api/documents/${id}`,
+      `https://legal-ai-z7vb.onrender.com/api/documents/${id}`,
       {
         method: "DELETE",
         headers: {
@@ -344,7 +344,7 @@ const renameDocument = async (
     const token = localStorage.getItem("token");
 
     const response = await fetch(
-      `http://localhost:5001/api/documents/${id}`,
+      `https://legal-ai-z7vb.onrender.com/api/documents/${id}`,
       {
         method: "PUT",
         headers: {
@@ -409,7 +409,7 @@ const renameDocument = async (
 
     const url = doc.url.startsWith("http")
       ? doc.url
-      : `http://localhost:5001${doc.url}`;
+      : `https://legal-ai-z7vb.onrender.com${doc.url}`;
 
     window.open(url, "_blank");
   };

@@ -46,7 +46,7 @@ const [docs, setDocs] = useState<Doc[]>([]);
         }
 
         const response = await fetch(
-          "http://localhost:5001/api/documents",
+          "https://legal-ai-z7vb.onrender.com/api/documents",
           {
             method: "GET",
             headers: {
@@ -157,7 +157,7 @@ const [docs, setDocs] = useState<Doc[]>([]);
       );
 
       const response = await fetch(
-        "http://localhost:5001/api/upload",
+        "https://legal-ai-z7vb.onrender.com/api/upload",
         {
           method: "POST",
 
@@ -279,7 +279,7 @@ const [docs, setDocs] = useState<Doc[]>([]);
       document.createElement("a");
 
     link.href =
-      `http://localhost:5001${doc.url}`;
+      `https://legal-ai-z7vb.onrender.com${doc.url}`;
 
     link.target = "_blank";
 
