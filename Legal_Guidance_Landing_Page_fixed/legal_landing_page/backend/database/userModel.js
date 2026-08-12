@@ -1,11 +1,17 @@
 const db = require("../db");
 
-async function createUser(fullName, email, password, phone) {
+async function createUser(
+    fullName,
+    email,
+    password,
+    phone,
+    role = "citizen"
+) {
 
     const sql = `
         INSERT INTO users
-        (full_name, email, password, phone)
-        VALUES (?, ?, ?, ?)
+        (full_name, email, password, phone, role)
+        VALUES (?, ?, ?, ?, ?)
     `;
 
     const [result] = await db.query(
@@ -14,12 +20,14 @@ async function createUser(fullName, email, password, phone) {
             fullName,
             email,
             password,
-            phone
+            phone,
+            role
         ]
     );
 
     return result;
 }
+
 
 async function findUserByEmail(email) {
 
@@ -31,12 +39,16 @@ async function findUserByEmail(email) {
         WHERE email = ?
     `;
 
-    const [rows] = await db.query(sql, [email]);
+    const [rows] = await db.query(
+        sql,
+        [email]
+    );
 
     console.log("Rows found:", rows);
 
     return rows[0];
 }
+
 
 module.exports = {
     createUser,

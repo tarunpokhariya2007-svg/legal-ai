@@ -1,4 +1,5 @@
 import { Link } from 'react-router'
+import { useEffect, useRef, useState } from 'react'
 import {
   Scale, ArrowRight, Star, CheckCircle, Shield, Zap, Globe, Lock,
   MessageSquare, Users, FileSearch, MapPin, Mic, ChevronRight,
@@ -16,22 +17,22 @@ const steps = [
   {
     step: '01', title: 'Describe Your Issue',
     desc: 'Simply type or speak your legal problem in any language — no legal jargon needed.',
-    color: 'var(--blue)',
+    color: '#D4AF37',
   },
   {
     step: '02', title: 'AI Analyzes Your Case',
     desc: 'Our Agentic AI cross-references thousands of statutes, IPC sections, and precedents instantly.',
-    color: '#7C3AED',
+    color: '#8A6A24',
   },
   {
     step: '03', title: 'Receive Legal Guidance',
     desc: 'Get a structured report with relevant laws, recommended actions, required documents, and timelines.',
-    color: 'var(--emerald)',
+    color: '#D4AF37',
   },
   {
     step: '04', title: 'Hire an Advocate',
     desc: 'Browse verified advocates matched to your case type, read reviews, and book consultations.',
-    color: '#F59E0B',
+    color: '#A27B2C',
   },
 ]
 
@@ -39,32 +40,32 @@ const features = [
   {
     icon: MessageSquare, title: 'AI Legal Assistant',
     desc: 'ChatGPT-style interface trained on Indian law. Ask anything about your rights and get instant, accurate guidance.',
-    color: 'var(--blue)', bg: 'var(--blue-subtle)',
+    color: '#D4AF37', bg: 'rgba(212,175,55,0.08)',
   },
   {
     icon: Users, title: 'Advocate Marketplace',
     desc: 'Connect with 1,840+ verified advocates filtered by specialization, city, language, and consultation fee.',
-    color: '#7C3AED', bg: 'rgba(124,58,237,0.08)',
+    color: '#8A6A24', bg: 'rgba(162,123,44,0.08)',
   },
   {
     icon: FileSearch, title: 'AI Document Analyzer',
     desc: 'Upload FIRs, contracts, court orders, and property papers. AI extracts key clauses and flags risks instantly.',
-    color: 'var(--emerald)', bg: 'var(--emerald-subtle)',
+    color: '#D4AF37', bg: 'rgba(212,175,55,0.08)',
   },
   {
     icon: MapPin, title: 'Jurisdiction Finder',
     desc: 'Automatically identify the correct court, jurisdiction, and authority for your case type and location.',
-    color: '#F59E0B', bg: 'rgba(245,158,11,0.08)',
+    color: '#A27B2C', bg: 'rgba(162,123,44,0.08)',
   },
   {
     icon: Lock, title: 'Secure Chat',
     desc: 'End-to-end encrypted communication with advocates. Your legal matters stay strictly confidential.',
-    color: '#EF4444', bg: 'rgba(239,68,68,0.08)',
+    color: '#8B4A42', bg: 'rgba(139,74,66,0.07)',
   },
   {
     icon: Globe, title: 'Multilingual Support',
     desc: 'Available in Hindi, English, Tamil, Bengali, Marathi, Telugu, Kannada, and 14 more Indian languages.',
-    color: '#06B6D4', bg: 'rgba(6,182,212,0.08)',
+    color: '#527B83', bg: 'rgba(82,123,131,0.08)',
   },
 ]
 
@@ -95,7 +96,7 @@ const pricing = [
     price: '₹0',
     period: 'Forever Free',
     highlight: false,
-    color: 'var(--blue)',
+    color: '#D4AF37',
     features: [
       '5 AI consultations / month',
       'Basic document analysis',
@@ -112,7 +113,7 @@ const pricing = [
     price: '₹299',
     period: 'per month',
     highlight: true,
-    color: 'var(--blue)',
+    color: '#D4AF37',
     features: [
       'Unlimited AI consultations',
       'Advanced document analysis (50 docs)',
@@ -130,7 +131,7 @@ const pricing = [
     price: '₹999',
     period: 'per month',
     highlight: false,
-    color: 'var(--emerald)',
+    color: '#D4AF37',
     features: [
       'AI Research Assistant',
       'Case file analysis & summaries',
@@ -145,20 +146,245 @@ const pricing = [
   },
 ]
 
+const teamProfileLinkStyle: React.CSSProperties = {
+  display: 'block',
+  padding: '8px 10px',
+  borderRadius: 5,
+  color: 'rgba(255,255,255,0.78)',
+  textDecoration: 'none',
+  fontSize: '0.75rem',
+  whiteSpace: 'nowrap',
+}
+
 export default function Landing() {
+  const [openSocial, setOpenSocial] = useState<'linkedin' | 'github' | null>(null)
+  const socialRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const handleOutsideClick = (event: MouseEvent) => {
+      if (socialRef.current && !socialRef.current.contains(event.target as Node)) {
+        setOpenSocial(null)
+      }
+    }
+
+    document.addEventListener('mousedown', handleOutsideClick)
+
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick)
+    }
+  }, [])
+
   return (
-    <div style={{ overflowX: 'hidden' }}>
+    <div className="landing-page" style={{ overflowX: 'hidden' }}>
+      <style>{`
+        /* =====================================================
+           NYAYA AI LANDING PAGE ONLY
+           BLACK BACKGROUND + MOVING WHITE SPARKLES + GOLD UI
+           ===================================================== */
+
+        .landing-page {
+          --landing-gold: #D4AF37;
+          --landing-gold-light: #F0D878;
+          --landing-gold-dark: #A88624;
+          background: #000 !important;
+          color: #fff !important;
+          min-height: 100vh;
+          position: relative;
+          overflow: hidden;
+          isolation: isolate;
+        }
+
+        /* Two subtle moving particle layers */
+        .landing-page::before,
+        .landing-page::after {
+          content: "";
+          position: absolute;
+          inset: -120px;
+          pointer-events: none;
+          z-index: 0;
+          background-repeat: repeat;
+        }
+
+        .landing-page::before {
+          background-image:
+            radial-gradient(circle, rgba(255,255,255,.90) 0 1px, transparent 1.6px),
+            radial-gradient(circle, rgba(255,255,255,.50) 0 1px, transparent 1.6px);
+          background-size: 125px 125px, 195px 195px;
+          background-position: 0 0, 45px 80px;
+          animation: nyayaStars 38s linear infinite;
+        }
+
+        .landing-page::after {
+          background-image:
+            radial-gradient(circle, rgba(255,255,255,.35) 0 1px, transparent 1.6px),
+            radial-gradient(circle, rgba(255,255,255,.20) 0 1px, transparent 1.6px);
+          background-size: 165px 165px, 270px 270px;
+          background-position: 25px 35px, 120px 70px;
+          animation: nyayaStarsReverse 55s linear infinite;
+        }
+
+        @keyframes nyayaStars {
+          from { transform: translate3d(0,0,0); }
+          to   { transform: translate3d(130px,170px,0); }
+        }
+
+        @keyframes nyayaStarsReverse {
+          from { transform: translate3d(0,0,0); }
+          to   { transform: translate3d(-150px,100px,0); }
+        }
+
+        /* Keep every real landing element above the particles */
+        .landing-page > * {
+          position: relative;
+          z-index: 1;
+        }
+
+        /* Remove old hero/mesh blue backgrounds */
+        .landing-page .hero-gradient,
+        .landing-page .mesh-gradient {
+          background: #000 !important;
+        }
+
+        /* All landing sections stay black */
+        .landing-page section,
+        .landing-page footer {
+          background-color: #000 !important;
+        }
+
+        /* White typography */
+        .landing-page h1,
+        .landing-page h2,
+        .landing-page h3,
+        .landing-page h4 {
+          color: #fff !important;
+        }
+
+        .landing-page p,
+        .landing-page span,
+        .landing-page li {
+          color: rgba(255,255,255,.78);
+        }
+
+        /* Gold highlighted headline */
+        .landing-page .gradient-text {
+          background: none !important;
+          color: var(--landing-gold) !important;
+          -webkit-text-fill-color: var(--landing-gold) !important;
+        }
+
+        /* Gold symbols/icons */
+        .landing-page svg {
+          color: var(--landing-gold) !important;
+          stroke: var(--landing-gold) !important;
+        }
+
+        .landing-page .section-tag {
+          color: var(--landing-gold) !important;
+          background: rgba(212,175,55,.08) !important;
+          border: 1px solid rgba(212,175,55,.30) !important;
+        }
+
+        /* Gold primary action */
+        .landing-page .btn-primary {
+          background: var(--landing-gold) !important;
+          color: #000 !important;
+          border: 1px solid var(--landing-gold-light) !important;
+          box-shadow: 0 8px 28px rgba(212,175,55,.18) !important;
+        }
+
+        .landing-page .btn-primary svg {
+          color: #000 !important;
+          stroke: #000 !important;
+        }
+
+        /* Black/transparent secondary action */
+        .landing-page .btn-ghost {
+          background: rgba(255,255,255,.025) !important;
+          color: #fff !important;
+          border: 1px solid rgba(212,175,55,.35) !important;
+        }
+
+        .landing-page .btn-ghost svg {
+          color: var(--landing-gold) !important;
+          stroke: var(--landing-gold) !important;
+        }
+
+        /* Stats strip */
+        .landing-page .stat-number {
+          color: var(--landing-gold) !important;
+        }
+
+        /* Cards */
+        .landing-page .card,
+        .landing-page .feature-card {
+          background: rgba(255,255,255,.025) !important;
+          border: 1px solid rgba(212,175,55,.16) !important;
+          box-shadow: 0 12px 35px rgba(0,0,0,.35);
+        }
+
+        .landing-page .card:hover,
+        .landing-page .feature-card:hover {
+          border-color: rgba(212,175,55,.42) !important;
+        }
+
+        /* Gold feature/step number backgrounds */
+        .landing-page .badge {
+          background: rgba(212,175,55,.10) !important;
+          color: var(--landing-gold) !important;
+        }
+
+        /* Testimonial stars */
+        .landing-page .stars {
+          color: var(--landing-gold) !important;
+        }
+
+        /* Footer */
+        .landing-page footer {
+          border-top-color: rgba(212,175,55,.18) !important;
+        }
+
+        /* Footer logo */
+        .landing-page footer a:hover {
+          color: var(--landing-gold) !important;
+        }
+
+        /* CTA banner links */
+        .landing-page a {
+          transition: border-color .2s ease, color .2s ease, background .2s ease;
+        }
+
+        /* If the navbar is outside Landing.tsx, style it ONLY while
+           this landing page exists. This does not affect dashboard pages. */
+        body:has(.landing-page) nav {
+          background: rgba(0,0,0,.88) !important;
+          border-bottom: 1px solid rgba(212,175,55,.18) !important;
+        }
+
+        body:has(.landing-page) nav svg {
+          color: var(--landing-gold) !important;
+          stroke: var(--landing-gold) !important;
+        }
+
+        /* Responsive particle performance */
+        @media (prefers-reduced-motion: reduce) {
+          .landing-page::before,
+          .landing-page::after {
+            animation: none;
+          }
+        }
+      `}</style>
+
       {/* ── Hero ── */}
       <section className="hero-gradient" style={{ minHeight: '90vh', display: 'flex', alignItems: 'center', position: 'relative' }}>
         {/* Decorative orbs */}
         <div style={{
           position: 'absolute', width: 600, height: 600, borderRadius: '50%',
-          background: 'radial-gradient(circle, rgba(37,99,235,0.08) 0%, transparent 70%)',
+          background: 'radial-gradient(circle, rgba(162,123,44,0.06) 0%, transparent 70%)',
           top: -100, left: -100, pointerEvents: 'none',
         }} />
         <div style={{
           position: 'absolute', width: 400, height: 400, borderRadius: '50%',
-          background: 'radial-gradient(circle, rgba(5,150,105,0.08) 0%, transparent 70%)',
+          background: 'radial-gradient(circle, rgba(36,52,71,0.05) 0%, transparent 70%)',
           bottom: 0, right: 100, pointerEvents: 'none',
         }} />
 
@@ -206,7 +432,7 @@ export default function Landing() {
               <div style={{ display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap' }}>
                 {['Bar Council Verified', 'ISO 27001 Certified', 'MeitY Recognized'].map(t => (
                   <div key={t} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                    <CheckCircle size={14} style={{ color: 'var(--emerald)', flexShrink: 0 }} />
+                    <CheckCircle size={14} style={{ color: '#D4AF37', flexShrink: 0 }} />
                     <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 500 }}>{t}</span>
                   </div>
                 ))}
@@ -369,7 +595,7 @@ export default function Landing() {
                 {plan.highlight && (
                   <div style={{
                     position: 'absolute', top: -12, left: '50%', transform: 'translateX(-50%)',
-                    background: 'linear-gradient(135deg, var(--blue), #7C3AED)',
+                    background: '#D4AF37',
                     color: 'white', padding: '4px 16px', borderRadius: 99,
                     fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.05em', whiteSpace: 'nowrap',
                   }}>
@@ -416,7 +642,7 @@ export default function Landing() {
       </section>
 
       {/* ── CTA Banner ── */}
-      <section style={{ padding: '80px 24px', background: 'linear-gradient(135deg, #1E40AF 0%, #7C3AED 50%, #059669 100%)' }}>
+      <section style={{ padding: '80px 24px', background: '#000000' }}>
         <div style={{ maxWidth: 700, margin: '0 auto', textAlign: 'center' }}>
           <Shield size={40} style={{ color: 'rgba(255,255,255,0.6)', margin: '0 auto 20px' }} />
           <h2 style={{ fontSize: 'clamp(1.8rem, 3vw, 2.6rem)', fontWeight: 800, color: 'white', letterSpacing: '-0.03em', marginBottom: 16 }}>
@@ -428,7 +654,7 @@ export default function Landing() {
           <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
             <Link to="/signup" style={{
               padding: '14px 32px', borderRadius: 12, fontWeight: 700, fontSize: '1rem',
-              background: 'white', color: '#1E40AF', textDecoration: 'none',
+              background: '#F5F1E8', color: '#243447', textDecoration: 'none',
               boxShadow: '0 8px 32px rgba(0,0,0,0.2)', display: 'inline-flex', alignItems: 'center', gap: 8,
             }}>
               Get Started Free <ArrowRight size={18} />
@@ -450,28 +676,167 @@ export default function Landing() {
           <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: 40, marginBottom: 48 }} className="footer-grid">
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-                <div style={{
-                  width: 32, height: 32, borderRadius: 8,
-                  background: 'linear-gradient(135deg, var(--blue), #7C3AED)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                <span style={{
+                  fontWeight: 900,
+                  fontSize: '1.25rem',
+                  letterSpacing: '4px',
+                  color: '#D4AF37',
                 }}>
-                  <Scale size={15} color="white" />
-                </div>
-                <span style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--text)' }}>
-                  Nyaya<span style={{ color: 'var(--blue)' }}>AI</span>
+                  ALPINE
                 </span>
               </div>
+
               <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)', lineHeight: 1.7, maxWidth: 280 }}>
-                India's first Agentic AI-powered legal assistance platform, making justice accessible for every citizen.
+                AI-powered legal assistance platform, making legal guidance simple and accessible for everyone.
               </p>
-              <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
-                {['Twitter', 'LinkedIn', 'GitHub'].map(s => (
-                  <div key={s} style={{
-                    padding: '6px 12px', borderRadius: 6, background: 'var(--bg-card)',
-                    border: '1px solid var(--border)', fontSize: '0.75rem', color: 'var(--text-muted)',
-                    cursor: 'pointer',
-                  }}>{s}</div>
-                ))}
+
+              {/* Team social profiles — Twitter removed */}
+              <div
+                ref={socialRef}
+                style={{
+                  display: 'flex',
+                  gap: 8,
+                  marginTop: 16,
+                  flexWrap: 'wrap',
+                }}
+              >
+
+                {/* LinkedIn */}
+                <div style={{ position: 'relative' }}>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setOpenSocial(
+                        openSocial === 'linkedin' ? null : 'linkedin'
+                      )
+                    }
+                    style={{
+                      padding: '7px 12px',
+                      borderRadius: 6,
+                      background: 'var(--bg-card)',
+                      border: '1px solid rgba(212,175,55,0.35)',
+                      fontSize: '0.75rem',
+                      color: '#D4AF37',
+                      cursor: 'pointer',
+                      fontWeight: 600,
+                    }}
+                  >
+                    LinkedIn
+                  </button>
+
+                  {openSocial === 'linkedin' && (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        bottom: 'calc(100% + 8px)',
+                        left: 0,
+                        minWidth: 190,
+                        padding: 8,
+                        borderRadius: 8,
+                        background: '#080808',
+                        border: '1px solid rgba(212,175,55,0.35)',
+                        boxShadow: '0 12px 30px rgba(0,0,0,0.55)',
+                        zIndex: 100,
+                      }}
+                    >
+                      <a
+                        href="https://www.linkedin.com/in/tarun-pokhariya-9971433a6"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={teamProfileLinkStyle}
+                      >
+                        Tarun Pokhariya
+                      </a>
+
+                      <a
+                        href="https://www.linkedin.com/in/pragitya-ghosh-33ba5a381/"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={teamProfileLinkStyle}
+                      >
+                        Pragitya Ghosh
+                      </a>
+
+                      <a
+                        href="https://www.linkedin.com/in/gaurav-singh-aa6a19376"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={teamProfileLinkStyle}
+                      >
+                        Gaurav Singh
+                      </a>
+                    </div>
+                  )}
+                </div>
+
+                {/* GitHub */}
+                <div style={{ position: 'relative' }}>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setOpenSocial(
+                        openSocial === 'github' ? null : 'github'
+                      )
+                    }
+                    style={{
+                      padding: '7px 12px',
+                      borderRadius: 6,
+                      background: 'var(--bg-card)',
+                      border: '1px solid rgba(212,175,55,0.35)',
+                      fontSize: '0.75rem',
+                      color: '#D4AF37',
+                      cursor: 'pointer',
+                      fontWeight: 600,
+                    }}
+                  >
+                    GitHub
+                  </button>
+
+                  {openSocial === 'github' && (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        bottom: 'calc(100% + 8px)',
+                        left: 0,
+                        minWidth: 190,
+                        padding: 8,
+                        borderRadius: 8,
+                        background: '#080808',
+                        border: '1px solid rgba(212,175,55,0.35)',
+                        boxShadow: '0 12px 30px rgba(0,0,0,0.55)',
+                        zIndex: 100,
+                      }}
+                    >
+                      <a
+                        href="https://github.com/tarunpokhariya2007-svg"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={teamProfileLinkStyle}
+                      >
+                        Tarun Pokhariya
+                      </a>
+
+                      <a
+                        href="https://github.com/gaurav8469"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={teamProfileLinkStyle}
+                      >
+                        Gaurav Singh
+                      </a>
+
+                      <a
+                        href="https://github.com/Pragitya02"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={teamProfileLinkStyle}
+                      >
+                        Pragitya Ghosh
+                      </a>
+                    </div>
+                  )}
+                </div>
+
               </div>
             </div>
             {[
@@ -529,92 +894,619 @@ export default function Landing() {
 
 function HeroIllustration() {
   return (
-    <div style={{ position: 'relative', width: 440, height: 420 }} className="float-animation">
-      <svg viewBox="0 0 440 420" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width: '100%', height: '100%' }}>
-        {/* Background circle */}
-        <circle cx="220" cy="210" r="180" fill="url(#bgGrad)" opacity="0.15" />
-
-        {/* Main phone/chat window */}
-        <rect x="80" y="60" width="200" height="300" rx="20" fill="url(#cardGrad)" stroke="#2563EB" strokeWidth="1.5" opacity="0.95" />
-
-        {/* Chat messages */}
-        <rect x="96" y="90" width="120" height="32" rx="8" fill="#EFF6FF" />
-        <text x="156" y="110" fontSize="9" fill="#2563EB" textAnchor="middle" fontFamily="Inter, sans-serif" fontWeight="600">How can I help you?</text>
-
-        <rect x="116" y="134" width="148" height="40" rx="8" fill="#DBEAFE" opacity="0.9" />
-        <text x="130" y="149" fontSize="8" fill="#1E40AF" fontFamily="Inter, sans-serif">My landlord isn't returning</text>
-        <text x="130" y="162" fontSize="8" fill="#1E40AF" fontFamily="Inter, sans-serif">my ₹80,000 deposit...</text>
-
-        <rect x="96" y="186" width="165" height="60" rx="8" fill="white" stroke="#E2E8F0" strokeWidth="1" />
-        <text x="106" y="200" fontSize="7.5" fill="#2563EB" fontFamily="Inter, sans-serif" fontWeight="700">⚖ Analysis Complete</text>
-        <text x="106" y="213" fontSize="7" fill="#475569" fontFamily="Inter, sans-serif">Relevant: Transfer of Property</text>
-        <text x="106" y="224" fontSize="7" fill="#475569" fontFamily="Inter, sans-serif">Act, 1882 · Section 108</text>
-        <text x="106" y="237" fontSize="7" fill="#059669" fontFamily="Inter, sans-serif" fontWeight="600">✓ Strong case — Act Now</text>
-
-        {/* Balance scale */}
-        <circle cx="200" cy="275" r="18" fill="url(#scaleGrad)" opacity="0.9" />
-        <text x="200" y="280" fontSize="18" textAnchor="middle">⚖️</text>
-
-        {/* Connecting line */}
-        <line x1="190" y1="275" x2="290" y2="200" stroke="#2563EB" strokeWidth="1.5" strokeDasharray="5,4" opacity="0.5" />
-
-        {/* AI card - right */}
-        <rect x="270" y="130" width="140" height="100" rx="14" fill="url(#aiCardGrad)" stroke="url(#borderGrad)" strokeWidth="1.5" />
-        <circle cx="292" cy="158" r="14" fill="url(#avatarGrad)" />
-        <text x="292" y="163" fontSize="12" textAnchor="middle">🤖</text>
-        <text x="310" y="154" fontSize="8.5" fill="white" fontFamily="Inter, sans-serif" fontWeight="700">NyayaAI</text>
-        <text x="310" y="165" fontSize="7" fill="rgba(255,255,255,0.7)" fontFamily="Inter, sans-serif">Legal Assistant</text>
-        <rect x="282" y="178" width="118" height="6" rx="3" fill="rgba(255,255,255,0.2)" />
-        <rect x="282" y="188" width="90" height="6" rx="3" fill="rgba(255,255,255,0.15)" />
-        <rect x="282" y="198" width="106" height="6" rx="3" fill="rgba(255,255,255,0.12)" />
-        <rect x="282" y="213" width="60" height="18" rx="6" fill="white" opacity="0.9" />
-        <text x="312" y="225" fontSize="7.5" fill="#2563EB" textAnchor="middle" fontFamily="Inter, sans-serif" fontWeight="700">Book Advocate</text>
-
-        {/* Floating tags */}
-        <rect x="290" y="60" width="100" height="28" rx="8" fill="white" stroke="#E2E8F0" strokeWidth="1" />
-        <text x="295" y="78" fontSize="8" fill="#059669" fontFamily="Inter, sans-serif" fontWeight="700">✓ Bar Council Verified</text>
-
-        <rect x="60" y="295" width="100" height="28" rx="8" fill="white" stroke="#E2E8F0" strokeWidth="1" />
-        <text x="110" y="313" fontSize="8" fill="#7C3AED" textAnchor="middle" fontFamily="Inter, sans-serif" fontWeight="700">🔒 Encrypted Chat</text>
-
-        <rect x="290" y="270" width="120" height="28" rx="8" fill="white" stroke="#E2E8F0" strokeWidth="1" />
-        <text x="350" y="288" fontSize="8" fill="#F59E0B" textAnchor="middle" fontFamily="Inter, sans-serif" fontWeight="700">⚡ 220+ Cities</text>
-
-        {/* Dots decoration */}
-        {[0,1,2,3,4].map(i => (
-          <circle key={i} cx={40 + i * 20} cy={380} r="3" fill="#2563EB" opacity={0.15 + i * 0.08} />
-        ))}
-        {[0,1,2].map(i => (
-          <circle key={i} cx={380} cy={80 + i * 25} r="3" fill="#059669" opacity={0.2 + i * 0.1} />
-        ))}
-
+    <div
+      className="legal-scale-animation"
+      style={{
+        position: 'relative',
+        width: 560,
+        height: 460,
+        maxWidth: '100%',
+      }}
+    >
+      <svg
+        viewBox="0 0 560 460"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        style={{
+          width: '100%',
+          height: '100%',
+          overflow: 'visible',
+        }}
+      >
         <defs>
-          <linearGradient id="bgGrad" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stopColor="#2563EB" />
-            <stop offset="100%" stopColor="#059669" />
+          {/* Gold scale */}
+          <linearGradient id="goldScale2" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor="#FFF1A8" />
+            <stop offset="25%" stopColor="#D4AF37" />
+            <stop offset="60%" stopColor="#A77F18" />
+            <stop offset="100%" stopColor="#F3D76A" />
           </linearGradient>
-          <linearGradient id="cardGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#F8FAFC" />
-            <stop offset="100%" stopColor="#EFF6FF" />
+
+          {/* Cloud */}
+          <linearGradient id="cloudGold" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#FFFDF5" />
+            <stop offset="100%" stopColor="#E9E2CF" />
           </linearGradient>
-          <linearGradient id="aiCardGrad" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stopColor="#1E40AF" />
-            <stop offset="100%" stopColor="#7C3AED" />
-          </linearGradient>
-          <linearGradient id="borderGrad" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stopColor="#3B82F6" />
-            <stop offset="100%" stopColor="#A78BFA" />
-          </linearGradient>
-          <linearGradient id="scaleGrad" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stopColor="#DBEAFE" />
-            <stop offset="100%" stopColor="#EDE9FE" />
-          </linearGradient>
-          <linearGradient id="avatarGrad" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stopColor="#3B82F6" />
-            <stop offset="100%" stopColor="#7C3AED" />
-          </linearGradient>
+
+          <radialGradient id="scaleGlow">
+            <stop offset="0%" stopColor="#D4AF37" stopOpacity="0.18" />
+            <stop offset="100%" stopColor="#D4AF37" stopOpacity="0" />
+          </radialGradient>
+
+          <filter id="cloudShadow" x="-30%" y="-30%" width="160%" height="180%">
+            <feDropShadow
+              dx="0"
+              dy="8"
+              stdDeviation="8"
+              floodColor="#000000"
+              floodOpacity="0.45"
+            />
+          </filter>
+
+          <filter id="goldBlur" x="-100%" y="-100%" width="300%" height="300%">
+            <feGaussianBlur stdDeviation="5" result="blur" />
+            <feMerge>
+              <feMergeNode in="blur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+
+          {/* Arrow head */}
+          <marker
+            id="goldArrow"
+            markerWidth="10"
+            markerHeight="10"
+            refX="8"
+            refY="5"
+            orient="auto"
+            markerUnits="strokeWidth"
+          >
+            <path
+              d="M0 0 L10 5 L0 10 L2.5 5 Z"
+              fill="#D4AF37"
+            />
+          </marker>
         </defs>
+
+        {/* Background glow */}
+        <circle cx="280" cy="235" r="205" fill="url(#scaleGlow)" />
+
+        {/* =====================================================
+            MAIN BALANCE SCALE
+            ===================================================== */}
+
+        <g
+          className="scale-balance"
+          style={{ transformOrigin: '280px 225px' }}
+        >
+          {/* Top finial */}
+          <circle
+            cx="280"
+            cy="42"
+            r="18"
+            fill="#050505"
+            stroke="url(#goldScale2)"
+            strokeWidth="3"
+          />
+
+          <path
+            d="M271 58 L289 58 L294 82 L266 82 Z"
+            fill="url(#goldScale2)"
+          />
+
+          {/* Center column */}
+          <rect
+            x="271"
+            y="75"
+            width="18"
+            height="285"
+            rx="9"
+            fill="url(#goldScale2)"
+            filter="url(#goldBlur)"
+          />
+
+          <rect
+            x="275"
+            y="85"
+            width="4"
+            height="265"
+            rx="2"
+            fill="#FFF0A6"
+            opacity="0.65"
+          />
+
+          {/* Beam */}
+          <path
+            d="
+              M105 128
+              Q155 92 205 112
+              Q242 128 280 112
+              Q318 128 355 112
+              Q405 92 455 128
+            "
+            stroke="url(#goldScale2)"
+            strokeWidth="15"
+            strokeLinecap="round"
+            fill="none"
+          />
+
+          {/* Center joint */}
+          <circle
+            cx="280"
+            cy="116"
+            r="16"
+            fill="#050505"
+            stroke="url(#goldScale2)"
+            strokeWidth="4"
+          />
+
+          <circle
+            cx="280"
+            cy="116"
+            r="5"
+            fill="#F3D76A"
+          />
+
+          {/* LEFT STRINGS */}
+          <g className="left-pan">
+            <line
+              x1="145"
+              y1="120"
+              x2="145"
+              y2="235"
+              stroke="url(#goldScale2)"
+              strokeWidth="3"
+            />
+            <line
+              x1="105"
+              y1="120"
+              x2="145"
+              y2="235"
+              stroke="url(#goldScale2)"
+              strokeWidth="3"
+            />
+            <line
+              x1="185"
+              y1="120"
+              x2="145"
+              y2="235"
+              stroke="url(#goldScale2)"
+              strokeWidth="3"
+            />
+
+            {/* Left pan */}
+            <path
+              d="
+                M82 235
+                Q145 260 208 235
+                L194 261
+                Q145 286 96 261
+                Z
+              "
+              fill="url(#goldScale2)"
+              stroke="#D4AF37"
+              strokeWidth="2"
+            />
+
+            <path
+              d="
+                M85 235
+                Q145 251 205 235
+                Q145 264 85 235
+              "
+              fill="#090909"
+            />
+          </g>
+
+          {/* RIGHT STRINGS */}
+          <g className="right-pan">
+            <line
+              x1="415"
+              y1="120"
+              x2="415"
+              y2="235"
+              stroke="url(#goldScale2)"
+              strokeWidth="3"
+            />
+            <line
+              x1="375"
+              y1="120"
+              x2="415"
+              y2="235"
+              stroke="url(#goldScale2)"
+              strokeWidth="3"
+            />
+            <line
+              x1="455"
+              y1="120"
+              x2="415"
+              y2="235"
+              stroke="url(#goldScale2)"
+              strokeWidth="3"
+            />
+
+            {/* Right pan */}
+            <path
+              d="
+                M352 235
+                Q415 260 478 235
+                L464 261
+                Q415 286 366 261
+                Z
+              "
+              fill="url(#goldScale2)"
+              stroke="#D4AF37"
+              strokeWidth="2"
+            />
+
+            <path
+              d="
+                M355 235
+                Q415 251 475 235
+                Q415 264 355 235
+              "
+              fill="#090909"
+            />
+          </g>
+
+          {/* Base */}
+          <path
+            d="
+              M225 365
+              Q280 338 335 365
+              L360 392
+              L200 392
+              Z
+            "
+            fill="url(#goldScale2)"
+          />
+
+          <ellipse
+            cx="280"
+            cy="393"
+            rx="82"
+            ry="13"
+            fill="#D4AF37"
+            opacity="0.28"
+          />
+        </g>
+
+        {/* =====================================================
+            LEFT FULL CLOUD
+            ===================================================== */}
+
+        <g className="cloud-left" filter="url(#cloudShadow)">
+          {/* Cloud */}
+          <path
+            d="
+              M18 142
+              C18 119 35 103 57 103
+              C62 78 83 60 108 60
+              C131 60 150 74 157 96
+              C164 91 173 88 183 88
+              C207 88 226 106 226 130
+              C226 135 225 140 223 144
+              C232 148 238 156 238 166
+              C238 183 224 196 207 196
+              L67 196
+              C40 196 18 174 18 148
+              Z
+            "
+            fill="url(#cloudGold)"
+            stroke="#D4AF37"
+            strokeWidth="3"
+          />
+
+          {/* Cloud highlight */}
+          <path
+            d="
+              M48 142
+              C48 126 61 116 76 116
+              C82 95 99 82 118 82
+              C136 82 150 94 155 111
+            "
+            stroke="#FFF7D0"
+            strokeWidth="4"
+            strokeLinecap="round"
+            opacity="0.9"
+          />
+
+          {/* Text */}
+          <text
+            x="128"
+            y="146"
+            textAnchor="middle"
+            fontSize="17"
+            fontWeight="800"
+            fill="#9C7517"
+            fontFamily="Inter, Arial, sans-serif"
+          >
+            Know Your Rights
+          </text>
+
+          <text
+            x="128"
+            y="169"
+            textAnchor="middle"
+            fontSize="12"
+            fontWeight="600"
+            fill="#6F5A2A"
+            fontFamily="Inter, Arial, sans-serif"
+          >
+            Get legal guidance
+          </text>
+
+          {/* Pointer connector */}
+          <path
+            d="M220 178 C245 188 250 203 164 228"
+            stroke="#D4AF37"
+            strokeWidth="3"
+            strokeDasharray="7 7"
+            markerEnd="url(#goldArrow)"
+            fill="none"
+          />
+
+          {/* Moving arrow head */}
+          <circle
+            className="arrow-dot-left"
+            cx="210"
+            cy="188"
+            r="4"
+            fill="#FFF0A6"
+          />
+        </g>
+
+        {/* =====================================================
+            RIGHT FULL CLOUD
+            ===================================================== */}
+
+        <g className="cloud-right" filter="url(#cloudShadow)">
+          {/* Cloud */}
+          <path
+            d="
+              M322 142
+              C322 119 339 103 361 103
+              C366 78 387 60 412 60
+              C435 60 454 74 461 96
+              C468 91 477 88 487 88
+              C511 88 530 106 530 130
+              C530 135 529 140 527 144
+              C536 148 542 156 542 166
+              C542 183 528 196 511 196
+              L371 196
+              C344 196 322 174 322 148
+              Z
+            "
+            fill="url(#cloudGold)"
+            stroke="#D4AF37"
+            strokeWidth="3"
+          />
+
+          {/* Cloud highlight */}
+          <path
+            d="
+              M352 142
+              C352 126 365 116 380 116
+              C386 95 403 82 422 82
+              C440 82 454 94 459 111
+            "
+            stroke="#FFF7D0"
+            strokeWidth="4"
+            strokeLinecap="round"
+            opacity="0.9"
+          />
+
+          {/* Text */}
+          <text
+            x="432"
+            y="146"
+            textAnchor="middle"
+            fontSize="17"
+            fontWeight="800"
+            fill="#9C7517"
+            fontFamily="Inter, Arial, sans-serif"
+          >
+            Login &amp; Explore
+          </text>
+
+          <text
+            x="432"
+            y="169"
+            textAnchor="middle"
+            fontSize="12"
+            fontWeight="600"
+            fill="#6F5A2A"
+            fontFamily="Inter, Arial, sans-serif"
+          >
+            Access your legal space
+          </text>
+
+          {/* Pointer connector */}
+          <path
+            d="M340 178 C315 188 310 203 396 228"
+            stroke="#D4AF37"
+            strokeWidth="3"
+            strokeDasharray="7 7"
+            markerEnd="url(#goldArrow)"
+            fill="none"
+          />
+
+          {/* Moving arrow head */}
+          <circle
+            className="arrow-dot-right"
+            cx="350"
+            cy="188"
+            r="4"
+            fill="#FFF0A6"
+          />
+        </g>
+
+        {/* Gold decorative dots */}
+        <g fill="#D4AF37">
+          <circle cx="32" cy="330" r="3" opacity="0.65" />
+          <circle cx="52" cy="350" r="2" opacity="0.4" />
+          <circle cx="505" cy="330" r="3" opacity="0.65" />
+          <circle cx="525" cy="350" r="2" opacity="0.4" />
+          <circle cx="280" cy="425" r="3" opacity="0.45" />
+        </g>
       </svg>
+
+      <style>{`
+        /* Scale gently balances */
+        .scale-balance {
+          animation: scaleBalance 4.5s ease-in-out infinite;
+        }
+
+        @keyframes scaleBalance {
+          0%, 100% {
+            transform: rotate(-2deg);
+          }
+
+          50% {
+            transform: rotate(2deg);
+          }
+        }
+
+        /* Pans move opposite to the beam */
+        .left-pan {
+          animation: leftPanMove 4.5s ease-in-out infinite;
+        }
+
+        .right-pan {
+          animation: rightPanMove 4.5s ease-in-out infinite;
+        }
+
+        @keyframes leftPanMove {
+          0%, 100% {
+            transform: translateY(5px);
+          }
+
+          50% {
+            transform: translateY(-7px);
+          }
+        }
+
+        @keyframes rightPanMove {
+          0%, 100% {
+            transform: translateY(-7px);
+          }
+
+          50% {
+            transform: translateY(5px);
+          }
+        }
+
+        /* Clouds float independently */
+        .cloud-left {
+          animation: leftCloudFloat 5s ease-in-out infinite;
+        }
+
+        .cloud-right {
+          animation: rightCloudFloat 5s ease-in-out infinite;
+        }
+
+        @keyframes leftCloudFloat {
+          0%, 100% {
+            transform: translateY(0);
+          }
+
+          50% {
+            transform: translateY(-8px);
+          }
+        }
+
+        @keyframes rightCloudFloat {
+          0%, 100% {
+            transform: translateY(-5px);
+          }
+
+          50% {
+            transform: translateY(3px);
+          }
+        }
+
+        /* Animated light traveling along left connector */
+        .arrow-dot-left {
+          animation: arrowLeft 2.2s linear infinite;
+        }
+
+        @keyframes arrowLeft {
+          0% {
+            transform: translate(0, 0);
+            opacity: 0;
+          }
+
+          15% {
+            opacity: 1;
+          }
+
+          50% {
+            transform: translate(-35px, 18px);
+            opacity: 1;
+          }
+
+          85% {
+            transform: translate(-65px, 36px);
+            opacity: 1;
+          }
+
+          100% {
+            transform: translate(-70px, 40px);
+            opacity: 0;
+          }
+        }
+
+        /* Animated light traveling along right connector */
+        .arrow-dot-right {
+          animation: arrowRight 2.2s linear infinite;
+        }
+
+        @keyframes arrowRight {
+          0% {
+            transform: translate(0, 0);
+            opacity: 0;
+          }
+
+          15% {
+            opacity: 1;
+          }
+
+          50% {
+            transform: translate(35px, 18px);
+            opacity: 1;
+          }
+
+          85% {
+            transform: translate(65px, 36px);
+            opacity: 1;
+          }
+
+          100% {
+            transform: translate(70px, 40px);
+            opacity: 0;
+          }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .scale-balance,
+          .left-pan,
+          .right-pan,
+          .cloud-left,
+          .cloud-right,
+          .arrow-dot-left,
+          .arrow-dot-right {
+            animation: none;
+          }
+        }
+
+        @media (max-width: 700px) {
+          .legal-scale-animation {
+            width:   100% !important;
+            height: auto !important;
+            min-height: 400px;
+          }
+        }
+      `}</style>
     </div>
   )
 }

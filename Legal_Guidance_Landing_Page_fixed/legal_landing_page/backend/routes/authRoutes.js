@@ -11,6 +11,11 @@ const router = express.Router();
 
 const JWT_SECRET = "nyaya_secret_key";
 
+
+// ==========================================
+// SIGNUP
+// ==========================================
+
 router.post("/signup", async (req, res) => {
 
     try {
@@ -19,37 +24,65 @@ router.post("/signup", async (req, res) => {
             fullName,
             email,
             password,
-            phone
+            phone,
+            role
         } = req.body;
 
-        const existingUser = await findUserByEmail(email);
+        const existingUser =
+            await findUserByEmail(email);
 
         if (existingUser) {
 
             return res.json({
                 success: false,
-                message: "Email already registered."
+                message:
+                    "Email already registered."
             });
 
         }
 
-        const hashedPassword = await bcrypt.hash(password, 10);
+        const hashedPassword =
+            await bcrypt.hash(
+                password,
+                10
+            );
 
-        await createUser(
-            fullName,
-            email,
-            hashedPassword,
-            phone
-        );
+        // UI says Advocate,
+        // database stores lawyer
+        const userRole =
+            role === "lawyer"
+                ? "lawyer"
+                : "citizen";
+
+        const result =
+            await createUser(
+                fullName,
+                email,
+                hashedPassword,
+                phone,
+                userRole
+            );
 
         res.json({
             success: true,
-            message: "Signup Successful"
+            message:
+                "Signup Successful",
+
+            user: {
+                id: result.insertId,
+                fullName,
+                email,
+                phone,
+                role: userRole
+            }
         });
 
     } catch (err) {
 
-        console.error(err);
+        console.error(
+            "SIGNUP ERROR:",
+            err
+        );
 
         res.status(500).json({
             success: false,
@@ -60,70 +93,98 @@ router.post("/signup", async (req, res) => {
 
 });
 
+
+// ==========================================
+// LOGIN
+// ==========================================
+
 router.post("/login", async (req, res) => {
 
     try {
 
-        const { email, password } = req.body;
+        const {
+            email,
+            password
+        } = req.body;
 
-        console.log("Received email:", email);
-        console.log("Received password:", password);
+        console.log(
+            "Received email:",
+            email
+        );
 
-        const user = await findUserByEmail(email);
+        const user =
+            await findUserByEmail(email);
 
-        console.log("User found:", user);
+        console.log(
+            "User found:",
+            user
+        );
 
         if (!user) {
 
             return res.json({
                 success: false,
-                message: "User not found"
+                message:
+                    "User not found"
             });
 
         }
 
-        const valid = await bcrypt.compare(
-            password,
-            user.password
-        );
-
-        console.log("Password valid:", valid);
+        const valid =
+            await bcrypt.compare(
+                password,
+                user.password
+            );
 
         if (!valid) {
 
             return res.json({
                 success: false,
-                message: "Invalid password"
+                message:
+                    "Invalid password"
             });
 
         }
 
-        const token = jwt.sign(
-            {
-                id: user.id,
-                email: user.email,
-                role: user.role
-            },
-            JWT_SECRET,
-            {
-                expiresIn: "7d"
-            }
-        );
+        const token =
+            jwt.sign(
+                {
+                    id: user.id,
+                    email: user.email,
+                    role: user.role
+                },
+                JWT_SECRET,
+                {
+                    expiresIn: "7d"
+                }
+            );
 
         res.json({
+
             success: true,
+
             token,
+
             user: {
                 id: user.id,
-                fullName: user.full_name,
-                email: user.email,
-                role: user.role
+                fullName:
+                    user.full_name,
+                email:
+                    user.email,
+                phone:
+                    user.phone,
+                role:
+                    user.role
             }
+
         });
 
     } catch (err) {
 
-        console.error(err);
+        console.error(
+            "LOGIN ERROR:",
+            err
+        );
 
         res.status(500).json({
             success: false,

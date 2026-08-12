@@ -11,6 +11,7 @@ require("./db");
 
 const uploadRoutes = require("./routes/uploadRoutes");
 const authRoutes = require("./routes/authRoutes");
+const lawyerRoutes = require("./routes/lawyerRoutes");
 const voiceRoutes = require("./routes/voiceRoutes");
 const chatRoutes = require("./routes/chatRoutes");
 const authMiddleware = require("./middleware/authMiddleware");
@@ -33,6 +34,7 @@ app.use("/uploads", express.static("uploads"));
 app.use("/api", uploadRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/voice", voiceRoutes);
+app.use("/api/lawyers", lawyerRoutes);
 app.use("/api/chat", chatRoutes);
 
 

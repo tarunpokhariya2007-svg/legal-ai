@@ -1,7 +1,5 @@
 import { useState } from 'react'
 import { Link, useLocation } from 'react-router'
-import { Scale, Moon, Sun, Menu, X, Sparkles } from 'lucide-react'
-import { useTheme } from '../../context/ThemeContext'
 
 const navLinks = [
   { label: 'Home', href: '/' },
@@ -14,7 +12,6 @@ const navLinks = [
 ]
 
 export default function Navbar() {
-  const { theme, toggle } = useTheme()
   const [mobileOpen, setMobileOpen] = useState(false)
   const location = useLocation()
 
@@ -23,160 +20,581 @@ export default function Navbar() {
       style={{
         position: 'sticky',
         top: 0,
-        zIndex: 50,
-        background: 'var(--bg-glass)',
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)',
-        borderBottom: '1px solid var(--border)',
-        transition: 'all 0.3s ease',
+        zIndex: 100,
+        width: '100%',
+        background: '#000000',
+        borderBottom: '1px solid rgba(212, 175, 55, 0.25)',
+        boxShadow: '0 2px 20px rgba(0,0,0,0.45)',
       }}
     >
-      <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 24px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', height: 64, gap: 32 }}>
-          {/* Logo */}
-          <Link to="/" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-            <div style={{
-              width: 36, height: 36, borderRadius: 10,
-              background: 'linear-gradient(135deg, var(--blue), #7C3AED)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: 'var(--shadow-blue)',
-            }}>
-              <Scale size={18} color="white" strokeWidth={2.5} />
-            </div>
-            <div>
-              <span style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text)', letterSpacing: '-0.03em' }}>
-                Nyaya<span style={{ color: 'var(--blue)' }}>AI</span>
-              </span>
-            </div>
+      <div
+        style={{
+          maxWidth: 1240,
+          margin: '0 auto',
+          padding: '0 24px',
+        }}
+      >
+        {/* =====================================================
+            NAVBAR
+            ===================================================== */}
+
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            height: 72,
+            gap: 28,
+          }}
+        >
+
+          {/* =====================================================
+              ALPINE LOGO
+              ===================================================== */}
+
+          <Link
+            to="/"
+            style={{
+              textDecoration: 'none',
+              display: 'flex',
+              alignItems: 'center',
+              flexShrink: 0,
+            }}
+          >
+            <span
+              style={{
+                fontFamily:
+                  'Arial, Helvetica, sans-serif',
+
+                fontSize: '24px',
+
+                fontWeight: 900,
+
+                letterSpacing: '4px',
+
+                color: '#D4AF37',
+
+                lineHeight: 1,
+
+                textTransform: 'uppercase',
+
+                whiteSpace: 'nowrap',
+
+                textShadow:
+                  '0 0 12px rgba(212,175,55,0.18)',
+              }}
+            >
+              ALPINE
+            </span>
           </Link>
 
-          {/* Desktop nav */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1 }} className="hidden lg:flex">
-            {navLinks.map(link => (
-              <a
-                key={link.label}
-                href={link.href}
-                style={{
-                  padding: '6px 12px',
-                  borderRadius: 8,
-                  fontSize: '0.875rem',
-                  fontWeight: 500,
-                  color: location.pathname === link.href ? 'var(--blue)' : 'var(--text-muted)',
-                  textDecoration: 'none',
-                  transition: 'all 0.15s',
-                  background: location.pathname === link.href ? 'var(--blue-subtle)' : 'transparent',
-                }}
-                onMouseEnter={e => {
-                  if (location.pathname !== link.href) {
-                    (e.target as HTMLElement).style.color = 'var(--text)'
-                    ;(e.target as HTMLElement).style.background = 'var(--bg-secondary)'
-                  }
-                }}
-                onMouseLeave={e => {
-                  if (location.pathname !== link.href) {
-                    (e.target as HTMLElement).style.color = 'var(--text-muted)'
-                    ;(e.target as HTMLElement).style.background = 'transparent'
-                  }
-                }}
-              >
-                {link.label}
-              </a>
-            ))}
+
+          {/* =====================================================
+              DESKTOP NAVIGATION
+              ===================================================== */}
+
+          <div
+            className="hidden lg:flex"
+            style={{
+              alignItems: 'center',
+              gap: 4,
+              flex: 1,
+            }}
+          >
+            {navLinks.map((link) => {
+
+              const active =
+                link.href === '/'
+                  ? location.pathname === '/'
+                  : location.pathname === link.href
+
+              return (
+                <a
+                  key={link.label}
+                  href={link.href}
+                  style={{
+                    padding: '8px 12px',
+
+                    borderRadius: 8,
+
+                    fontSize: '0.9rem',
+
+                    fontWeight: 600,
+
+                    color: active
+                      ? '#D4AF37'
+                      : '#E2E2E2',
+
+                    textDecoration: 'none',
+
+                    background: active
+                      ? 'rgba(212,175,55,0.08)'
+                      : 'transparent',
+
+                    border: active
+                      ? '1px solid rgba(212,175,55,0.22)'
+                      : '1px solid transparent',
+
+                    transition:
+                      'all 0.2s ease',
+
+                    whiteSpace: 'nowrap',
+                  }}
+
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.color =
+                      '#D4AF37'
+
+                    e.currentTarget.style.background =
+                      'rgba(212,175,55,0.08)'
+
+                    e.currentTarget.style.borderColor =
+                      'rgba(212,175,55,0.22)'
+                  }}
+
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.color =
+                      active
+                        ? '#D4AF37'
+                        : '#E2E2E2'
+
+                    e.currentTarget.style.background =
+                      active
+                        ? 'rgba(212,175,55,0.08)'
+                        : 'transparent'
+
+                    e.currentTarget.style.borderColor =
+                      active
+                        ? 'rgba(212,175,55,0.22)'
+                        : 'transparent'
+                  }}
+                >
+                  {link.label}
+                </a>
+              )
+            })}
           </div>
 
-          {/* Right actions */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginLeft: 'auto', flexShrink: 0 }}>
-            <button
-              onClick={toggle}
-              style={{
-                width: 36, height: 36, borderRadius: 8,
-                background: 'var(--bg-secondary)',
-                border: '1px solid var(--border)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                cursor: 'pointer', color: 'var(--text-muted)',
-                transition: 'all 0.15s',
-              }}
-              title="Toggle theme"
-            >
-              {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
-            </button>
+
+          {/* =====================================================
+              RIGHT SIDE
+              ===================================================== */}
+
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              marginLeft: 'auto',
+              flexShrink: 0,
+            }}
+          >
+
+            {/* =================================================
+                LOGIN
+                ================================================= */}
 
             <Link
               to="/login"
-              style={{
-                padding: '7px 16px', borderRadius: 8, fontSize: '0.875rem', fontWeight: 500,
-                color: 'var(--text)', textDecoration: 'none',
-                border: '1px solid var(--border)',
-                background: 'var(--bg-card)',
-                transition: 'all 0.15s',
-              }}
               className="hidden sm:inline-flex"
+              style={{
+                height: 44,
+
+                padding: '0 18px',
+
+                borderRadius: 9,
+
+                border:
+                  '1px solid rgba(212,175,55,0.55)',
+
+                background: '#050505',
+
+                color: '#FFFFFF',
+
+                textDecoration: 'none',
+
+                fontSize: '0.9rem',
+
+                fontWeight: 650,
+
+                alignItems: 'center',
+
+                justifyContent: 'center',
+
+                transition:
+                  'all 0.2s ease',
+              }}
+
+              onMouseEnter={(e) => {
+                e.currentTarget.style.color =
+                  '#D4AF37'
+
+                e.currentTarget.style.borderColor =
+                  '#D4AF37'
+
+                e.currentTarget.style.background =
+                  'rgba(212,175,55,0.08)'
+              }}
+
+              onMouseLeave={(e) => {
+                e.currentTarget.style.color =
+                  '#FFFFFF'
+
+                e.currentTarget.style.borderColor =
+                  'rgba(212,175,55,0.55)'
+
+                e.currentTarget.style.background =
+                  '#050505'
+              }}
             >
               Login
             </Link>
 
+
+            {/* =================================================
+                GET STARTED
+                ================================================= */}
+
             <Link
               to="/signup"
-              className="btn-primary hidden sm:inline-flex"
+              className="hidden sm:inline-flex"
               style={{
-                padding: '7px 16px', borderRadius: 8, fontSize: '0.875rem', fontWeight: 600,
-                textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6,
+                height: 44,
+
+                padding: '0 22px',
+
+                borderRadius: 9,
+
+                background:
+                  'linear-gradient(135deg, #F5DD78, #D4AF37)',
+
+                border:
+                  '1px solid #E8CC65',
+
+                color: '#000000',
+
+                textDecoration: 'none',
+
+                fontSize: '0.9rem',
+
+                fontWeight: 750,
+
+                alignItems: 'center',
+
+                justifyContent: 'center',
+
+                gap: 8,
+
+                boxShadow:
+                  '0 5px 20px rgba(212,175,55,0.18)',
+
+                transition:
+                  'all 0.2s ease',
+              }}
+
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform =
+                  'translateY(-1px)'
+
+                e.currentTarget.style.boxShadow =
+                  '0 8px 25px rgba(212,175,55,0.28)'
+              }}
+
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform =
+                  'translateY(0)'
+
+                e.currentTarget.style.boxShadow =
+                  '0 5px 20px rgba(212,175,55,0.18)'
               }}
             >
-              <Sparkles size={14} />
+              <span
+                style={{
+                  fontSize: 18,
+                  lineHeight: 1,
+                  color: '#000000',
+                  fontWeight: 900,
+                }}
+              >
+                ✦
+              </span>
+
               Get Started
             </Link>
 
+
+            {/* =================================================
+                GOLD THREE-LINE MENU
+                ================================================= */}
+
             <button
-              onClick={() => setMobileOpen(o => !o)}
+              type="button"
+
+              aria-label={
+                mobileOpen
+                  ? 'Close navigation menu'
+                  : 'Open navigation menu'
+              }
+
+              onClick={() =>
+                setMobileOpen(
+                  (value) => !value
+                )
+              }
+
               className="lg:hidden"
+
               style={{
-                width: 36, height: 36, borderRadius: 8, border: '1px solid var(--border)',
-                background: 'var(--bg-card)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                cursor: 'pointer', color: 'var(--text)',
+                width: 44,
+                height: 44,
+
+                padding: 0,
+
+                borderRadius: 9,
+
+                border:
+                  '1.5px solid #D4AF37',
+
+                background: '#050505',
+
+                display: 'flex',
+
+                flexDirection: 'column',
+
+                alignItems: 'center',
+
+                justifyContent: 'center',
+
+                gap: 5,
+
+                cursor: 'pointer',
+
+                boxShadow:
+                  '0 0 15px rgba(212,175,55,0.18)',
               }}
             >
-              {mobileOpen ? <X size={18} /> : <Menu size={18} />}
+
+              {mobileOpen ? (
+
+                <>
+                  <span
+                    style={{
+                      width: 23,
+                      height: 2.5,
+                      background: '#D4AF37',
+                      borderRadius: 3,
+                      display: 'block',
+                      transform:
+                        'rotate(45deg) translateY(5px)',
+                    }}
+                  />
+
+                  <span
+                    style={{
+                      width: 23,
+                      height: 2.5,
+                      background: '#D4AF37',
+                      borderRadius: 3,
+                      display: 'block',
+                      transform:
+                        'rotate(-45deg) translateY(-5px)',
+                    }}
+                  />
+                </>
+
+              ) : (
+
+                <>
+                  <span
+                    style={{
+                      width: 23,
+                      height: 2.5,
+                      background: '#D4AF37',
+                      borderRadius: 3,
+                      display: 'block',
+                    }}
+                  />
+
+                  <span
+                    style={{
+                      width: 23,
+                      height: 2.5,
+                      background: '#D4AF37',
+                      borderRadius: 3,
+                      display: 'block',
+                    }}
+                  />
+
+                  <span
+                    style={{
+                      width: 23,
+                      height: 2.5,
+                      background: '#D4AF37',
+                      borderRadius: 3,
+                      display: 'block',
+                    }}
+                  />
+                </>
+              )}
+
             </button>
+
           </div>
         </div>
 
-        {/* Mobile menu */}
+
+        {/* =====================================================
+            MOBILE MENU
+            ===================================================== */}
+
         {mobileOpen && (
-          <div style={{
-            borderTop: '1px solid var(--border)',
-            padding: '12px 0 16px',
-            display: 'flex', flexDirection: 'column', gap: 4,
-          }}>
-            {navLinks.map(link => (
-              <a
-                key={link.label}
-                href={link.href}
-                onClick={() => setMobileOpen(false)}
+          <div
+            style={{
+              borderTop:
+                '1px solid rgba(212,175,55,0.20)',
+
+              padding:
+                '14px 0 18px',
+
+              display: 'flex',
+
+              flexDirection: 'column',
+
+              gap: 5,
+
+              background: '#000000',
+            }}
+          >
+
+            {navLinks.map((link) => {
+
+              const active =
+                link.href === '/'
+                  ? location.pathname === '/'
+                  : location.pathname === link.href
+
+              return (
+                <a
+                  key={link.label}
+
+                  href={link.href}
+
+                  onClick={() =>
+                    setMobileOpen(false)
+                  }
+
+                  style={{
+                    padding:
+                      '11px 13px',
+
+                    borderRadius: 8,
+
+                    fontSize:
+                      '0.9rem',
+
+                    fontWeight: 600,
+
+                    color: active
+                      ? '#D4AF37'
+                      : '#E2E2E2',
+
+                    textDecoration:
+                      'none',
+
+                    background:
+                      active
+                        ? 'rgba(212,175,55,0.08)'
+                        : 'transparent',
+
+                    border:
+                      active
+                        ? '1px solid rgba(212,175,55,0.18)'
+                        : '1px solid transparent',
+                  }}
+                >
+                  {link.label}
+                </a>
+              )
+            })}
+
+
+            {/* MOBILE LOGIN + GET STARTED */}
+
+            <div
+              style={{
+                display: 'flex',
+                gap: 10,
+                paddingTop: 10,
+              }}
+            >
+
+              <Link
+                to="/login"
+                onClick={() =>
+                  setMobileOpen(false)
+                }
                 style={{
-                  padding: '10px 12px', borderRadius: 8, fontSize: '0.9rem', fontWeight: 500,
-                  color: 'var(--text-muted)', textDecoration: 'none',
+                  flex: 1,
+
+                  padding: 11,
+
+                  borderRadius: 8,
+
+                  textAlign: 'center',
+
+                  border:
+                    '1px solid rgba(212,175,55,0.55)',
+
+                  color: '#FFFFFF',
+
+                  background: '#050505',
+
+                  textDecoration: 'none',
+
+                  fontSize:
+                    '0.875rem',
+
+                  fontWeight: 600,
                 }}
               >
-                {link.label}
-              </a>
-            ))}
-            <div style={{ display: 'flex', gap: 10, paddingTop: 8 }}>
-              <Link to="/login" onClick={() => setMobileOpen(false)}
+                Login
+              </Link>
+
+
+              <Link
+                to="/signup"
+                onClick={() =>
+                  setMobileOpen(false)
+                }
                 style={{
-                  flex: 1, padding: '10px', borderRadius: 8, textAlign: 'center',
-                  border: '1px solid var(--border)', color: 'var(--text)',
-                  textDecoration: 'none', fontSize: '0.875rem', fontWeight: 500,
-                }}>Login</Link>
-              <Link to="/signup" onClick={() => setMobileOpen(false)}
-                className="btn-primary"
-                style={{
-                  flex: 1, padding: '10px', borderRadius: 8, textAlign: 'center',
-                  textDecoration: 'none', fontSize: '0.875rem', fontWeight: 600,
-                }}>Sign Up</Link>
+                  flex: 1,
+
+                  padding: 11,
+
+                  borderRadius: 8,
+
+                  textAlign: 'center',
+
+                  color: '#000000',
+
+                  background:
+                    'linear-gradient(135deg, #F5DD78, #D4AF37)',
+
+                  textDecoration: 'none',
+
+                  fontSize:
+                    '0.875rem',
+
+                  fontWeight: 700,
+                }}
+              >
+                Get Started
+              </Link>
+
             </div>
+
           </div>
         )}
+
       </div>
     </nav>
   )

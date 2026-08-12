@@ -1,29 +1,75 @@
-import { createContext, useContext, useState, useEffect, type ReactNode } from 'react'
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  type ReactNode,
+} from 'react'
 
 type Theme = 'light' | 'dark'
 
-const ThemeContext = createContext<{ theme: Theme; toggle: () => void }>({
+const ThemeContext = createContext<{
+  theme: Theme
+  toggle: () => void
+}>({
   theme: 'light',
   toggle: () => {},
 })
 
-export function ThemeProvider({ children }: { children: ReactNode }) {
+export function ThemeProvider({
+  children,
+}: {
+  children: ReactNode
+}) {
   const [theme, setTheme] = useState<Theme>(() => {
     if (typeof window !== 'undefined') {
-      return (localStorage.getItem('nyaya-theme') as Theme) ||
-        (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+      const savedTheme =
+        localStorage.getItem('nyaya-theme')
+
+      // Use saved preference if available
+      if (
+        savedTheme === 'light' ||
+        savedTheme === 'dark'
+      ) {
+        return savedTheme
+      }
     }
+
+    // Default Nyaya AI theme
     return 'light'
   })
 
   useEffect(() => {
-    document.documentElement.classList.toggle('dark', theme === 'dark')
-    localStorage.setItem('nyaya-theme', theme)
+    document.documentElement.classList.toggle(
+      'dark',
+      theme === 'dark'
+    )
+
+    localStorage.setItem(
+      'nyaya-theme',
+      theme
+    )
   }, [theme])
 
-  const toggle = () => setTheme(t => (t === 'light' ? 'dark' : 'light'))
+  const toggle = () => {
+    setTheme(current =>
+      current === 'light'
+        ? 'dark'
+        : 'light'
+    )
+  }
 
-  return <ThemeContext.Provider value={{ theme, toggle }}>{children}</ThemeContext.Provider>
+  return (
+    <ThemeContext.Provider
+      value={{
+        theme,
+        toggle,
+      }}
+    >
+      {children}
+    </ThemeContext.Provider>
+  )
 }
 
-export const useTheme = () => useContext(ThemeContext)
+export const useTheme = () =>
+  useContext(ThemeContext)
