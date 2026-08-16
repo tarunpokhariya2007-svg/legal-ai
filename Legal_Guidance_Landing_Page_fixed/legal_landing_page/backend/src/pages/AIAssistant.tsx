@@ -1,8 +1,10 @@
 import { useState, useRef, useEffect } from 'react'
 import { Link } from 'react-router'
+import jsPDF from 'jspdf'
 import {
-  Send, Mic, Paperclip, RotateCcw, Scale, FileText, Users,
-  Clock, ChevronRight, Sparkles, MessageSquare, Plus, X,
+  Send, Mic, Square, Paperclip, RotateCcw, Scale, FileText, Users,
+  Clock, ChevronRight, Sparkles, MessageSquare, Plus, X, Volume2, Loader2,
+  Download,
 } from 'lucide-react'
 
 interface Message {
@@ -26,13 +28,6 @@ const suggestedPrompts = [
   'My neighbor is encroaching on my property',
   'How do I file an RTI application?',
   'What are my rights if I am arrested?',
-]
-
-const chatHistory = [
-  { id: '1', title: 'Security Deposit Dispute', date: 'Today' },
-  { id: '2', title: 'Consumer Complaint - Flipkart', date: 'Yesterday' },
-  { id: '3', title: 'Property Boundary Issue', date: '2 days ago' },
-  { id: '4', title: 'Workplace Harassment Case', date: '1 week ago' },
 ]
 
 const aiResponses: Record<string, Message> = {
@@ -78,32 +73,920 @@ export default function AIAssistant() {
   ])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
-  const [activeChat] = useState('1')
+  const [agentStep, setAgentStep] = useState("");
+  const [conversationId, setConversationId] = useState<number | null>(null)
+  // One database case per chat conversation.
+  const [caseId, setCaseId] = useState<number | null>(null)
+  const activeChat = conversationId?.toString() || ''
+  const [chatHistory, setChatHistory] = useState<
+  { id: string; title: string; date: string }[]
+>([])
   const [fileUploaded, setFileUploaded] = useState<string | null>(null)
+  const [isRecording, setIsRecording] = useState(false)
+  const [transcribing, setTranscribing] = useState(false)
+  const [speakingId, setSpeakingId] = useState<string | null>(null)
+  const [loadingSpeechId, setLoadingSpeechId] = useState<string | null>(null)
+  const [voiceEngine, setVoiceEngine] = useState<'browser' | 'sarvam'>('sarvam')
   const bottomRef = useRef<HTMLDivElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const audioChunksRef = useRef<Blob[]>([])
+  const audioPlayerRef = useRef<HTMLAudioElement | null>(null)
+  const speechRecognitionRef = useRef<any>(null)
+const loadConversations = async () => {
+  try {
+    const token = localStorage.getItem("token");
 
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+    if (!token) return;
 
-  const sendMessage = (text: string) => {
-    if (!text.trim()) return
-    const userMsg: Message = {
-      id: Date.now().toString(),
-      role: 'user',
-      content: text,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    const res = await fetch(
+      "https://legal-ai-z7vb.onrender.com/api/chat/conversations",
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    const data = await res.json();
+
+    if (!res.ok || !data.success) {
+      throw new Error(
+        data.message || "Failed to load conversations"
+      );
     }
-    setMessages(prev => [...prev, userMsg])
-    setInput('')
-    setLoading(true)
 
-    setTimeout(() => {
-      const aiMsg = { ...aiResponses.default, id: Date.now().toString() }
-      setMessages(prev => [...prev, aiMsg])
-      setLoading(false)
-    }, 1800)
+    setChatHistory(
+      data.conversations.map((chat: any) => ({
+        id: String(chat.id),
+        title: chat.title || "New Chat",
+        date: new Date(
+          chat.updated_at || chat.created_at
+        ).toLocaleDateString("en-IN", {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+        }),
+      }))
+    );
+  } catch (err) {
+    console.error("LOAD CONVERSATIONS ERROR:", err);
+  }
+};
+
+const loadConversation = async (id: string) => {
+  try {
+    const token = localStorage.getItem("token");
+
+    if (!token) {
+      alert("Please login again.");
+      return;
+    }
+
+    const res = await fetch(
+      `https://legal-ai-z7vb.onrender.com/api/chat/conversations/${id}/messages`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    const data = await res.json();
+
+    if (!res.ok || !data.success) {
+      throw new Error(
+        data.message || "Failed to load conversation"
+      );
+    }
+
+    setConversationId(Number(id))
+
+    // Restore the database case linked to this conversation.
+    const savedCaseId = localStorage.getItem(`nyaya_case_${id}`)
+    setCaseId(savedCaseId ? Number(savedCaseId) : null)
+
+    const loadedMessages: Message[] = data.messages.map(
+      (msg: any, index: number) => ({
+        id: String(msg.id ?? index),
+        role: msg.sender === "user" ? "user" : "ai",
+        content: msg.message,
+        timestamp: msg.created_at
+          ? new Date(msg.created_at).toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            })
+          : "",
+      })
+    );
+
+    setMessages(loadedMessages);
+  } catch (err) {
+    console.error("LOAD CONVERSATION ERROR:", err);
+    alert("Failed to load conversation.");
+  }
+};
+
+useEffect(() => {
+  loadConversations();
+}, []);
+
+  const saveMessage = async (
+  conversationId: number,
+  sender: "user" | "ai",
+  message: string,
+  token: string
+) => {
+  const res = await fetch(
+    `https://legal-ai-z7vb.onrender.com/api/chat/conversations/${conversationId}/messages`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        sender,
+        message,
+      }),
+    }
+  );
+
+  const data = await res.json();
+
+  if (!res.ok || !data.success) {
+    throw new Error(
+      data.message || "Failed to save message"
+    );
+  }
+
+  return data;
+};
+const createCase = async (
+  title: string,
+  description: string,
+  token: string
+) => {
+  const res = await fetch(
+    "https://legal-ai-z7vb.onrender.com/api/cases",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        title:
+          title.trim().slice(0, 100) ||
+          "New Legal Case",
+        description:
+          description.trim() ||
+          "Legal matter started through NyayaAI.",
+        category: "General Legal Matter",
+        severity: "Medium",
+        status: "open",
+      }),
+    }
+  );
+
+  const data = await res.json();
+
+  console.log("CREATE CASE RESPONSE:", data);
+
+  if (!res.ok || !data.success) {
+    throw new Error(
+      data.message || "Failed to create case"
+    );
+  }
+
+  return data;
+};
+
+const sendMessage = async (text: string) => {
+  if (!text.trim()) return;
+
+  const token = localStorage.getItem("token");
+
+  if (!token) {
+    alert("Please login again.");
+    return;
+  }
+
+  const userMsg: Message = {
+        id: Date.now().toString(),
+        role: "user",
+        content: text,
+        timestamp: new Date().toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+        }),
+    };
+
+    setMessages(prev => [...prev, userMsg]);
+    setInput("");
+    setLoading(true);
+    setAgentStep("🧠 Master Agent is understanding your case...");
+    await new Promise(r => setTimeout(r, 700));
+
+    setAgentStep("📄 Case Analyzer is classifying the zcase...");
+    await new Promise(r => setTimeout(r, 700));
+
+    setAgentStep("⚖️ Law Research Agent is finding relevant laws...");
+    await new Promise(r => setTimeout(r, 700));
+
+    setAgentStep("👨‍⚖️ Lawyer Recommendation Agent is selecting advocates...");
+    await new Promise(r => setTimeout(r, 700));
+
+    setAgentStep("📝 Report Generator is preparing your legal report...");
+
+    try {
+      let currentConversationId = conversationId
+      let currentCaseId = caseId
+
+      // Create a conversation only for a brand-new chat.
+      if (!currentConversationId) {
+        const conversationRes = await fetch(
+          "https://legal-ai-z7vb.onrender.com/api/chat/conversations",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              title: text.trim().slice(0, 60) || "New Legal Case",
+            }),
+          }
+        )
+
+        const conversationData = await conversationRes.json()
+
+        if (!conversationRes.ok || !conversationData.success) {
+          throw new Error(
+            conversationData.message || "Failed to create conversation"
+          )
+        }
+
+        currentConversationId = Number(conversationData.conversationId)
+        setConversationId(currentConversationId)
+      }
+
+      // Create exactly one real case for this conversation.
+      // Further messages in the same chat reuse this case.
+      if (!currentCaseId) {
+        const caseData = await createCase(text, text, token)
+
+        currentCaseId = Number(caseData.caseId)
+        setCaseId(currentCaseId)
+
+        if (currentConversationId) {
+          localStorage.setItem(
+            `nyaya_case_${currentConversationId}`,
+            String(currentCaseId)
+          )
+        }
+
+        console.log("NEW NYAYAAI CASE CREATED:", currentCaseId)
+      }
+if (currentConversationId !== null) {
+  await saveMessage(
+    currentConversationId,
+    "user",
+    text,
+    token
+  );
+}
+       const res = await fetch("https://legal-ai-z7vb.onrender.com/analyze", {
+          method: "POST",
+          headers: {
+             "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+          body: JSON.stringify({
+             case: text,
+          }),
+    });
+
+        const data = await res.json();
+
+        const aiMsg: Message = {
+            id: Date.now().toString() + "-ai",
+            role: "ai",
+            content: data.response,
+            timestamp: new Date().toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit",
+            }),
+        };
+setMessages(prev => [...prev, aiMsg]);
+
+if (currentConversationId !== null) {
+  await saveMessage(
+    currentConversationId,
+    "ai",
+    data.response,
+    token
+  );
+}
+
+    } catch (err) {
+        console.error(err);
+
+        setMessages(prev => [
+            ...prev,
+            {
+                id: Date.now().toString(),
+                role: "ai",
+                content: "Unable to connect to backend.",
+                timestamp: new Date().toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                }),
+            },
+        ]);
+    } finally {
+        setLoading(false);
+        setAgentStep("");
+    }
+};
+
+
+  // =========================================================
+  // DOWNLOAD LEGAL CASE REPORT AS PDF
+  // =========================================================
+  const generateCaseReport = (
+    caseSummary: string,
+    reportText: string,
+    metadata?: Message['metadata']
+  ) => {
+    const pdf = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4',
+    })
+
+    const pageWidth = pdf.internal.pageSize.getWidth()
+    const pageHeight = pdf.internal.pageSize.getHeight()
+    const margin = 18
+    const contentWidth = pageWidth - margin * 2
+
+    const gold: [number, number, number] = [212, 175, 55]
+    const black: [number, number, number] = [15, 15, 15]
+    const darkGray: [number, number, number] = [55, 55, 55]
+
+    let y = 20
+
+    const ensureSpace = (requiredHeight: number) => {
+      if (y + requiredHeight > pageHeight - 22) {
+        pdf.addPage()
+        y = 20
+      }
+    }
+
+    const addWrappedText = (
+      text: string,
+      fontSize = 9,
+      lineHeight = 4.5,
+      color: [number, number, number] = darkGray
+    ) => {
+      pdf.setTextColor(...color)
+      pdf.setFont('helvetica', 'normal')
+      pdf.setFontSize(fontSize)
+
+      const lines = pdf.splitTextToSize(text, contentWidth)
+
+      for (const line of lines) {
+        ensureSpace(lineHeight)
+        pdf.text(line, margin, y)
+        y += lineHeight
+      }
+    }
+
+    // ---------------------------------------------------------
+    // HEADER
+    // ---------------------------------------------------------
+    pdf.setFillColor(...black)
+    pdf.rect(0, 0, pageWidth, 32, 'F')
+
+    pdf.setTextColor(255, 255, 255)
+    pdf.setFont('helvetica', 'bold')
+    pdf.setFontSize(20)
+    pdf.text('NYAYAAI', margin, 14)
+
+    pdf.setFontSize(8.5)
+    pdf.setTextColor(...gold)
+    pdf.text('AI LEGAL ASSISTANT', margin, 22)
+
+    pdf.setDrawColor(...gold)
+    pdf.setLineWidth(0.5)
+    pdf.line(margin, 32, pageWidth - margin, 32)
+
+    y = 46
+
+    // ---------------------------------------------------------
+    // TITLE
+    // ---------------------------------------------------------
+    pdf.setTextColor(...black)
+    pdf.setFont('helvetica', 'bold')
+    pdf.setFontSize(21)
+    pdf.text('LEGAL CASE REPORT', margin, y)
+
+    y += 8
+
+    pdf.setFont('helvetica', 'normal')
+    pdf.setFontSize(9)
+    pdf.setTextColor(100, 100, 100)
+    pdf.text(
+      `Generated on ${new Date().toLocaleDateString('en-IN', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      })}`,
+      margin,
+      y
+    )
+
+    y += 12
+
+    // ---------------------------------------------------------
+    // CASE TYPE
+    // ---------------------------------------------------------
+    if (metadata?.caseType) {
+      ensureSpace(16)
+
+      pdf.setFillColor(248, 246, 238)
+      pdf.setDrawColor(...gold)
+      pdf.setLineWidth(0.35)
+      pdf.roundedRect(
+        margin,
+        y,
+        contentWidth,
+        14,
+        2.5,
+        2.5,
+        'FD'
+      )
+
+      pdf.setTextColor(...gold)
+      pdf.setFont('helvetica', 'bold')
+      pdf.setFontSize(9)
+      pdf.text('CASE TYPE', margin + 5, y + 5.5)
+
+      pdf.setTextColor(...black)
+      pdf.setFont('helvetica', 'normal')
+      pdf.setFontSize(9)
+      pdf.text(metadata.caseType, margin + 5, y + 10.5)
+
+      y += 21
+    }
+
+    // ---------------------------------------------------------
+    // CASE SUMMARY
+    // ---------------------------------------------------------
+    ensureSpace(45)
+
+    pdf.setFillColor(248, 246, 238)
+    pdf.setDrawColor(...gold)
+    pdf.setLineWidth(0.35)
+    pdf.roundedRect(
+      margin,
+      y,
+      contentWidth,
+      42,
+      3,
+      3,
+      'FD'
+    )
+
+    pdf.setTextColor(...gold)
+    pdf.setFont('helvetica', 'bold')
+    pdf.setFontSize(11)
+    pdf.text('CASE SUMMARY', margin + 6, y + 8)
+
+    pdf.setTextColor(...darkGray)
+    pdf.setFont('helvetica', 'normal')
+    pdf.setFontSize(8.8)
+
+    const summaryLines = pdf.splitTextToSize(
+      caseSummary,
+      contentWidth - 12
+    )
+
+    pdf.text(
+      summaryLines.slice(0, 6),
+      margin + 6,
+      y + 15
+    )
+
+    y += 49
+
+    // ---------------------------------------------------------
+    // STRUCTURED LEGAL INFORMATION
+    // ---------------------------------------------------------
+    const addListSection = (
+      title: string,
+      items?: string[],
+      bullet = '•'
+    ) => {
+      if (!items || items.length === 0) return
+
+      ensureSpace(18)
+
+      pdf.setTextColor(...gold)
+      pdf.setFont('helvetica', 'bold')
+      pdf.setFontSize(11)
+      pdf.text(title, margin, y)
+      y += 7
+
+      pdf.setTextColor(...darkGray)
+      pdf.setFont('helvetica', 'normal')
+      pdf.setFontSize(8.8)
+
+      for (const item of items) {
+        const lines = pdf.splitTextToSize(
+          `${bullet} ${item}`,
+          contentWidth - 3
+        )
+
+        for (const line of lines) {
+          ensureSpace(4.5)
+          pdf.text(line, margin + 2, y)
+          y += 4.5
+        }
+
+        y += 1
+      }
+
+      y += 3
+    }
+
+    addListSection('RELEVANT LAWS', metadata?.laws)
+    addListSection('RECOMMENDED ACTIONS', metadata?.actions)
+    addListSection('DOCUMENTS REQUIRED', metadata?.documents)
+
+    if (metadata?.timeline) {
+      ensureSpace(24)
+
+      pdf.setTextColor(...gold)
+      pdf.setFont('helvetica', 'bold')
+      pdf.setFontSize(11)
+      pdf.text('ESTIMATED TIMELINE', margin, y)
+      y += 7
+
+      pdf.setFillColor(248, 248, 248)
+      pdf.setDrawColor(210, 210, 210)
+
+      const timelineLines = pdf.splitTextToSize(
+        metadata.timeline,
+        contentWidth - 12
+      )
+
+      const boxHeight = Math.max(
+        16,
+        timelineLines.length * 4.5 + 8
+      )
+
+      ensureSpace(boxHeight)
+
+      pdf.roundedRect(
+        margin,
+        y - 2,
+        contentWidth,
+        boxHeight,
+        2,
+        2,
+        'FD'
+      )
+
+      pdf.setTextColor(...darkGray)
+      pdf.setFont('helvetica', 'normal')
+      pdf.setFontSize(8.8)
+      pdf.text(
+        timelineLines,
+        margin + 6,
+        y + 5
+      )
+
+      y += boxHeight + 7
+    }
+
+    // ---------------------------------------------------------
+    // FULL AI REPORT
+    // ---------------------------------------------------------
+    ensureSpace(20)
+
+    pdf.setTextColor(...black)
+    pdf.setFont('helvetica', 'bold')
+    pdf.setFontSize(15)
+    pdf.text('LEGAL ANALYSIS & REPORT', margin, y)
+    y += 9
+
+    const paragraphs = reportText.split(/\r?\n/)
+
+    for (const rawParagraph of paragraphs) {
+      const line = rawParagraph.trim()
+
+      if (!line) {
+        y += 3
+        continue
+      }
+
+      const normalized = line
+        .replace(/^#+\s*/, '')
+        .replace(/^\*\*(.*?)\*\*$/, '$1')
+        .trim()
+
+      const looksLikeHeading =
+        /^#{1,6}\s/.test(line) ||
+        /^[A-Z][A-Z\s&/:-]{4,}$/.test(normalized) ||
+        /^(case analysis|legal research|applicable laws?|relevant laws?|recommended actions?|lawyer recommendation|documents required|estimated timeline|case summary|conclusion|next steps|legal disclaimer)$/i.test(
+          normalized
+        )
+
+      if (looksLikeHeading) {
+        ensureSpace(14)
+
+        pdf.setTextColor(...gold)
+        pdf.setFont('helvetica', 'bold')
+        pdf.setFontSize(11)
+
+        const headingLines = pdf.splitTextToSize(
+          normalized,
+          contentWidth
+        )
+
+        pdf.text(headingLines, margin, y)
+        y += headingLines.length * 5 + 3
+        continue
+      }
+
+      // Remove simple markdown emphasis markers while keeping content.
+      const cleanText = normalized
+        .replace(/\*\*(.*?)\*\*/g, '$1')
+        .replace(/\*(.*?)\*/g, '$1')
+        .replace(/^[-•]\s*/, '• ')
+
+      addWrappedText(cleanText, 8.8, 4.5)
+      y += 2
+    }
+
+    // ---------------------------------------------------------
+    // DISCLAIMER
+    // ---------------------------------------------------------
+    ensureSpace(46)
+
+    y += 6
+
+    const disclaimer =
+      'This report is generated by NyayaAI for general informational and educational purposes only. It is not professional legal advice, does not create an advocate-client relationship, and should not be treated as a substitute for consultation with a qualified advocate. Laws, procedures, limitation periods, and facts may change or require case-specific verification.'
+
+    const disclaimerLines = pdf.splitTextToSize(
+      disclaimer,
+      contentWidth - 12
+    )
+
+    const disclaimerHeight =
+      18 + disclaimerLines.length * 4
+
+    pdf.setFillColor(248, 248, 248)
+    pdf.setDrawColor(190, 190, 190)
+
+    pdf.roundedRect(
+      margin,
+      y,
+      contentWidth,
+      disclaimerHeight,
+      3,
+      3,
+      'FD'
+    )
+
+    pdf.setTextColor(70, 70, 70)
+    pdf.setFont('helvetica', 'bold')
+    pdf.setFontSize(8.5)
+    pdf.text(
+      'LEGAL DISCLAIMER',
+      margin + 6,
+      y + 7
+    )
+
+    pdf.setFont('helvetica', 'normal')
+    pdf.setFontSize(7.3)
+
+    pdf.text(
+      disclaimerLines,
+      margin + 6,
+      y + 13
+    )
+
+    // ---------------------------------------------------------
+    // FOOTER + PAGE NUMBERS
+    // ---------------------------------------------------------
+    const totalPages = pdf.getNumberOfPages()
+
+    for (let page = 1; page <= totalPages; page++) {
+      pdf.setPage(page)
+
+      pdf.setDrawColor(220, 220, 220)
+      pdf.setLineWidth(0.25)
+      pdf.line(
+        margin,
+        pageHeight - 12,
+        pageWidth - margin,
+        pageHeight - 12
+      )
+
+      pdf.setFont('helvetica', 'normal')
+      pdf.setFontSize(7)
+      pdf.setTextColor(120, 120, 120)
+
+      pdf.text(
+        'NyayaAI • AI Legal Assistant',
+        margin,
+        pageHeight - 6
+      )
+
+      pdf.text(
+        `Page ${page} of ${totalPages}`,
+        pageWidth - margin,
+        pageHeight - 6,
+        { align: 'right' }
+      )
+    }
+
+    // ---------------------------------------------------------
+    // DOWNLOAD
+    // ---------------------------------------------------------
+    const datePart = new Date()
+      .toISOString()
+      .slice(0, 10)
+
+    pdf.save(
+      `NyayaAI-Legal-Case-Report-${datePart}.pdf`
+    )
+  }
+
+  // ---- Speech-to-text (mic input) ----
+
+  // Browser-native path: uses the Web Speech API (free, no backend call, English-strongest)
+  const startBrowserRecognition = () => {
+    const SpeechRecognitionCtor =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+
+    if (!SpeechRecognitionCtor) {
+      alert('Your browser does not support built-in speech recognition. Try Chrome, or switch to the Sarvam AI engine.')
+      return
+    }
+
+    const recognition = new SpeechRecognitionCtor()
+    recognition.lang = 'en-IN'
+    recognition.interimResults = false
+    recognition.maxAlternatives = 1
+
+    recognition.onresult = (event: any) => {
+      const transcript = event.results[0][0].transcript
+      setInput(prev => (prev ? prev + ' ' : '') + transcript)
+    }
+    recognition.onerror = (event: any) => {
+      console.error('Browser speech recognition error:', event.error)
+    }
+    recognition.onend = () => setIsRecording(false)
+
+    speechRecognitionRef.current = recognition
+    recognition.start()
+    setIsRecording(true)
+  }
+
+  const stopBrowserRecognition = () => {
+    speechRecognitionRef.current?.stop()
+    setIsRecording(false)
+  }
+
+  // Sarvam path: records audio and sends it to the backend for transcription
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const recorder = new MediaRecorder(stream)
+      mediaRecorderRef.current = recorder
+      audioChunksRef.current = []
+
+      recorder.ondataavailable = e => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data)
+      }
+
+      recorder.onstop = async () => {
+        stream.getTracks().forEach(t => t.stop())
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
+        await transcribeAudio(audioBlob)
+      }
+
+      recorder.start()
+      setIsRecording(true)
+    } catch (err) {
+      console.error('Mic access error:', err)
+      alert('Could not access microphone. Please check browser permissions.')
+    }
+  }
+
+  const stopRecording = () => {
+    mediaRecorderRef.current?.stop()
+    setIsRecording(false)
+  }
+
+  const handleMicClick = () => {
+    if (voiceEngine === 'browser') {
+      isRecording ? stopBrowserRecognition() : startBrowserRecognition()
+    } else {
+      isRecording ? stopRecording() : startRecording()
+    }
+  }
+
+  const transcribeAudio = async (audioBlob: Blob) => {
+    setTranscribing(true)
+    try {
+      const token = localStorage.getItem('token')
+      const formData = new FormData()
+      formData.append('audio', audioBlob, 'recording.webm')
+      formData.append('language_code', 'unknown') // auto-detect Hindi/Punjabi/English etc.
+
+      const res = await fetch('https://legal-ai-z7vb.onrender.com/api/voice/stt', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      })
+
+      const data = await res.json()
+      if (data.success && data.transcript) {
+        setInput(prev => (prev ? prev + ' ' : '') + data.transcript)
+      } else {
+        console.error('STT failed:', data.message)
+        alert(`Voice input failed: ${data.message || 'unknown error'}`)
+      }
+    } catch (err) {
+      console.error('STT error:', err)
+      alert('Voice input failed — could not reach the server. Check that the backend is running on port 5001.')
+    } finally {
+      setTranscribing(false)
+    }
+  }
+
+  // ---- Text-to-speech (read AI reply aloud) ----
+  const handleSpeak = async (messageId: string, text: string) => {
+    // If this message is already playing, stop it
+    if (speakingId === messageId) {
+      if (voiceEngine === 'browser') {
+        window.speechSynthesis.cancel()
+      } else {
+        audioPlayerRef.current?.pause()
+      }
+      setSpeakingId(null)
+      return
+    }
+
+    // Stop anything else currently playing
+    window.speechSynthesis.cancel()
+    audioPlayerRef.current?.pause()
+    setSpeakingId(null)
+
+    if (voiceEngine === 'browser') {
+      const utterance = new SpeechSynthesisUtterance(text)
+      utterance.lang = 'en-IN'
+      utterance.onend = () => setSpeakingId(null)
+      utterance.onerror = () => setSpeakingId(null)
+      setSpeakingId(messageId)
+      window.speechSynthesis.speak(utterance)
+      return
+    }
+
+    setLoadingSpeechId(messageId)
+    try {
+      const token = localStorage.getItem('token')
+      const res = await fetch('https://legal-ai-z7vb.onrender.com/api/voice/tts', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ text, language_code: 'en-IN' }),
+      })
+
+      const data = await res.json()
+      if (data.success && data.audio) {
+        const audio = new Audio(`data:audio/wav;base64,${data.audio}`)
+        audioPlayerRef.current = audio
+        audio.onended = () => setSpeakingId(null)
+        setSpeakingId(messageId)
+        await audio.play()
+      } else {
+        console.error('TTS failed:', data.message)
+        alert(`Voice output failed: ${data.message || 'unknown error'}`)
+      }
+    } catch (err) {
+      console.error('TTS error:', err)
+      alert('Voice output failed — could not reach the server. Check that the backend is running on port 5001.')
+    } finally {
+      setLoadingSpeechId(null)
+    }
   }
 
   return (
@@ -116,12 +999,20 @@ export default function AIAssistant() {
       }} className="ai-sidebar">
         <div style={{ padding: '16px 12px', borderBottom: '1px solid var(--border)' }}>
           <button className="btn-primary"
-            onClick={() => setMessages([{
-              id: 'welcome-new',
-              role: 'ai',
-              content: 'New conversation started. How can I help you with your legal matter today?',
-              timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            }])}
+            onClick={() => {
+  setConversationId(null)
+  setCaseId(null)
+
+  setMessages([{
+    id: 'welcome-new',
+    role: 'ai',
+    content: 'New conversation started. How can I help you with your legal matter today?',
+    timestamp: new Date().toLocaleTimeString([], {
+      hour: '2-digit',
+      minute: '2-digit'
+    }),
+  }]);
+}}
             style={{
               width: '100%', padding: '9px', borderRadius: 8, fontWeight: 600, fontSize: '0.8rem',
               border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
@@ -131,8 +1022,10 @@ export default function AIAssistant() {
         </div>
         <div style={{ flex: 1, overflowY: 'auto', padding: '8px' }}>
           {chatHistory.map(ch => (
-            <div key={ch.id}
-              style={{
+            <div
+           key={ch.id}
+  onClick={() => loadConversation(ch.id)}
+  style={{
                 padding: '10px 10px', borderRadius: 8, cursor: 'pointer', marginBottom: 2,
                 background: ch.id === activeChat ? 'var(--bg-card)' : 'transparent',
                 border: ch.id === activeChat ? '1px solid var(--border)' : '1px solid transparent',
@@ -175,6 +1068,16 @@ export default function AIAssistant() {
             </div>
           </div>
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+            <button
+              onClick={() => setVoiceEngine(v => v === 'sarvam' ? 'browser' : 'sarvam')}
+              title="Switch voice engine"
+              style={{
+                padding: '6px 12px', borderRadius: 7, border: '1px solid var(--border)',
+                background: 'var(--bg-secondary)', fontSize: '0.75rem', color: 'var(--text-muted)',
+                cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5,
+              }}>
+              <Volume2 size={12} /> Voice: {voiceEngine === 'sarvam' ? 'Sarvam AI' : 'Browser'}
+            </button>
             <button style={{
               padding: '6px 12px', borderRadius: 7, border: '1px solid var(--border)',
               background: 'var(--bg-secondary)', fontSize: '0.75rem', color: 'var(--text-muted)',
@@ -193,7 +1096,7 @@ export default function AIAssistant() {
 
         {/* Messages */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '20px', display: 'flex', flexDirection: 'column', gap: 20 }}>
-          {messages.map(msg => (
+          {messages.map((msg, index) => (
             <div key={msg.id} style={{
               display: 'flex', gap: 10,
               flexDirection: msg.role === 'user' ? 'row-reverse' : 'row',
@@ -218,10 +1121,63 @@ export default function AIAssistant() {
                     {msg.content}
                   </p>
                   <div style={{
-                    fontSize: '0.68rem', marginTop: 6, opacity: 0.6,
-                    textAlign: msg.role === 'user' ? 'right' : 'left',
+                    display: 'flex', alignItems: 'center', gap: 8, marginTop: 6,
+                    justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start',
                   }}>
-                    {msg.timestamp}
+                    <div style={{ fontSize: '0.68rem', opacity: 0.6 }}>
+                      {msg.timestamp}
+                    </div>
+                    {msg.role === 'ai' && (
+                      <button
+                        onClick={() => handleSpeak(msg.id, msg.content)}
+                        disabled={loadingSpeechId === msg.id}
+                        title={speakingId === msg.id ? 'Stop reading' : 'Read aloud'}
+                        style={{
+                          background: 'none', border: 'none', cursor: 'pointer',
+                          padding: 2, display: 'flex', alignItems: 'center',
+                          color: speakingId === msg.id ? 'var(--blue)' : 'var(--text-muted)',
+                          opacity: loadingSpeechId === msg.id ? 0.5 : 0.75,
+                        }}>
+                        {loadingSpeechId === msg.id ? (
+                          <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} />
+                        ) : speakingId === msg.id ? (
+                          <Square size={11} fill="currentColor" />
+                        ) : (
+                          <Volume2 size={13} />
+                        )}
+                      </button>
+                    )}
+
+                    {msg.role === 'ai' && index > 0 && msg.content.length > 80 && (
+                      <button
+                        onClick={() => {
+                          const previousUserMessage = [...messages]
+                            .slice(0, index)
+                            .reverse()
+                            .find(message => message.role === 'user')
+
+                          generateCaseReport(
+                            previousUserMessage?.content ||
+                              'Case details were not available in the conversation.',
+                            msg.content,
+                            msg.metadata
+                          )
+                        }}
+                        title="Download legal case report"
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          cursor: 'pointer',
+                          padding: 2,
+                          display: 'flex',
+                          alignItems: 'center',
+                          color: 'var(--blue)',
+                          opacity: 0.85,
+                        }}
+                      >
+                        <Download size={13} />
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -301,6 +1257,42 @@ export default function AIAssistant() {
                           Find an Advocate <ChevronRight size={13} />
                         </Link>
                       </div>
+
+                      <button
+                        onClick={() => {
+                          const previousUserMessage = [...messages]
+                            .slice(0, index)
+                            .reverse()
+                            .find(message => message.role === 'user')
+
+                          generateCaseReport(
+                            previousUserMessage?.content ||
+                              'Case details were not available in the conversation.',
+                            msg.content,
+                            msg.metadata
+                          )
+                        }}
+                        style={{
+                          marginTop: 16,
+                          width: '100%',
+                          padding: '10px 12px',
+                          borderRadius: 8,
+                          border: '1px solid var(--border)',
+                          background: 'var(--bg-secondary)',
+                          color: 'var(--text)',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: 7,
+                          fontWeight: 600,
+                          fontSize: '0.8rem',
+                        }}
+                        title="Download complete legal case report"
+                      >
+                        <Download size={14} />
+                        Download Case Report PDF
+                      </button>
                     </div>
                   </div>
                 )}
@@ -308,31 +1300,69 @@ export default function AIAssistant() {
             </div>
           ))}
 
-          {/* Loading */}
-          {loading && (
-            <div style={{ display: 'flex', gap: 10 }}>
-              <div style={{
-                width: 30, height: 30, borderRadius: '50%', flexShrink: 0,
-                background: 'linear-gradient(135deg, var(--blue), #7C3AED)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}>
-                <Scale size={13} color="white" />
-              </div>
-              <div className="chat-bubble-ai" style={{ padding: '14px 18px' }}>
-                <div style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
-                  {[0, 1, 2].map(i => (
-                    <div key={i} style={{
-                      width: 7, height: 7, borderRadius: '50%', background: 'var(--blue)',
-                      animation: `bounce 1.2s ease-in-out ${i * 0.2}s infinite`,
-                    }} />
-                  ))}
-                  <span style={{ marginLeft: 8, fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                    Analyzing your case...
-                  </span>
-                </div>
-              </div>
-            </div>
-          )}
+         {/* Agent Status */}
+{loading && (
+  <div
+    className="chat-bubble-ai"
+    style={{
+      padding: "16px",
+      borderRadius: 12,
+      background: "var(--bg-secondary)",
+      border: "1px solid var(--border)",
+    }}
+  >
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        marginBottom: 10,
+      }}
+    >
+      <div
+        style={{
+          width: 10,
+          height: 10,
+          borderRadius: "50%",
+          background: "#22c55e",
+          animation: "pulse 1s infinite",
+        }}
+      />
+      <strong>NyayaAI Agent Network Working...</strong>
+    </div>
+
+    <div
+      style={{
+        color: "#60a5fa",
+        fontWeight: 600,
+        marginBottom: 10,
+      }}
+    >
+      {agentStep}
+    </div>
+
+    <div
+      style={{
+        display: "flex",
+        gap: 5,
+        alignItems: "center",
+      }}
+    >
+      {[0, 1, 2].map((i) => (
+        <div
+          key={i}
+          style={{
+            width: 8,
+            height: 8,
+            borderRadius: "50%",
+            background: "#3b82f6",
+            animation: `bounce 1.2s ${i * 0.2}s infinite`,
+          }}
+        />
+      ))}
+    </div>
+  </div>
+)}
           <div ref={bottomRef} />
         </div>
 
@@ -416,12 +1446,26 @@ export default function AIAssistant() {
                 }} title="Upload document">
                 <Paperclip size={15} />
               </button>
-              <button style={{
-                width: 34, height: 34, borderRadius: 8, border: '1px solid var(--border)',
-                background: 'var(--bg-card)', cursor: 'pointer', color: 'var(--text-muted)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }} title="Voice input">
-                <Mic size={15} />
+              <button
+                onClick={handleMicClick}
+                disabled={transcribing}
+                style={{
+                  width: 34, height: 34, borderRadius: 8,
+                  border: isRecording ? '1px solid #EF4444' : '1px solid var(--border)',
+                  background: isRecording ? 'rgba(239,68,68,0.1)' : 'var(--bg-card)',
+                  cursor: transcribing ? 'default' : 'pointer',
+                  color: isRecording ? '#EF4444' : 'var(--text-muted)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  opacity: transcribing ? 0.6 : 1,
+                }}
+                title={isRecording ? 'Stop recording' : 'Voice input'}>
+                {transcribing ? (
+                  <Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} />
+                ) : isRecording ? (
+                  <Square size={13} fill="currentColor" />
+                ) : (
+                  <Mic size={15} />
+                )}
               </button>
               <button
                 onClick={() => sendMessage(input)}
@@ -446,14 +1490,24 @@ export default function AIAssistant() {
       </div>
 
       <style>{`
-        @keyframes bounce {
-          0%, 80%, 100% { transform: translateY(0); }
-          40% { transform: translateY(-6px); }
-        }
-        @media (max-width: 700px) {
-          .ai-sidebar { display: none !important; }
-          .metadata-grid { grid-template-columns: 1fr !important; }
-        }
+        @keyframes pulse {
+         0% {
+         opacity: 0.4;
+         transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.3);
+  }
+  100% {
+    opacity: 0.4;
+    transform: scale(1);
+  }
+}
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
       `}</style>
     </div>
   )

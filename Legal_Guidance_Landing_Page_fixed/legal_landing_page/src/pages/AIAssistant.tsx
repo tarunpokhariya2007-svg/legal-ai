@@ -1,8 +1,10 @@
 import { useState, useRef, useEffect } from 'react'
 import { Link } from 'react-router'
+import jsPDF from 'jspdf'
 import {
   Send, Mic, Square, Paperclip, RotateCcw, Scale, FileText, Users,
   Clock, ChevronRight, Sparkles, MessageSquare, Plus, X, Volume2, Loader2,
+  Download,
 } from 'lucide-react'
 
 interface Message {
@@ -73,6 +75,8 @@ export default function AIAssistant() {
   const [loading, setLoading] = useState(false)
   const [agentStep, setAgentStep] = useState("");
   const [conversationId, setConversationId] = useState<number | null>(null)
+  // One database case per chat conversation.
+  const [caseId, setCaseId] = useState<number | null>(null)
   const activeChat = conversationId?.toString() || ''
   const [chatHistory, setChatHistory] = useState<
   { id: string; title: string; date: string }[]
@@ -156,7 +160,11 @@ const loadConversation = async (id: string) => {
       );
     }
 
-    setConversationId(Number(id));
+    setConversationId(Number(id))
+
+    // Restore the database case linked to this conversation.
+    const savedCaseId = localStorage.getItem(`nyaya_case_${id}`)
+    setCaseId(savedCaseId ? Number(savedCaseId) : null)
 
     const loadedMessages: Message[] = data.messages.map(
       (msg: any, index: number) => ({
@@ -214,6 +222,46 @@ useEffect(() => {
 
   return data;
 };
+const createCase = async (
+  title: string,
+  description: string,
+  token: string
+) => {
+  const res = await fetch(
+    "https://legal-ai-z7vb.onrender.com/api/cases",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        title:
+          title.trim().slice(0, 100) ||
+          "New Legal Case",
+        description:
+          description.trim() ||
+          "Legal matter started through NyayaAI.",
+        category: "General Legal Matter",
+        severity: "Medium",
+        status: "open",
+      }),
+    }
+  );
+
+  const data = await res.json();
+
+  console.log("CREATE CASE RESPONSE:", data);
+
+  if (!res.ok || !data.success) {
+    throw new Error(
+      data.message || "Failed to create case"
+    );
+  }
+
+  return data;
+};
+
 const sendMessage = async (text: string) => {
   if (!text.trim()) return;
 
@@ -252,34 +300,54 @@ const sendMessage = async (text: string) => {
     setAgentStep("📝 Report Generator is preparing your legal report...");
 
     try {
-      let currentConversationId = conversationId;
+      let currentConversationId = conversationId
+      let currentCaseId = caseId
 
-if (!currentConversationId) {
-  const conversationRes = await fetch(
-    "https://legal-ai-z7vb.onrender.com/api/chat/conversations",
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        title: text.slice(0, 60),
-      }),
-    }
-  );
+      // Create a conversation only for a brand-new chat.
+      if (!currentConversationId) {
+        const conversationRes = await fetch(
+          "https://legal-ai-z7vb.onrender.com/api/chat/conversations",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              title: text.trim().slice(0, 60) || "New Legal Case",
+            }),
+          }
+        )
 
-  const conversationData = await conversationRes.json();
+        const conversationData = await conversationRes.json()
 
-  if (!conversationRes.ok || !conversationData.success) {
-    throw new Error(
-      conversationData.message || "Failed to create conversation"
-    );
-  }
+        if (!conversationRes.ok || !conversationData.success) {
+          throw new Error(
+            conversationData.message || "Failed to create conversation"
+          )
+        }
 
-  currentConversationId = conversationData.conversationId;
-  setConversationId(currentConversationId);
-}
+        currentConversationId = Number(conversationData.conversationId)
+        setConversationId(currentConversationId)
+      }
+
+      // Create exactly one real case for this conversation.
+      // Further messages in the same chat reuse this case.
+      if (!currentCaseId) {
+        const caseData = await createCase(text, text, token)
+
+        currentCaseId = Number(caseData.caseId)
+        setCaseId(currentCaseId)
+
+        if (currentConversationId) {
+          localStorage.setItem(
+            `nyaya_case_${currentConversationId}`,
+            String(currentCaseId)
+          )
+        }
+
+        console.log("NEW NYAYAAI CASE CREATED:", currentCaseId)
+      }
 if (currentConversationId !== null) {
   await saveMessage(
     currentConversationId,
@@ -341,6 +409,422 @@ if (currentConversationId !== null) {
         setAgentStep("");
     }
 };
+
+
+  // =========================================================
+  // DOWNLOAD LEGAL CASE REPORT AS PDF
+  // =========================================================
+  const generateCaseReport = (
+    caseSummary: string,
+    reportText: string,
+    metadata?: Message['metadata']
+  ) => {
+    const pdf = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4',
+    })
+
+    const pageWidth = pdf.internal.pageSize.getWidth()
+    const pageHeight = pdf.internal.pageSize.getHeight()
+    const margin = 18
+    const contentWidth = pageWidth - margin * 2
+
+    const gold: [number, number, number] = [212, 175, 55]
+    const black: [number, number, number] = [15, 15, 15]
+    const darkGray: [number, number, number] = [55, 55, 55]
+
+    let y = 20
+
+    const ensureSpace = (requiredHeight: number) => {
+      if (y + requiredHeight > pageHeight - 22) {
+        pdf.addPage()
+        y = 20
+      }
+    }
+
+    const addWrappedText = (
+      text: string,
+      fontSize = 9,
+      lineHeight = 4.5,
+      color: [number, number, number] = darkGray
+    ) => {
+      pdf.setTextColor(...color)
+      pdf.setFont('helvetica', 'normal')
+      pdf.setFontSize(fontSize)
+
+      const lines = pdf.splitTextToSize(text, contentWidth)
+
+      for (const line of lines) {
+        ensureSpace(lineHeight)
+        pdf.text(line, margin, y)
+        y += lineHeight
+      }
+    }
+
+    // ---------------------------------------------------------
+    // HEADER
+    // ---------------------------------------------------------
+    pdf.setFillColor(...black)
+    pdf.rect(0, 0, pageWidth, 32, 'F')
+
+    pdf.setTextColor(255, 255, 255)
+    pdf.setFont('helvetica', 'bold')
+    pdf.setFontSize(20)
+    pdf.text('NYAYAAI', margin, 14)
+
+    pdf.setFontSize(8.5)
+    pdf.setTextColor(...gold)
+    pdf.text('AI LEGAL ASSISTANT', margin, 22)
+
+    pdf.setDrawColor(...gold)
+    pdf.setLineWidth(0.5)
+    pdf.line(margin, 32, pageWidth - margin, 32)
+
+    y = 46
+
+    // ---------------------------------------------------------
+    // TITLE
+    // ---------------------------------------------------------
+    pdf.setTextColor(...black)
+    pdf.setFont('helvetica', 'bold')
+    pdf.setFontSize(21)
+    pdf.text('LEGAL CASE REPORT', margin, y)
+
+    y += 8
+
+    pdf.setFont('helvetica', 'normal')
+    pdf.setFontSize(9)
+    pdf.setTextColor(100, 100, 100)
+    pdf.text(
+      `Generated on ${new Date().toLocaleDateString('en-IN', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      })}`,
+      margin,
+      y
+    )
+
+    y += 12
+
+    // ---------------------------------------------------------
+    // CASE TYPE
+    // ---------------------------------------------------------
+    if (metadata?.caseType) {
+      ensureSpace(16)
+
+      pdf.setFillColor(248, 246, 238)
+      pdf.setDrawColor(...gold)
+      pdf.setLineWidth(0.35)
+      pdf.roundedRect(
+        margin,
+        y,
+        contentWidth,
+        14,
+        2.5,
+        2.5,
+        'FD'
+      )
+
+      pdf.setTextColor(...gold)
+      pdf.setFont('helvetica', 'bold')
+      pdf.setFontSize(9)
+      pdf.text('CASE TYPE', margin + 5, y + 5.5)
+
+      pdf.setTextColor(...black)
+      pdf.setFont('helvetica', 'normal')
+      pdf.setFontSize(9)
+      pdf.text(metadata.caseType, margin + 5, y + 10.5)
+
+      y += 21
+    }
+
+    // ---------------------------------------------------------
+    // CASE SUMMARY
+    // ---------------------------------------------------------
+    ensureSpace(45)
+
+    pdf.setFillColor(248, 246, 238)
+    pdf.setDrawColor(...gold)
+    pdf.setLineWidth(0.35)
+    pdf.roundedRect(
+      margin,
+      y,
+      contentWidth,
+      42,
+      3,
+      3,
+      'FD'
+    )
+
+    pdf.setTextColor(...gold)
+    pdf.setFont('helvetica', 'bold')
+    pdf.setFontSize(11)
+    pdf.text('CASE SUMMARY', margin + 6, y + 8)
+
+    pdf.setTextColor(...darkGray)
+    pdf.setFont('helvetica', 'normal')
+    pdf.setFontSize(8.8)
+
+    const summaryLines = pdf.splitTextToSize(
+      caseSummary,
+      contentWidth - 12
+    )
+
+    pdf.text(
+      summaryLines.slice(0, 6),
+      margin + 6,
+      y + 15
+    )
+
+    y += 49
+
+    // ---------------------------------------------------------
+    // STRUCTURED LEGAL INFORMATION
+    // ---------------------------------------------------------
+    const addListSection = (
+      title: string,
+      items?: string[],
+      bullet = '•'
+    ) => {
+      if (!items || items.length === 0) return
+
+      ensureSpace(18)
+
+      pdf.setTextColor(...gold)
+      pdf.setFont('helvetica', 'bold')
+      pdf.setFontSize(11)
+      pdf.text(title, margin, y)
+      y += 7
+
+      pdf.setTextColor(...darkGray)
+      pdf.setFont('helvetica', 'normal')
+      pdf.setFontSize(8.8)
+
+      for (const item of items) {
+        const lines = pdf.splitTextToSize(
+          `${bullet} ${item}`,
+          contentWidth - 3
+        )
+
+        for (const line of lines) {
+          ensureSpace(4.5)
+          pdf.text(line, margin + 2, y)
+          y += 4.5
+        }
+
+        y += 1
+      }
+
+      y += 3
+    }
+
+    addListSection('RELEVANT LAWS', metadata?.laws)
+    addListSection('RECOMMENDED ACTIONS', metadata?.actions)
+    addListSection('DOCUMENTS REQUIRED', metadata?.documents)
+
+    if (metadata?.timeline) {
+      ensureSpace(24)
+
+      pdf.setTextColor(...gold)
+      pdf.setFont('helvetica', 'bold')
+      pdf.setFontSize(11)
+      pdf.text('ESTIMATED TIMELINE', margin, y)
+      y += 7
+
+      pdf.setFillColor(248, 248, 248)
+      pdf.setDrawColor(210, 210, 210)
+
+      const timelineLines = pdf.splitTextToSize(
+        metadata.timeline,
+        contentWidth - 12
+      )
+
+      const boxHeight = Math.max(
+        16,
+        timelineLines.length * 4.5 + 8
+      )
+
+      ensureSpace(boxHeight)
+
+      pdf.roundedRect(
+        margin,
+        y - 2,
+        contentWidth,
+        boxHeight,
+        2,
+        2,
+        'FD'
+      )
+
+      pdf.setTextColor(...darkGray)
+      pdf.setFont('helvetica', 'normal')
+      pdf.setFontSize(8.8)
+      pdf.text(
+        timelineLines,
+        margin + 6,
+        y + 5
+      )
+
+      y += boxHeight + 7
+    }
+
+    // ---------------------------------------------------------
+    // FULL AI REPORT
+    // ---------------------------------------------------------
+    ensureSpace(20)
+
+    pdf.setTextColor(...black)
+    pdf.setFont('helvetica', 'bold')
+    pdf.setFontSize(15)
+    pdf.text('LEGAL ANALYSIS & REPORT', margin, y)
+    y += 9
+
+    const paragraphs = reportText.split(/\r?\n/)
+
+    for (const rawParagraph of paragraphs) {
+      const line = rawParagraph.trim()
+
+      if (!line) {
+        y += 3
+        continue
+      }
+
+      const normalized = line
+        .replace(/^#+\s*/, '')
+        .replace(/^\*\*(.*?)\*\*$/, '$1')
+        .trim()
+
+      const looksLikeHeading =
+        /^#{1,6}\s/.test(line) ||
+        /^[A-Z][A-Z\s&/:-]{4,}$/.test(normalized) ||
+        /^(case analysis|legal research|applicable laws?|relevant laws?|recommended actions?|lawyer recommendation|documents required|estimated timeline|case summary|conclusion|next steps|legal disclaimer)$/i.test(
+          normalized
+        )
+
+      if (looksLikeHeading) {
+        ensureSpace(14)
+
+        pdf.setTextColor(...gold)
+        pdf.setFont('helvetica', 'bold')
+        pdf.setFontSize(11)
+
+        const headingLines = pdf.splitTextToSize(
+          normalized,
+          contentWidth
+        )
+
+        pdf.text(headingLines, margin, y)
+        y += headingLines.length * 5 + 3
+        continue
+      }
+
+      // Remove simple markdown emphasis markers while keeping content.
+      const cleanText = normalized
+        .replace(/\*\*(.*?)\*\*/g, '$1')
+        .replace(/\*(.*?)\*/g, '$1')
+        .replace(/^[-•]\s*/, '• ')
+
+      addWrappedText(cleanText, 8.8, 4.5)
+      y += 2
+    }
+
+    // ---------------------------------------------------------
+    // DISCLAIMER
+    // ---------------------------------------------------------
+    ensureSpace(46)
+
+    y += 6
+
+    const disclaimer =
+      'This report is generated by NyayaAI for general informational and educational purposes only. It is not professional legal advice, does not create an advocate-client relationship, and should not be treated as a substitute for consultation with a qualified advocate. Laws, procedures, limitation periods, and facts may change or require case-specific verification.'
+
+    const disclaimerLines = pdf.splitTextToSize(
+      disclaimer,
+      contentWidth - 12
+    )
+
+    const disclaimerHeight =
+      18 + disclaimerLines.length * 4
+
+    pdf.setFillColor(248, 248, 248)
+    pdf.setDrawColor(190, 190, 190)
+
+    pdf.roundedRect(
+      margin,
+      y,
+      contentWidth,
+      disclaimerHeight,
+      3,
+      3,
+      'FD'
+    )
+
+    pdf.setTextColor(70, 70, 70)
+    pdf.setFont('helvetica', 'bold')
+    pdf.setFontSize(8.5)
+    pdf.text(
+      'LEGAL DISCLAIMER',
+      margin + 6,
+      y + 7
+    )
+
+    pdf.setFont('helvetica', 'normal')
+    pdf.setFontSize(7.3)
+
+    pdf.text(
+      disclaimerLines,
+      margin + 6,
+      y + 13
+    )
+
+    // ---------------------------------------------------------
+    // FOOTER + PAGE NUMBERS
+    // ---------------------------------------------------------
+    const totalPages = pdf.getNumberOfPages()
+
+    for (let page = 1; page <= totalPages; page++) {
+      pdf.setPage(page)
+
+      pdf.setDrawColor(220, 220, 220)
+      pdf.setLineWidth(0.25)
+      pdf.line(
+        margin,
+        pageHeight - 12,
+        pageWidth - margin,
+        pageHeight - 12
+      )
+
+      pdf.setFont('helvetica', 'normal')
+      pdf.setFontSize(7)
+      pdf.setTextColor(120, 120, 120)
+
+      pdf.text(
+        'NyayaAI • AI Legal Assistant',
+        margin,
+        pageHeight - 6
+      )
+
+      pdf.text(
+        `Page ${page} of ${totalPages}`,
+        pageWidth - margin,
+        pageHeight - 6,
+        { align: 'right' }
+      )
+    }
+
+    // ---------------------------------------------------------
+    // DOWNLOAD
+    // ---------------------------------------------------------
+    const datePart = new Date()
+      .toISOString()
+      .slice(0, 10)
+
+    pdf.save(
+      `NyayaAI-Legal-Case-Report-${datePart}.pdf`
+    )
+  }
 
   // ---- Speech-to-text (mic input) ----
 
@@ -516,7 +1000,8 @@ if (currentConversationId !== null) {
         <div style={{ padding: '16px 12px', borderBottom: '1px solid var(--border)' }}>
           <button className="btn-primary"
             onClick={() => {
-  setConversationId(null);
+  setConversationId(null)
+  setCaseId(null)
 
   setMessages([{
     id: 'welcome-new',
@@ -611,7 +1096,7 @@ if (currentConversationId !== null) {
 
         {/* Messages */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '20px', display: 'flex', flexDirection: 'column', gap: 20 }}>
-          {messages.map(msg => (
+          {messages.map((msg, index) => (
             <div key={msg.id} style={{
               display: 'flex', gap: 10,
               flexDirection: msg.role === 'user' ? 'row-reverse' : 'row',
@@ -660,6 +1145,37 @@ if (currentConversationId !== null) {
                         ) : (
                           <Volume2 size={13} />
                         )}
+                      </button>
+                    )}
+
+                    {msg.role === 'ai' && index > 0 && msg.content.length > 80 && (
+                      <button
+                        onClick={() => {
+                          const previousUserMessage = [...messages]
+                            .slice(0, index)
+                            .reverse()
+                            .find(message => message.role === 'user')
+
+                          generateCaseReport(
+                            previousUserMessage?.content ||
+                              'Case details were not available in the conversation.',
+                            msg.content,
+                            msg.metadata
+                          )
+                        }}
+                        title="Download legal case report"
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          cursor: 'pointer',
+                          padding: 2,
+                          display: 'flex',
+                          alignItems: 'center',
+                          color: 'var(--blue)',
+                          opacity: 0.85,
+                        }}
+                      >
+                        <Download size={13} />
                       </button>
                     )}
                   </div>
@@ -741,6 +1257,42 @@ if (currentConversationId !== null) {
                           Find an Advocate <ChevronRight size={13} />
                         </Link>
                       </div>
+
+                      <button
+                        onClick={() => {
+                          const previousUserMessage = [...messages]
+                            .slice(0, index)
+                            .reverse()
+                            .find(message => message.role === 'user')
+
+                          generateCaseReport(
+                            previousUserMessage?.content ||
+                              'Case details were not available in the conversation.',
+                            msg.content,
+                            msg.metadata
+                          )
+                        }}
+                        style={{
+                          marginTop: 16,
+                          width: '100%',
+                          padding: '10px 12px',
+                          borderRadius: 8,
+                          border: '1px solid var(--border)',
+                          background: 'var(--bg-secondary)',
+                          color: 'var(--text)',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: 7,
+                          fontWeight: 600,
+                          fontSize: '0.8rem',
+                        }}
+                        title="Download complete legal case report"
+                      >
+                        <Download size={14} />
+                        Download Case Report PDF
+                      </button>
                     </div>
                   </div>
                 )}

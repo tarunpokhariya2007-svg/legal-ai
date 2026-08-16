@@ -100,29 +100,18 @@ const statusConfig = {
   },
 }
 
-const myCases = [
-  {
-    id: 'NYC-2026-0842',
-    title: 'Security Deposit Dispute',
-    type: 'Property Law',
-    status: 'Active',
-    progress: 65,
-  },
-  {
-    id: 'NYC-2026-0671',
-    title: 'Wrongful Dismissal Claim',
-    type: 'Employment',
-    status: 'Pending',
-    progress: 30,
-  },
-  {
-    id: 'NYC-2026-0390',
-    title: 'E-commerce Fraud Complaint',
-    type: 'Consumer',
-    status: 'Resolved',
-    progress: 100,
-  },
-]
+
+interface CaseItem {
+  id: number
+  user_id: number
+  title: string
+  description: string
+  category: string
+  severity: string
+  status: 'open' | 'in_progress' | 'resolved' | 'closed' | string
+  created_at: string
+  updated_at: string
+}
 
 interface Advocate {
   id: number
@@ -146,6 +135,13 @@ export default function CitizenDashboard() {
 
   const [advocateError, setAdvocateError] = useState('')
 
+  // =========================================================
+  // REAL CASES FROM DATABASE
+  // =========================================================
+  const [cases, setCases] = useState<CaseItem[]>([])
+  const [loadingCases, setLoadingCases] = useState(true)
+  const [caseError, setCaseError] = useState('')
+
   // Get logged-in citizen
   let savedUser: any = {}
 
@@ -164,6 +160,64 @@ export default function CitizenDashboard() {
     'User'
 
   // ==========================================
+  // LOAD REAL CASES FROM DATABASE
+  // ==========================================
+
+  useEffect(() => {
+    const loadCases = async () => {
+      try {
+        setLoadingCases(true)
+        setCaseError('')
+
+        const token = localStorage.getItem('token')
+
+        if (!token) {
+          setCases([])
+          setCaseError('Please login again to load your cases.')
+          return
+        }
+
+        const response = await fetch(
+          'https://legal-ai-z7vb.onrender.com/api/cases',
+          {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        )
+
+        const result = await response.json()
+
+        console.log('CASES API RESPONSE:', result)
+
+        if (!response.ok || !result.success) {
+          throw new Error(
+            result.message || 'Failed to load cases'
+          )
+        }
+
+        setCases(
+          Array.isArray(result.cases)
+            ? result.cases
+            : []
+        )
+      } catch (error: any) {
+        console.error('LOAD CASES ERROR:', error)
+        setCases([])
+        setCaseError(
+          error.message || 'Unable to load cases'
+        )
+      } finally {
+        setLoadingCases(false)
+      }
+    }
+
+    loadCases()
+  }, [])
+
+  // ==========================================
   // LOAD REAL ADVOCATES FROM DATABASE
   // ==========================================
 
@@ -176,20 +230,20 @@ export default function CitizenDashboard() {
         const token = localStorage.getItem('token')
 
         const response = await fetch(
-          '/api/lawyers',
-          {
-            method: 'GET',
-            headers: {
-              'Content-Type': 'application/json',
+  'http://localhost:5001/api/lawyers',
+  {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
 
-              ...(token
-                ? {
-                    Authorization: `Bearer ${token}`,
-                  }
-                : {}),
-            },
+      ...(token
+        ? {
+            Authorization: `Bearer ${token}`,
           }
-        )
+        : {}),
+    },
+  }
+)
 
         const result = await response.json()
 
@@ -382,7 +436,19 @@ export default function CitizenDashboard() {
             >
               You have{' '}
               <strong style={{ color: 'white' }}>
-                1 active case
+                {cases.filter(
+                  (c) =>
+                    c.status === 'open' ||
+                    c.status === 'in_progress'
+                ).length}{' '}
+                active case
+                {cases.filter(
+                  (c) =>
+                    c.status === 'open' ||
+                    c.status === 'in_progress'
+                ).length === 1
+                  ? ''
+                  : 's'}
               </strong>{' '}
               and{' '}
               <strong style={{ color: 'white' }}>
@@ -428,11 +494,17 @@ export default function CitizenDashboard() {
         >
           {[
             {
-              val: '3',
+              val: String(cases.length),
               lbl: 'Total Cases',
             },
             {
-              val: '1',
+              val: String(
+                cases.filter(
+                  (c) =>
+                    c.status === 'open' ||
+                    c.status === 'in_progress'
+                ).length
+              ),
               lbl: 'Active',
             },
             {
@@ -627,112 +699,170 @@ export default function CitizenDashboard() {
               gap: 14,
             }}
           >
-            {myCases.map((c) => (
+            {loadingCases && (
               <div
-                key={c.id}
                 style={{
-                  padding: 14,
-                  borderRadius: 10,
-                  background:
-                    'var(--bg-secondary)',
-                  cursor: 'pointer',
+                  padding: 24,
+                  textAlign: 'center',
+                  color: 'var(--text-muted)',
+                  fontSize: '0.8rem',
                 }}
               >
+                Loading your cases...
+              </div>
+            )}
+
+            {!loadingCases && caseError && (
+              <div
+                style={{
+                  padding: 24,
+                  textAlign: 'center',
+                  color: '#DC2626',
+                  fontSize: '0.8rem',
+                }}
+              >
+                {caseError}
+              </div>
+            )}
+
+            {!loadingCases &&
+              !caseError &&
+              cases.length === 0 && (
                 <div
                   style={{
-                    display: 'flex',
-                    justifyContent:
-                      'space-between',
-                    alignItems:
-                      'flex-start',
-                    marginBottom: 8,
+                    padding: 24,
+                    textAlign: 'center',
+                    color: 'var(--text-muted)',
+                    fontSize: '0.8rem',
                   }}
                 >
-                  <div>
-                    <div
-                      style={{
-                        fontWeight: 600,
-                        color: 'var(--text)',
-                        fontSize: '0.85rem',
-                      }}
-                    >
-                      {c.title}
-                    </div>
+                  No cases yet. Start a new case with the AI Assistant.
+                </div>
+              )}
 
-                    <div
-                      style={{
-                        fontSize: '0.72rem',
-                        color:
-                          'var(--text-muted)',
-                        marginTop: 2,
-                      }}
-                    >
-                      {c.id} · {c.type}
-                    </div>
-                  </div>
+            {!loadingCases &&
+              !caseError &&
+              cases.slice(0, 3).map((c) => {
+                const isResolved =
+                  c.status === 'resolved' ||
+                  c.status === 'closed'
 
-                  <span
-                    className="badge"
+                const isActive =
+                  c.status === 'open' ||
+                  c.status === 'in_progress'
+
+                const progress = isResolved
+                  ? 100
+                  : c.status === 'in_progress'
+                    ? 60
+                    : 25
+
+                const statusLabel = isResolved
+                  ? 'Resolved'
+                  : c.status === 'in_progress'
+                    ? 'In Progress'
+                    : 'Active'
+
+                return (
+                  <div
+                    key={c.id}
                     style={{
-                      background:
-                        c.status === 'Active'
-                          ? 'var(--blue-subtle)'
-                          : c.status ===
-                            'Resolved'
-                          ? 'var(--emerald-subtle)'
-                          : 'rgba(245,158,11,0.1)',
-
-                      color:
-                        c.status === 'Active'
-                          ? 'var(--blue)'
-                          : c.status ===
-                            'Resolved'
-                          ? 'var(--emerald)'
-                          : '#F59E0B',
+                      padding: 14,
+                      borderRadius: 10,
+                      background: 'var(--bg-secondary)',
+                      cursor: 'pointer',
                     }}
                   >
-                    {c.status}
-                  </span>
-                </div>
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'flex-start',
+                        marginBottom: 8,
+                        gap: 10,
+                      }}
+                    >
+                      <div
+                        style={{
+                          minWidth: 0,
+                          flex: 1,
+                        }}
+                      >
+                        <div
+                          style={{
+                            fontWeight: 600,
+                            color: 'var(--text)',
+                            fontSize: '0.85rem',
+                          }}
+                        >
+                          {c.title}
+                        </div>
 
-                <div
-                  style={{
-                    height: 4,
-                    borderRadius: 2,
-                    background:
-                      'var(--border)',
-                    overflow: 'hidden',
-                  }}
-                >
-                  <div
-                    style={{
-                      height: '100%',
-                      width: `${c.progress}%`,
-                      borderRadius: 2,
-                      background:
-                        c.status ===
-                        'Resolved'
-                          ? 'var(--emerald)'
-                          : c.status ===
-                            'Active'
-                          ? 'var(--blue)'
-                          : '#F59E0B',
-                    }}
-                  />
-                </div>
+                        <div
+                          style={{
+                            fontSize: '0.72rem',
+                            color: 'var(--text-muted)',
+                            marginTop: 2,
+                          }}
+                        >
+                          Case #{c.id} · {c.category}
+                        </div>
+                      </div>
 
-                <div
-                  style={{
-                    fontSize: '0.68rem',
-                    color:
-                      'var(--text-subtle)',
-                    marginTop: 4,
-                  }}
-                >
-                  {c.progress}% complete
-                </div>
-              </div>
-            ))}
+                      <span
+                        className="badge"
+                        style={{
+                          background: isResolved
+                            ? 'var(--emerald-subtle)'
+                            : isActive
+                              ? 'var(--blue-subtle)'
+                              : 'rgba(245,158,11,0.1)',
+                          color: isResolved
+                            ? 'var(--emerald)'
+                            : isActive
+                              ? 'var(--blue)'
+                              : '#F59E0B',
+                          flexShrink: 0,
+                        }}
+                      >
+                        {statusLabel}
+                      </span>
+                    </div>
+
+                    <div
+                      style={{
+                        height: 4,
+                        borderRadius: 2,
+                        background: 'var(--border)',
+                        overflow: 'hidden',
+                      }}
+                    >
+                      <div
+                        style={{
+                          height: '100%',
+                          width: `${progress}%`,
+                          borderRadius: 2,
+                          background: isResolved
+                            ? 'var(--emerald)'
+                            : isActive
+                              ? 'var(--blue)'
+                              : '#F59E0B',
+                        }}
+                      />
+                    </div>
+
+                    <div
+                      style={{
+                        fontSize: '0.68rem',
+                        color: 'var(--text-subtle)',
+                        marginTop: 4,
+                      }}
+                    >
+                      {progress}% complete
+                    </div>
+                  </div>
+                )
+              })}
           </div>
         </div>
 

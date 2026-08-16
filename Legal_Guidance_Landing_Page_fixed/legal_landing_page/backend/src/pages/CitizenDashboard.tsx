@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import {
   MessageSquare,
@@ -142,29 +143,94 @@ const recommendedAdvocates = [
   },
 ]
 
-const myCases = [
-  {
-    id: 'NYC-2026-0842',
-    title: 'Security Deposit Dispute',
-    type: 'Property Law',
-    status: 'Active',
-    progress: 65,
-  },
-  {
-    id: 'NYC-2026-0671',
-    title: 'Wrongful Dismissal Claim',
-    type: 'Employment',
-    status: 'Pending',
-    progress: 30,
-  },
-  {
-    id: 'NYC-2026-0390',
-    title: 'E-commerce Fraud Complaint',
-    type: 'Consumer',
-    status: 'Resolved',
-    progress: 100,
-  },
-]
+const API_BASE = 'http://localhost:5001'
+
+type CaseItem = {
+  id: string | number
+  title: string
+  type: string
+  status: string
+  progress: number
+}
+
+function getToken() {
+  return localStorage.getItem('token')
+}
+
+function normalizeStatus(status: any) {
+  const value = String(status || 'open').toLowerCase()
+
+  if (
+    value === 'resolved' ||
+    value === 'closed' ||
+    value === 'completed'
+  ) {
+    return 'Resolved'
+  }
+
+  if (
+    value === 'pending' ||
+    value === 'in_progress' ||
+    value === 'in progress'
+  ) {
+    return 'Pending'
+  }
+
+  return 'Active'
+}
+
+function getProgress(status: any) {
+  const value = String(status || 'open').toLowerCase()
+
+  if (
+    value === 'resolved' ||
+    value === 'closed' ||
+    value === 'completed'
+  ) {
+    return 100
+  }
+
+  if (
+    value === 'pending' ||
+    value === 'in_progress' ||
+    value === 'in progress'
+  ) {
+    return 50
+  }
+
+  return 20
+}
+
+function normalizeCase(item: any, index: number): CaseItem {
+  const status = normalizeStatus(
+    item.status || item.case_status
+  )
+
+  return {
+    id:
+      item.id ??
+      item.case_id ??
+      item.caseId ??
+      `CASE-${index + 1}`,
+    title:
+      item.title ||
+      item.case_title ||
+      item.name ||
+      'Untitled Legal Case',
+    type:
+      item.type ||
+      item.category ||
+      item.case_type ||
+      'General Legal Matter',
+    status,
+    progress:
+      typeof item.progress === 'number'
+        ? item.progress
+        : getProgress(
+            item.status || item.case_status
+          ),
+  }
+}
 
 export default function CitizenDashboard() {
   // Get logged-in user's information
@@ -173,6 +239,74 @@ export default function CitizenDashboard() {
   )
 
   const userName = savedUser.fullName || 'User'
+
+  const [myCases, setMyCases] = useState<CaseItem[]>([])
+  const [casesLoading, setCasesLoading] = useState(true)
+  const [casesError, setCasesError] = useState('')
+
+  useEffect(() => {
+    loadMyCases()
+  }, [])
+
+  const loadMyCases = async () => {
+    const token = getToken()
+
+    if (!token) {
+      setCasesLoading(false)
+      setCasesError('Please log in to view your cases.')
+      return
+    }
+
+    try {
+      setCasesLoading(true)
+      setCasesError('')
+
+      const response = await fetch(
+        `${API_BASE}/api/cases`,
+        {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      )
+
+      const data = await response.json()
+
+      if (!response.ok || !data.success) {
+        throw new Error(
+          data.message || 'Failed to load cases'
+        )
+      }
+
+      // Supports { cases: [...] } as well as a direct array.
+      const rawCases = Array.isArray(data)
+        ? data
+        : Array.isArray(data.cases)
+        ? data.cases
+        : Array.isArray(data.data)
+        ? data.data
+        : []
+
+      setMyCases(
+        rawCases.map((item: any, index: number) =>
+          normalizeCase(item, index)
+        )
+      )
+    } catch (error: any) {
+      console.error('GET MY CASES ERROR:', error)
+      setCasesError(
+        error?.message || 'Unable to load your cases.'
+      )
+      setMyCases([])
+    } finally {
+      setCasesLoading(false)
+    }
+  }
+
+  const activeCasesCount = myCases.filter(
+    (c) => c.status === 'Active'
+  ).length
 
   return (
     <div
@@ -249,7 +383,8 @@ export default function CitizenDashboard() {
             >
               You have{' '}
               <strong style={{ color: 'white' }}>
-                1 active case
+                {activeCasesCount} active case
+                {activeCasesCount === 1 ? '' : 's'}
               </strong>{' '}
               and{' '}
               <strong style={{ color: 'white' }}>
@@ -291,8 +426,14 @@ export default function CitizenDashboard() {
           }}
         >
           {[
-            { val: '3', lbl: 'Total Cases' },
-            { val: '1', lbl: 'Active' },
+            {
+              val: String(myCases.length),
+              lbl: 'Total Cases',
+            },
+            {
+              val: String(activeCasesCount),
+              lbl: 'Active',
+            },
             { val: '5', lbl: 'AI Consultations' },
             { val: '2', lbl: 'Documents' },
           ].map((s) => (
@@ -459,103 +600,183 @@ export default function CitizenDashboard() {
               gap: 14,
             }}
           >
-            {myCases.map((c) => (
+            {casesLoading ? (
               <div
-                key={c.id}
                 style={{
-                  padding: 14,
-                  borderRadius: 10,
-                  background: 'var(--bg-secondary)',
-                  cursor: 'pointer',
+                  padding: '28px 14px',
+                  textAlign: 'center',
+                  color: 'var(--text-muted)',
+                  fontSize: '0.8rem',
                 }}
               >
-                <div
+                Loading your cases...
+              </div>
+            ) : casesError ? (
+              <div
+                style={{
+                  padding: '18px 14px',
+                  borderRadius: 10,
+                  background: 'rgba(245,158,11,0.08)',
+                  border: '1px solid rgba(245,158,11,0.2)',
+                  color: '#F59E0B',
+                  fontSize: '0.78rem',
+                  lineHeight: 1.5,
+                }}
+              >
+                {casesError}
+              </div>
+            ) : myCases.length === 0 ? (
+              <div
+                style={{
+                  padding: '28px 14px',
+                  textAlign: 'center',
+                  color: 'var(--text-muted)',
+                }}
+              >
+                <FileText
+                  size={24}
                   style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'flex-start',
+                    color: 'var(--text-subtle)',
                     marginBottom: 8,
                   }}
-                >
-                  <div>
-                    <div
-                      style={{
-                        fontWeight: 600,
-                        color: 'var(--text)',
-                        fontSize: '0.85rem',
-                      }}
-                    >
-                      {c.title}
-                    </div>
+                />
 
-                    <div
-                      style={{
-                        fontSize: '0.72rem',
-                        color: 'var(--text-muted)',
-                        marginTop: 2,
-                      }}
-                    >
-                      {c.id} · {c.type}
-                    </div>
-                  </div>
-
-                  <span
-                    className="badge"
-                    style={{
-                      background:
-                        c.status === 'Active'
-                          ? 'var(--blue-subtle)'
-                          : c.status === 'Resolved'
-                          ? 'var(--emerald-subtle)'
-                          : 'rgba(245,158,11,0.1)',
-                      color:
-                        c.status === 'Active'
-                          ? 'var(--blue)'
-                          : c.status === 'Resolved'
-                          ? 'var(--emerald)'
-                          : '#F59E0B',
-                    }}
-                  >
-                    {c.status}
-                  </span>
-                </div>
-
-                {/* Progress bar */}
                 <div
                   style={{
-                    height: 4,
-                    borderRadius: 2,
-                    background: 'var(--border)',
-                    overflow: 'hidden',
+                    fontWeight: 600,
+                    color: 'var(--text)',
+                    fontSize: '0.85rem',
+                    marginBottom: 4,
+                  }}
+                >
+                  No cases yet
+                </div>
+
+                <div
+                  style={{
+                    fontSize: '0.72rem',
+                    marginBottom: 12,
+                  }}
+                >
+                  Start a legal case with NyayaAI and it will appear here.
+                </div>
+
+                <Link
+                  to="/dashboard/ai-assistant"
+                  className="btn-primary"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    padding: '8px 12px',
+                    borderRadius: 8,
+                    textDecoration: 'none',
+                    fontSize: '0.75rem',
+                    fontWeight: 600,
+                  }}
+                >
+                  <Plus size={13} />
+                  Start New Case
+                </Link>
+              </div>
+            ) : (
+              myCases.slice(0, 3).map((c) => (
+                <div
+                  key={c.id}
+                  style={{
+                    padding: 14,
+                    borderRadius: 10,
+                    background: 'var(--bg-secondary)',
+                    cursor: 'pointer',
                   }}
                 >
                   <div
                     style={{
-                      height: '100%',
-                      width: `${c.progress}%`,
-                      borderRadius: 2,
-                      background:
-                        c.status === 'Resolved'
-                          ? 'var(--emerald)'
-                          : c.status === 'Active'
-                          ? 'var(--blue)'
-                          : '#F59E0B',
-                      transition: 'width 0.5s ease',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'flex-start',
+                      marginBottom: 8,
                     }}
-                  />
-                </div>
+                  >
+                    <div>
+                      <div
+                        style={{
+                          fontWeight: 600,
+                          color: 'var(--text)',
+                          fontSize: '0.85rem',
+                        }}
+                      >
+                        {c.title}
+                      </div>
 
-                <div
-                  style={{
-                    fontSize: '0.68rem',
-                    color: 'var(--text-subtle)',
-                    marginTop: 4,
-                  }}
-                >
-                  {c.progress}% complete
+                      <div
+                        style={{
+                          fontSize: '0.72rem',
+                          color: 'var(--text-muted)',
+                          marginTop: 2,
+                        }}
+                      >
+                        {c.id} · {c.type}
+                      </div>
+                    </div>
+
+                    <span
+                      className="badge"
+                      style={{
+                        background:
+                          c.status === 'Active'
+                            ? 'var(--blue-subtle)'
+                            : c.status === 'Resolved'
+                            ? 'var(--emerald-subtle)'
+                            : 'rgba(245,158,11,0.1)',
+                        color:
+                          c.status === 'Active'
+                            ? 'var(--blue)'
+                            : c.status === 'Resolved'
+                            ? 'var(--emerald)'
+                            : '#F59E0B',
+                      }}
+                    >
+                      {c.status}
+                    </span>
+                  </div>
+
+                  <div
+                    style={{
+                      height: 4,
+                      borderRadius: 2,
+                      background: 'var(--border)',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    <div
+                      style={{
+                        height: '100%',
+                        width: `${c.progress}%`,
+                        borderRadius: 2,
+                        background:
+                          c.status === 'Resolved'
+                            ? 'var(--emerald)'
+                            : c.status === 'Active'
+                            ? 'var(--blue)'
+                            : '#F59E0B',
+                        transition: 'width 0.5s ease',
+                      }}
+                    />
+                  </div>
+
+                  <div
+                    style={{
+                      fontSize: '0.68rem',
+                      color: 'var(--text-subtle)',
+                      marginTop: 4,
+                    }}
+                  >
+                    {c.progress}% complete
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
 

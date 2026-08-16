@@ -1,4 +1,4 @@
-import { Link } from 'react-router'
+import { Link, useNavigate } from 'react-router'
 import { useEffect, useRef, useState } from 'react'
 import {
   Scale, ArrowRight, Star, CheckCircle, Shield, Zap, Globe, Lock,
@@ -159,6 +159,17 @@ const teamProfileLinkStyle: React.CSSProperties = {
 export default function Landing() {
   const [openSocial, setOpenSocial] = useState<'linkedin' | 'github' | null>(null)
   const socialRef = useRef<HTMLDivElement>(null)
+  const navigate = useNavigate()
+
+  const handleProtectedNavigation = (path: string) => {
+    const token = localStorage.getItem('token')
+
+    if (token) {
+      navigate(path)
+    } else {
+      navigate('/login')
+    }
+  }
 
   useEffect(() => {
     const handleOutsideClick = (event: MouseEvent) => {
@@ -415,17 +426,23 @@ export default function Landing() {
               </p>
 
               <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 40 }}>
-                <Link to="/dashboard/ai-assistant" className="btn-primary"
-                  style={{ padding: '14px 28px', borderRadius: 12, fontWeight: 700, fontSize: '1rem', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                <button
+                  type="button"
+                  onClick={() => handleProtectedNavigation('/dashboard/ai-assistant')}
+                  className="btn-primary"
+                  style={{ padding: '14px 28px', borderRadius: 12, fontWeight: 700, fontSize: '1rem', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
                   <MessageSquare size={18} />
                   Get Legal Help
-                </Link>
-                <Link to="/dashboard/advocates" className="btn-ghost"
-                  style={{ padding: '14px 28px', borderRadius: 12, fontWeight: 600, fontSize: '1rem', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleProtectedNavigation('/dashboard/advocates')}
+                  className="btn-ghost"
+                  style={{ padding: '14px 28px', borderRadius: 12, fontWeight: 600, fontSize: '1rem', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
                   <Users size={18} />
                   Find an Advocate
                   <ArrowRight size={16} />
-                </Link>
+                </button>
               </div>
 
               {/* Trust indicators */}
@@ -690,7 +707,7 @@ export default function Landing() {
                 AI-powered legal assistance platform, making legal guidance simple and accessible for everyone.
               </p>
 
-              {/* Team social profiles — Twitter removed */}
+              {/* Team social profiles */}
               <div
                 ref={socialRef}
                 style={{

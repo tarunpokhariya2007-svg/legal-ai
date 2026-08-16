@@ -22,6 +22,7 @@ import {
   ChevronRight,
 } from 'lucide-react'
 import { useTheme } from '../../context/ThemeContext'
+import BackButton from './BackButton'
 
 const isCitizenPath = (p: string) =>
   p.startsWith('/dashboard')
@@ -901,6 +902,14 @@ export default function DashboardLayout() {
           }}
           className="page-enter"
         >
+          <div
+            style={{
+              marginBottom: 18,
+            }}
+          >
+            <BackButton />
+          </div>
+
           <Outlet />
         </main>
       </div>
