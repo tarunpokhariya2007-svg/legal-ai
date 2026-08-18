@@ -230,7 +230,7 @@ export default function CitizenDashboard() {
         const token = localStorage.getItem('token')
 
         const response = await fetch(
-  'http://localhost:5001/api/lawyers',
+  'https://legal-ai-z7vb.onrender.com/api/lawyers',
   {
     method: 'GET',
     headers: {

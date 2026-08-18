@@ -263,8 +263,8 @@ export default function Login() {
 
     try {
       const endpoint = isAdvocate
-        ? 'http://localhost:5001/api/auth/advocate-login'
-        : 'http://localhost:5001/api/auth/login'
+        ? 'https://legal-ai-z7vb.onrender.com/api/auth/advocate-login'
+        : 'https://legal-ai-z7vb.onrender.com/api/auth/login'
 
       const response = await fetch(endpoint, {
         method: 'POST',
@@ -291,8 +291,45 @@ export default function Login() {
         localStorage.setItem('token', data.token)
       }
 
+      /*
+       * Save the logged-in user's complete profile.
+       *
+       * The Advocate Dashboard reads the display name from
+       * localStorage.user. Some backend responses may return
+       * fullName, full_name, or name, so normalize all of them
+       * into fullName here.
+       */
       if (data.user) {
-        localStorage.setItem('user', JSON.stringify(data.user))
+        const loggedInUser = {
+          ...data.user,
+          fullName:
+            data.user.fullName ||
+            data.user.full_name ||
+            data.user.name ||
+            (isAdvocate ? data.user.advocateName : undefined) ||
+            name.trim() ||
+            email.trim(),
+        }
+
+        localStorage.setItem(
+          'user',
+          JSON.stringify(loggedInUser)
+        )
+      } else {
+        /*
+         * Fallback: if the backend does not return a user object,
+         * still save enough information for the dashboard header
+         * to display the current account name.
+         */
+        localStorage.setItem(
+          'user',
+          JSON.stringify({
+            fullName: name.trim() || email.trim(),
+            email: email.trim(),
+            role: isAdvocate ? 'advocate' : 'citizen',
+            country,
+          })
+        )
       }
 
       if (isAdvocate) {

@@ -143,7 +143,7 @@ const recommendedAdvocates = [
   },
 ]
 
-const API_BASE = 'http://localhost:5001'
+const API_BASE = 'https://legal-ai-z7vb.onrender.com'
 
 type CaseItem = {
   id: string | number
