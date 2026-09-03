@@ -13,37 +13,42 @@ async function masterAgent(data) {
         console.log("==================================");
         console.log("MASTER AGENT STARTED");
         console.log("User Request:", data.case);
+        console.log("==================================");
 
         // ==============================
-        // STEP 1 - Case Analyzer
+        // STEP 1 - CASE ANALYZER
         // ==============================
 
         console.log("Running Case Analyzer...");
+
         const analysis = await caseAnalyzer(data.case);
 
         // ==============================
-        // STEP 2 - Law Research
+        // STEP 2 - LAW RESEARCH
         // ==============================
 
         console.log("Running Law Research Agent...");
+
         const lawResearch = await lawResearchAgent(data.case);
 
         // ==============================
-        // STEP 3 - Lawyer Recommendation
+        // STEP 3 - LAWYER RECOMMENDATION
         // ==============================
 
         console.log("Running Lawyer Recommendation Agent...");
-        const lawyerRecommendation = await lawyerRecommendationAgent(data.case);
+
+        const lawyerRecommendation =
+            await lawyerRecommendationAgent(data.case);
 
         console.log("==================================");
         console.log("LAWYER RECOMMENDATION OBJECT:");
         console.log(lawyerRecommendation);
 
         console.log("SPECIALIZATION:");
-        console.log(lawyerRecommendation.specialization);
+        console.log(lawyerRecommendation?.specialization);
 
         // ==============================
-        // STEP 4 - Report Generator
+        // STEP 4 - REPORT GENERATOR
         // ==============================
 
         console.log("Running Report Generator...");
@@ -51,7 +56,7 @@ async function masterAgent(data) {
         const report = await reportGeneratorAgent(
             analysis,
             lawResearch,
-            lawyerRecommendation.specialization
+            lawyerRecommendation?.specialization || "General Lawyer"
         );
 
         console.log("==================================");
@@ -77,25 +82,25 @@ A specialized multi-agent AI system has already analyzed the user's case.
 
 ================================
 
-Case Analysis
+CASE ANALYSIS
 
 ${analysis}
 
 ================================
 
-Legal Research
+LEGAL RESEARCH
 
 ${lawResearch}
 
 ================================
 
-Recommended Legal Specialization
+RECOMMENDED LEGAL SPECIALIZATION
 
-${lawyerRecommendation.specialization}
+${lawyerRecommendation?.specialization || "General Lawyer"}
 
 ================================
 
-Generated Report
+GENERATED REPORT
 
 ${report}
 
@@ -103,7 +108,7 @@ ${report}
 
 Now use ALL of the above information together with the user's original legal issue to generate the final legal guidance.
 
-User's Legal Issue:
+USER'S LEGAL ISSUE:
 
 ${data.case}
 
@@ -125,7 +130,7 @@ Your response must include:
 4. Citizen Rights
 5. Next Steps
 6. Documents Required
-7. Whether consulting a lawyer is recommended.
+7. Whether consulting a lawyer is recommended
 
 IMPORTANT:
 
@@ -134,7 +139,13 @@ IMPORTANT:
 - DO NOT recommend any law firms.
 - DO NOT mention advocates from the database.
 - Keep the response professional and easy to understand.
+- Do not invent legal sections.
+- Clearly state when the available information is insufficient.
 `;
+
+        // ==============================
+        // FINAL AI RESPONSE
+        // ==============================
 
         console.log("Sending request to Groq...");
 
@@ -143,31 +154,60 @@ IMPORTANT:
         console.log("FINAL RESPONSE GENERATED");
 
         // ==============================
+        // VALIDATE AI RESPONSE
+        // ==============================
+
+        const finalAnswer =
+            typeof answer === "string"
+                ? answer
+                : answer?.response
+                    ? String(answer.response)
+                    : answer?.message
+                        ? String(answer.message)
+                        : "I could not generate a legal response.";
+
+        // ==============================
         // SAVE CASE
         // ==============================
 
+        console.log("Saving case...");
+
         await saveCase(
-          data.userId,
-          data.case,
-          data.case,
-          lawyerRecommendation.specialization,
-          "Medium"
+            data.userId,
+            data.case,
+            data.case,
+            lawyerRecommendation?.specialization || "General Lawyer",
+            "Medium"
         );
+
+        console.log("CASE SAVED SUCCESSFULLY");
+
+        // ==============================
+        // RETURN FINAL RESULT
+        // ==============================
+
         return {
             success: true,
-            response: answer,
-            specialization: lawyerRecommendation.specialization
+            response: finalAnswer,
+            specialization:
+                lawyerRecommendation?.specialization ||
+                "General Lawyer"
         };
 
     } catch (err) {
 
         console.error("==================================");
         console.error("MASTER AGENT ERROR");
+        console.error("==================================");
+
         console.error(err);
 
         return {
             success: false,
-            error: err.message
+            response: "Unable to generate legal guidance at this time.",
+            error:
+                err?.message ||
+                "Failed to analyze case"
         };
     }
 }
