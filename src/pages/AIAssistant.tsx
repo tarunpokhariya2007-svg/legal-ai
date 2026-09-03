@@ -91,6 +91,7 @@ export default function AIAssistant() {
   const [speakingId, setSpeakingId] = useState<string | null>(null)
   const [loadingSpeechId, setLoadingSpeechId] = useState<string | null>(null)
   const [voiceEngine, setVoiceEngine] = useState<'browser' | 'sarvam'>('sarvam')
+  const [voiceLanguage, setVoiceLanguage] = useState('hi-IN')
   const bottomRef = useRef<HTMLDivElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
@@ -870,7 +871,7 @@ if (currentConversationId !== null) {
     }
 
     const recognition = new SpeechRecognitionCtor()
-    recognition.lang = 'en-IN'
+    recognition.lang = voiceLanguage
     recognition.interimResults = false
     recognition.maxAlternatives = 1
 
@@ -938,7 +939,7 @@ if (currentConversationId !== null) {
       const token = localStorage.getItem('token')
       const formData = new FormData()
       formData.append('audio', audioBlob, 'recording.webm')
-      formData.append('language_code', 'unknown') // auto-detect Hindi/Punjabi/English etc.
+      formData.append('language_code', voiceLanguage)
 
       const res = await fetch(`${API_BASE_URL}/api/voice/stt`, {
         method: 'POST',
