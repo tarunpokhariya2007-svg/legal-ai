@@ -21,6 +21,10 @@ interface Message {
   }
 }
 
+const API_BASE_URL =
+  (import.meta as any).env?.VITE_API_URL ||
+  "https://legal-ai-z7vb.onrender.com"
+
 const suggestedPrompts = [
   'My landlord is refusing to return my security deposit',
   'I was wrongfully terminated without notice period',
@@ -100,7 +104,7 @@ const loadConversations = async () => {
     if (!token) return;
 
     const res = await fetch(
-      "https://legal-ai-z7vb.onrender.com/api/chat/conversations",
+      `${API_BASE_URL}/api/chat/conversations`,
       {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -144,7 +148,7 @@ const loadConversation = async (id: string) => {
     }
 
     const res = await fetch(
-      `https://legal-ai-z7vb.onrender.com/api/chat/conversations/${id}/messages`,
+      `${API_BASE_URL}/api/chat/conversations/${id}/messages`,
       {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -170,7 +174,7 @@ const loadConversation = async (id: string) => {
       (msg: any, index: number) => ({
         id: String(msg.id ?? index),
         role: msg.sender === "user" ? "user" : "ai",
-        content: msg.message,
+        content: String(msg.message ?? ""),
         timestamp: msg.created_at
           ? new Date(msg.created_at).toLocaleTimeString([], {
               hour: "2-digit",
@@ -198,7 +202,7 @@ useEffect(() => {
   token: string
 ) => {
   const res = await fetch(
-    `https://legal-ai-z7vb.onrender.com/api/chat/conversations/${conversationId}/messages`,
+    `${API_BASE_URL}/api/chat/conversations/${conversationId}/messages`,
     {
       method: "POST",
       headers: {
@@ -228,7 +232,7 @@ const createCase = async (
   token: string
 ) => {
   const res = await fetch(
-    "https://legal-ai-z7vb.onrender.com/api/cases",
+    `${API_BASE_URL}/api/cases`,
     {
       method: "POST",
       headers: {
@@ -306,7 +310,7 @@ const sendMessage = async (text: string) => {
       // Create a conversation only for a brand-new chat.
       if (!currentConversationId) {
         const conversationRes = await fetch(
-          "https://legal-ai-z7vb.onrender.com/api/chat/conversations",
+          `${API_BASE_URL}/api/chat/conversations`,
           {
             method: "POST",
             headers: {
@@ -356,7 +360,7 @@ if (currentConversationId !== null) {
     token
   );
 }
-       const res = await fetch("https://legal-ai-z7vb.onrender.com/analyze", {
+       const res = await fetch(`${API_BASE_URL}/analyze`, {
           method: "POST",
           headers: {
              "Content-Type": "application/json",
@@ -369,10 +373,25 @@ if (currentConversationId !== null) {
 
         const data = await res.json();
 
+        if (!res.ok) {
+          throw new Error(
+            data?.message || data?.error || "AI analysis failed"
+          );
+        }
+
+        // Always normalize the backend response to a string.
+        // This prevents the UI from crashing when data.response is missing/null.
+        const aiResponse =
+          typeof data?.response === "string"
+            ? data.response
+            : data?.response == null
+              ? "I could not generate a response."
+              : String(data.response);
+
         const aiMsg: Message = {
             id: Date.now().toString() + "-ai",
             role: "ai",
-            content: data.response,
+            content: aiResponse,
             timestamp: new Date().toLocaleTimeString([], {
                 hour: "2-digit",
                 minute: "2-digit",
@@ -384,7 +403,7 @@ if (currentConversationId !== null) {
   await saveMessage(
     currentConversationId,
     "ai",
-    data.response,
+    aiResponse,
     token
   );
 }
@@ -567,8 +586,10 @@ if (currentConversationId !== null) {
     pdf.setFont('helvetica', 'normal')
     pdf.setFontSize(8.8)
 
+    const safeCaseSummary = String(caseSummary ?? '')
+
     const summaryLines = pdf.splitTextToSize(
-      caseSummary,
+      safeCaseSummary,
       contentWidth - 12
     )
 
@@ -588,7 +609,13 @@ if (currentConversationId !== null) {
       items?: string[],
       bullet = '•'
     ) => {
-      if (!items || items.length === 0) return
+      // Backend data can be missing or malformed. Always normalize it
+      // before using .length or iterating over it.
+      const safeItems = Array.isArray(items)
+        ? items.filter(item => item != null).map(item => String(item))
+        : []
+
+      if (safeItems.length === 0) return
 
       ensureSpace(18)
 
@@ -602,7 +629,7 @@ if (currentConversationId !== null) {
       pdf.setFont('helvetica', 'normal')
       pdf.setFontSize(8.8)
 
-      for (const item of items) {
+      for (const item of safeItems) {
         const lines = pdf.splitTextToSize(
           `${bullet} ${item}`,
           contentWidth - 3
@@ -624,7 +651,10 @@ if (currentConversationId !== null) {
     addListSection('RECOMMENDED ACTIONS', metadata?.actions)
     addListSection('DOCUMENTS REQUIRED', metadata?.documents)
 
-    if (metadata?.timeline) {
+    if (
+      typeof metadata?.timeline === 'string' &&
+      metadata.timeline.trim()
+    ) {
       ensureSpace(24)
 
       pdf.setTextColor(...gold)
@@ -681,7 +711,8 @@ if (currentConversationId !== null) {
     pdf.text('LEGAL ANALYSIS & REPORT', margin, y)
     y += 9
 
-    const paragraphs = reportText.split(/\r?\n/)
+    const safeReportText = String(reportText ?? '')
+    const paragraphs = safeReportText.split(/\r?\n/)
 
     for (const rawParagraph of paragraphs) {
       const line = rawParagraph.trim()
@@ -909,7 +940,7 @@ if (currentConversationId !== null) {
       formData.append('audio', audioBlob, 'recording.webm')
       formData.append('language_code', 'unknown') // auto-detect Hindi/Punjabi/English etc.
 
-      const res = await fetch('https://legal-ai-z7vb.onrender.com/api/voice/stt', {
+      const res = await fetch(`${API_BASE_URL}/api/voice/stt`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
         body: formData,
@@ -932,6 +963,8 @@ if (currentConversationId !== null) {
 
   // ---- Text-to-speech (read AI reply aloud) ----
   const handleSpeak = async (messageId: string, text: string) => {
+    const safeText = String(text ?? '')
+    if (!safeText.trim()) return
     // If this message is already playing, stop it
     if (speakingId === messageId) {
       if (voiceEngine === 'browser') {
@@ -949,7 +982,7 @@ if (currentConversationId !== null) {
     setSpeakingId(null)
 
     if (voiceEngine === 'browser') {
-      const utterance = new SpeechSynthesisUtterance(text)
+      const utterance = new SpeechSynthesisUtterance(safeText)
       utterance.lang = 'en-IN'
       utterance.onend = () => setSpeakingId(null)
       utterance.onerror = () => setSpeakingId(null)
@@ -961,13 +994,13 @@ if (currentConversationId !== null) {
     setLoadingSpeechId(messageId)
     try {
       const token = localStorage.getItem('token')
-      const res = await fetch('https://legal-ai-z7vb.onrender.com/api/voice/tts', {
+      const res = await fetch(`${API_BASE_URL}/api/voice/tts`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ text, language_code: 'en-IN' }),
+        body: JSON.stringify({ text: safeText, language_code: 'en-IN' }),
       })
 
       const data = await res.json()
@@ -1118,7 +1151,7 @@ if (currentConversationId !== null) {
                 <div className={msg.role === 'ai' ? 'chat-bubble-ai' : 'chat-bubble-user'}
                   style={{ padding: '12px 16px' }}>
                   <p style={{ fontSize: '0.875rem', lineHeight: 1.6, whiteSpace: 'pre-line', margin: 0 }}>
-                    {msg.content}
+                    {String(msg.content ?? "")}
                   </p>
                   <div style={{
                     display: 'flex', alignItems: 'center', gap: 8, marginTop: 6,
@@ -1148,7 +1181,9 @@ if (currentConversationId !== null) {
                       </button>
                     )}
 
-                    {msg.role === 'ai' && index > 0 && msg.content.length > 80 && (
+                    {msg.role === 'ai' &&
+                      index > 0 &&
+                      String(msg.content ?? '').length > 80 && (
                       <button
                         onClick={() => {
                           const previousUserMessage = [...messages]
@@ -1188,7 +1223,7 @@ if (currentConversationId !== null) {
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
                       <Scale size={16} style={{ color: 'var(--blue)' }} />
                       <span style={{ fontWeight: 700, color: 'var(--blue)', fontSize: '0.9rem' }}>
-                        {msg.metadata.caseType}
+                        {String(msg.metadata.caseType ?? "General Legal Matter")}
                       </span>
                     </div>
 
@@ -1199,7 +1234,7 @@ if (currentConversationId !== null) {
                           📚 Relevant Laws
                         </div>
                         <ul style={{ listStyle: 'none', padding: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                          {msg.metadata.laws?.map(l => (
+                          {(Array.isArray(msg.metadata.laws) ? msg.metadata.laws : []).map(l => (
                             <li key={l} style={{ fontSize: '0.78rem', color: 'var(--text)', padding: '5px 8px', borderRadius: 6, background: 'var(--blue-subtle)', border: '1px solid var(--blue-light)' }}>
                               {l}
                             </li>
@@ -1213,7 +1248,7 @@ if (currentConversationId !== null) {
                           ⚡ Recommended Actions
                         </div>
                         <ul style={{ listStyle: 'none', padding: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                          {msg.metadata.actions?.map((a, i) => (
+                          {(Array.isArray(msg.metadata.actions) ? msg.metadata.actions : []).map((a, i) => (
                             <li key={i} style={{ fontSize: '0.78rem', color: 'var(--text)', display: 'flex', gap: 6, alignItems: 'flex-start' }}>
                               <span style={{ color: 'var(--emerald)', fontWeight: 700, flexShrink: 0 }}>{i + 1}.</span>
                               {a}
@@ -1228,7 +1263,7 @@ if (currentConversationId !== null) {
                           📄 Documents Required
                         </div>
                         <ul style={{ listStyle: 'none', padding: 0, display: 'flex', flexDirection: 'column', gap: 5 }}>
-                          {msg.metadata.documents?.map(d => (
+                          {(Array.isArray(msg.metadata.documents) ? msg.metadata.documents : []).map(d => (
                             <li key={d} style={{ fontSize: '0.78rem', color: 'var(--text)', display: 'flex', gap: 6, alignItems: 'flex-start' }}>
                               <FileText size={12} style={{ color: 'var(--text-muted)', marginTop: 2, flexShrink: 0 }} />
                               {d}
@@ -1244,7 +1279,7 @@ if (currentConversationId !== null) {
                         </div>
                         <div style={{ padding: '10px 12px', borderRadius: 8, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', fontSize: '0.8rem', color: 'var(--text)' }}>
                           <Clock size={13} style={{ color: '#F59E0B', marginRight: 6, verticalAlign: 'middle' }} />
-                          {msg.metadata.timeline}
+                          {String(msg.metadata.timeline ?? "Timeline not available.")}
                         </div>
 
                         <Link to="/dashboard/advocates" className="btn-primary"
