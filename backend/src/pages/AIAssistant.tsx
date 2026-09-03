@@ -87,6 +87,9 @@ export default function AIAssistant() {
   const [speakingId, setSpeakingId] = useState<string | null>(null)
   const [loadingSpeechId, setLoadingSpeechId] = useState<string | null>(null)
   const [voiceEngine, setVoiceEngine] = useState<'browser' | 'sarvam'>('sarvam')
+  // Selected language for voice input.
+  // Hindi is the default; change it from the language selector.
+  const [voiceLanguage, setVoiceLanguage] = useState('hi-IN')
   const bottomRef = useRef<HTMLDivElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
@@ -839,7 +842,7 @@ if (currentConversationId !== null) {
     }
 
     const recognition = new SpeechRecognitionCtor()
-    recognition.lang = 'en-IN'
+    recognition.lang = voiceLanguage
     recognition.interimResults = false
     recognition.maxAlternatives = 1
 
@@ -863,6 +866,7 @@ if (currentConversationId !== null) {
   }
 
   // Sarvam path: records audio and sends it to the backend for transcription
+  // using the language selected above.
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
@@ -1067,7 +1071,7 @@ if (currentConversationId !== null) {
               Online · Trained on Indian Law
             </div>
           </div>
-          <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
             <button
               onClick={() => setVoiceEngine(v => v === 'sarvam' ? 'browser' : 'sarvam')}
               title="Switch voice engine"
@@ -1078,6 +1082,37 @@ if (currentConversationId !== null) {
               }}>
               <Volume2 size={12} /> Voice: {voiceEngine === 'sarvam' ? 'Sarvam AI' : 'Browser'}
             </button>
+
+            <select
+              value={voiceLanguage}
+              onChange={e => setVoiceLanguage(e.target.value)}
+              disabled={isRecording || transcribing}
+              title="Voice input language"
+              aria-label="Voice input language"
+              style={{
+                padding: '6px 10px',
+                borderRadius: 7,
+                border: '1px solid var(--border)',
+                background: 'var(--bg-secondary)',
+                color: 'var(--text-muted)',
+                fontSize: '0.75rem',
+                cursor: isRecording || transcribing ? 'not-allowed' : 'pointer',
+                outline: 'none',
+              }}
+            >
+              <option value="hi-IN">Hindi</option>
+              <option value="pa-IN">Punjabi</option>
+              <option value="en-IN">English</option>
+              <option value="gu-IN">Gujarati</option>
+              <option value="mr-IN">Marathi</option>
+              <option value="bn-IN">Bengali</option>
+              <option value="ta-IN">Tamil</option>
+              <option value="te-IN">Telugu</option>
+              <option value="kn-IN">Kannada</option>
+              <option value="ml-IN">Malayalam</option>
+              <option value="od-IN">Odia</option>
+            </select>
+
             <button style={{
               padding: '6px 12px', borderRadius: 7, border: '1px solid var(--border)',
               background: 'var(--bg-secondary)', fontSize: '0.75rem', color: 'var(--text-muted)',
@@ -1458,7 +1493,7 @@ if (currentConversationId !== null) {
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   opacity: transcribing ? 0.6 : 1,
                 }}
-                title={isRecording ? 'Stop recording' : 'Voice input'}>
+                title={isRecording ? 'Stop recording' : `Voice input (${voiceLanguage})`}>
                 {transcribing ? (
                   <Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} />
                 ) : isRecording ? (
