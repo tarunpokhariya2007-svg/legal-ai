@@ -49,14 +49,104 @@ async function initializeNotificationsTable() {
         `);
 
         console.log("NOTIFICATIONS TABLE READY");
+
     } catch (error) {
+
         console.error(
             "FAILED TO CREATE NOTIFICATIONS TABLE:",
             error.message
         );
+
     }
 }
 
+
+// =====================================================
+// CREATE APPOINTMENTS TABLE
+// =====================================================
+
+async function initializeAppointmentsTable() {
+
+    try {
+
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS appointments (
+
+                id INT NOT NULL AUTO_INCREMENT,
+
+                citizen_id INT NOT NULL,
+
+                advocate_id INT NOT NULL,
+
+                appointment_date DATE NOT NULL,
+
+                appointment_time VARCHAR(50) NOT NULL,
+
+                mode VARCHAR(20) NOT NULL DEFAULT 'video',
+
+                consultation_fee DECIMAL(10,2) NOT NULL DEFAULT 0,
+
+                platform_fee DECIMAL(10,2) NOT NULL DEFAULT 0,
+
+                total_fee DECIMAL(10,2) NOT NULL DEFAULT 0,
+
+                status VARCHAR(30) NOT NULL DEFAULT 'pending',
+
+                payment_status VARCHAR(30) NOT NULL DEFAULT 'pending',
+
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+                PRIMARY KEY (id),
+
+                INDEX idx_appointments_citizen (citizen_id),
+
+                INDEX idx_appointments_advocate (advocate_id),
+
+                INDEX idx_appointments_date (
+                    appointment_date,
+                    appointment_time
+                ),
+
+                INDEX idx_appointments_status (
+                    status
+                ),
+
+                CONSTRAINT fk_appointments_citizen
+                    FOREIGN KEY (citizen_id)
+                    REFERENCES users(id)
+                    ON DELETE CASCADE,
+
+                CONSTRAINT fk_appointments_advocate
+                    FOREIGN KEY (advocate_id)
+                    REFERENCES users(id)
+                    ON DELETE CASCADE
+
+            )
+        `);
+
+        console.log("APPOINTMENTS TABLE READY");
+
+    } catch (error) {
+
+        console.error(
+            "FAILED TO CREATE APPOINTMENTS TABLE:",
+            error.message
+        );
+
+    }
+}
+
+
+// =====================================================
+// INITIALIZE DATABASE TABLES
+// =====================================================
+
 initializeNotificationsTable();
+initializeAppointmentsTable();
+
+
+// =====================================================
+// EXPORT DATABASE
+// =====================================================
 
 module.exports = pool;
