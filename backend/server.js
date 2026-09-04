@@ -48,6 +48,7 @@ const chatRoutes = require("./routes/chatRoutes");
 const caseRoutes = require("./routes/caseRoutes");
 const profileRoutes = require("./routes/profileRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
+const appointmentRoutes = require("./routes/appointmentRoutes");
 
 // =====================================================
 // MIDDLEWARE / AGENTS
@@ -152,8 +153,15 @@ app.use(
     notificationRoutes
 );
 
+// Appointments
+app.use(
+    "/api/appointments",
+    appointmentRoutes
+);
+
 console.log("******** PROFILE ROUTES MOUNTED ********");
 console.log("******** NOTIFICATION ROUTES MOUNTED ********");
+console.log("******** APPOINTMENT ROUTES MOUNTED ********");
 
 app.get("/api/profile-direct-test", (req, res) => {
     console.log("DIRECT PROFILE TEST HIT");
@@ -193,26 +201,28 @@ app.post(
             console.log("USER ID:", req.user.id);
             console.log("=================================");
 
-           const result = await masterAgent({
-    ...req.body,
-    userId: req.user.id
-});
+            const result = await masterAgent({
+                ...req.body,
+                userId: req.user.id
+            });
 
-// =====================================================
-// CREATE AI RESPONSE NOTIFICATION
-// =====================================================
+            // =====================================================
+            // CREATE AI RESPONSE NOTIFICATION
+            // =====================================================
 
-if (result?.success === true) {
-    await createNotification({
-        userId: req.user.id,
-        type: "ai_response",
-        title: "AI Assistant replied to your query",
-        message: "Your legal guidance is ready to view.",
-        relatedId: null
-    });
-}
+            if (result?.success === true) {
 
-res.json(result);
+                await createNotification({
+                    userId: req.user.id,
+                    type: "ai_response",
+                    title: "AI Assistant replied to your query",
+                    message: "Your legal guidance is ready to view.",
+                    relatedId: null
+                });
+
+            }
+
+            res.json(result);
 
         } catch (err) {
 
@@ -335,6 +345,10 @@ app.listen(
 
         console.log(
             `Notifications API: http://localhost:${PORT}/api/notifications`
+        );
+
+        console.log(
+            `Appointments API: http://localhost:${PORT}/api/appointments`
         );
 
         console.log("=================================");
