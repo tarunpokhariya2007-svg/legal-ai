@@ -33,12 +33,12 @@ router.post("/stt", authMiddleware, upload.single("audio"), async (req, res) => 
         });
 
     } catch (err) {
-        console.error("STT ERROR:", err);
-        res.status(500).json({
-            success: false,
-            message: "Speech-to-text failed",
-        });
-    }
+    console.error("STT ERROR:", err);
+    res.status(500).json({
+        success: false,
+        message: err?.message || "Speech-to-text failed",
+    });
+}
 });
 
 // POST /api/voice/tts  — text in, base64 audio out
