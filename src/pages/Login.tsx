@@ -891,19 +891,7 @@ backgroundRepeat: 'no-repeat',
             isAdvocate={tab === 'advocate'}
           />
 
-          <h2
-            style={{
-              color: 'white',
-              fontSize: '1.6rem',
-              fontWeight: 800,
-              marginTop: 32,
-              letterSpacing: '-0.03em',
-            }}
-          >
-            {tab === 'advocate'
-              ? 'Empower Your Practice with AI'
-              : 'Justice at Your Fingertips'}
-          </h2>
+        
 
           <p
             style={{
