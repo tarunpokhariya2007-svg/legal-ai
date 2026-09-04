@@ -939,7 +939,7 @@ if (currentConversationId !== null) {
       const token = localStorage.getItem('token')
       const formData = new FormData()
       formData.append('audio', audioBlob, 'recording.webm')
-      formData.append('language_code', voiceLanguage)
+      formData.append('language_code', 'unknown')
 
       const res = await fetch(`${API_BASE_URL}/api/voice/stt`, {
         method: 'POST',
