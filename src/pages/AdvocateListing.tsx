@@ -12,7 +12,7 @@ import {
   Award,
 } from 'lucide-react'
 
-const API_URL = 'http://localhost:5001'
+const API_URL = 'https://legal-ai-z7vb.onrender.com'
 
 const cities = [
   'All Cities',
