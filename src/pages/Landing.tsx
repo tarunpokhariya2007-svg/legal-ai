@@ -158,6 +158,7 @@ const teamProfileLinkStyle: React.CSSProperties = {
 
 export default function Landing() {
   const [openSocial, setOpenSocial] = useState<'linkedin' | 'github' | null>(null)
+  const [showDisclaimer, setShowDisclaimer] = useState(true)
   const socialRef = useRef<HTMLDivElement>(null)
   const navigate = useNavigate()
 
@@ -170,6 +171,14 @@ export default function Landing() {
       navigate('/login')
     }
   }
+
+  useEffect(() => {
+    const disclaimerTimer = window.setTimeout(() => {
+      setShowDisclaimer(false)
+    }, 10000)
+
+    return () => window.clearTimeout(disclaimerTimer)
+  }, [])
 
   useEffect(() => {
     const handleOutsideClick = (event: MouseEvent) => {
@@ -887,6 +896,114 @@ export default function Landing() {
           </div>
         </div>
       </footer>
+
+      <style>{`
+        .nyaya-disclaimer {
+          position: fixed;
+          right: 20px;
+          bottom: 20px;
+          width: min(360px, calc(100vw - 32px));
+          max-height: 190px;
+          overflow-y: auto;
+          padding: 14px 42px 14px 16px;
+          background: rgba(8, 8, 8, 0.96);
+          border: 1px solid rgba(212, 175, 55, 0.65);
+          border-radius: 12px;
+          box-shadow: 0 12px 35px rgba(0, 0, 0, 0.55);
+          backdrop-filter: blur(8px);
+          -webkit-backdrop-filter: blur(8px);
+          z-index: 9999;
+          scrollbar-width: thin;
+        }
+
+        .nyaya-disclaimer::-webkit-scrollbar {
+          width: 6px;
+        }
+
+        .nyaya-disclaimer::-webkit-scrollbar-thumb {
+          background: rgba(212, 175, 55, 0.65);
+          border-radius: 10px;
+        }
+
+        .nyaya-disclaimer-title {
+          margin: 0 0 7px;
+          color: #D4AF37;
+          font-size: 0.78rem;
+          font-weight: 800;
+          letter-spacing: 0.04em;
+          text-transform: uppercase;
+        }
+
+        .nyaya-disclaimer-text {
+          margin: 0;
+          color: rgba(255, 255, 255, 0.78);
+          font-size: 0.72rem;
+          line-height: 1.55;
+        }
+
+        .nyaya-disclaimer-close {
+          position: absolute;
+          top: 8px;
+          right: 8px;
+          width: 28px;
+          height: 28px;
+          border: 1px solid rgba(212, 175, 55, 0.35);
+          border-radius: 50%;
+          background: rgba(255, 255, 255, 0.04);
+          color: #D4AF37;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          font-size: 18px;
+          line-height: 1;
+          padding: 0;
+        }
+
+        .nyaya-disclaimer-close:hover {
+          background: rgba(212, 175, 55, 0.12);
+        }
+
+        @media (max-width: 600px) {
+          .nyaya-disclaimer {
+            right: 12px;
+            bottom: 12px;
+            width: calc(100vw - 24px);
+            max-height: 170px;
+            padding: 13px 40px 13px 14px;
+          }
+
+          .nyaya-disclaimer-text {
+            font-size: 0.7rem;
+          }
+        }
+      `}</style>
+
+      {showDisclaimer && (
+        <div
+          className="nyaya-disclaimer"
+          role="dialog"
+          aria-label="Legal disclaimer"
+        >
+          <button
+            type="button"
+            className="nyaya-disclaimer-close"
+            onClick={() => setShowDisclaimer(false)}
+            aria-label="Close disclaimer"
+            title="Close"
+          >
+            ×
+          </button>
+
+          <p className="nyaya-disclaimer-title">Disclaimer</p>
+          <p className="nyaya-disclaimer-text">
+            Nyaya AI provides general legal information and AI-assisted
+            guidance. It is not a substitute for advice from a qualified
+            advocate. Laws and procedures may change, so users should verify
+            important matters with a legal professional.
+          </p>
+        </div>
+      )}
 
       <style>{`
         @media (max-width: 900px) {
