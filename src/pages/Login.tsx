@@ -844,114 +844,15 @@ if (redirectTo && redirectTo.startsWith('/')) {
           alignItems: 'center',
           padding: '60px 40px',
           backgroundImage:
-  "linear-gradient(rgba(0,0,0,0.45), rgba(0,0,0,0.45)), url('/zx.jpeg')",
-backgroundSize: 'cover',
-backgroundPosition: 'center',
-backgroundRepeat: 'no-repeat',
+            "linear-gradient(rgba(0,0,0,0.45), rgba(0,0,0,0.45)), url('/zx.jpeg')",
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
           position: 'relative',
           overflow: 'hidden',
         }}
         className="auth-left"
-      >
-        {/* Background glow */}
-
-        <div
-          style={{
-            position: 'absolute',
-            width: 500,
-            height: 500,
-            borderRadius: '50%',
-            background:
-              'radial-gradient(circle, rgba(59,130,246,0.15) 0%, transparent 70%)',
-            top: -100,
-            left: -100,
-          }}
-        />
-
-        <div
-          style={{
-            position: 'absolute',
-            width: 400,
-            height: 400,
-            borderRadius: '50%',
-            background:
-              'radial-gradient(circle, rgba(16,185,129,0.1) 0%, transparent 70%)',
-            bottom: -80,
-            right: -80,
-          }}
-        />
-
-        <div
-          style={{
-            position: 'relative',
-            textAlign: 'center',
-          }}
-        >
-          <LoginIllustration
-            isAdvocate={tab === 'advocate'}
-          />
-
-        
-
-          
-
-          <div
-            style={{
-              display: 'flex',
-              gap: 16,
-              justifyContent: 'center',
-              marginTop: 32,
-            }}
-          >
-            {[
-              {
-                val: '97.4%',
-                lbl: 'AI Accuracy',
-              },
-              {
-                val: '1,840+',
-                lbl: 'Advocates',
-              },
-              {
-                val: '48K+',
-                lbl: 'Cases Guided',
-              },
-            ].map((s) => (
-              <div
-                key={s.lbl}
-                style={{
-                  padding: '12px 16px',
-                  borderRadius: 12,
-                  textAlign: 'center',
-                  background: 'rgba(255,255,255,0.05)',
-                  border:
-                    '1px solid rgba(255,255,255,0.1)',
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: '1.2rem',
-                    fontWeight: 800,
-                    color: 'white',
-                  }}
-                >
-                  {s.val}
-                </div>
-
-                <div
-                  style={{
-                    fontSize: '0.7rem',
-                    color: 'rgba(255,255,255,0.5)',
-                    marginTop: 2,
-                  }}
-                >
-                  {s.lbl}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
+      />
 
       {/* =================================================
           RIGHT PANEL
