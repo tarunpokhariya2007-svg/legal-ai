@@ -560,9 +560,15 @@ export default function Login() {
       }
 
       localStorage.setItem('token', data.token)
-      localStorage.setItem('user', JSON.stringify(data.user))
+localStorage.setItem('user', JSON.stringify(data.user))
 
-      navigate(tab === 'advocate' ? '/advocate' : '/dashboard')
+const redirectTo = (location.state as { from?: string } | null)?.from
+
+if (redirectTo && redirectTo.startsWith('/')) {
+  navigate(redirectTo, { replace: true })
+} else {
+  navigate(tab === 'advocate' ? '/advocate' : '/dashboard')
+}
     } catch (err) {
       setErrorMsg(
         err instanceof Error ? err.message : 'Login failed. Please try again.'
@@ -706,7 +712,13 @@ export default function Login() {
         localStorage.setItem('user', JSON.stringify(loginData.user))
       }
 
-      navigate(tab === 'advocate' ? '/advocate' : '/dashboard')
+      const redirectTo = (location.state as { from?: string } | null)?.from
+
+      if (redirectTo && redirectTo.startsWith('/')) {
+        navigate(redirectTo, { replace: true })
+      } else {
+        navigate(tab === 'advocate' ? '/advocate' : '/dashboard')
+      }
     } catch (err) {
       setErrorMsg(
         err instanceof Error ? err.message : 'Signup failed. Please try again.'
@@ -767,7 +779,17 @@ export default function Login() {
         localStorage.setItem('token', data.token)
         localStorage.setItem('user', JSON.stringify(data.user))
 
-        navigate(data.user.role === 'lawyer' ? '/advocate' : '/dashboard')
+        const redirectTo = (location.state as { from?: string } | null)?.from
+
+        if (redirectTo && redirectTo.startsWith('/')) {
+          navigate(redirectTo, { replace: true })
+        } else {
+          navigate(
+            data.user.role === 'lawyer'
+              ? '/advocate'
+              : '/dashboard'
+          )
+        }
       } catch (err) {
         setErrorMsg(
           err instanceof Error ? err.message : 'Google sign-in failed.'
