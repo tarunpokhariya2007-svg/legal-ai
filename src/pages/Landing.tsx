@@ -1,9 +1,10 @@
 import { Link, useNavigate } from 'react-router'
 import { useEffect, useRef, useState } from 'react'
 import {
-  Scale, ArrowRight, Star, CheckCircle, Shield, Zap, Globe, Lock,
+  Scale, ArrowRight, CheckCircle, Shield, Zap, Globe, Lock,
   MessageSquare, Users, FileSearch, MapPin, Mic, ChevronRight,
-  Award, Clock, TrendingUp, BookOpen,
+  Award, Clock, TrendingUp, BookOpen, Crown, Code2, Database,
+  Lightbulb, Target, ShieldCheck, BarChart3,
 } from 'lucide-react'
 
 const stats = [
@@ -66,27 +67,6 @@ const features = [
     icon: Globe, title: 'Multilingual Support',
     desc: 'Available in Hindi, English, Tamil, Bengali, Marathi, Telugu, Kannada, and 14 more Indian languages.',
     color: '#527B83', bg: 'rgba(82,123,131,0.08)',
-  },
-]
-
-const testimonials = [
-  {
-    name: 'Rajesh Kumar', city: 'New Delhi', initials: 'RK',
-    role: 'Property Dispute Resolved',
-    text: 'NyayaAI helped me understand my rights in a landlord dispute in 10 minutes. The AI cited the exact Rent Control Act provisions. The advocate I hired through the platform won the case.',
-    rating: 5,
-  },
-  {
-    name: 'Preethi Nair', city: 'Bangalore', initials: 'PN',
-    role: 'Consumer Complaint',
-    text: 'I had no idea how to file a consumer complaint after being defrauded online. NyayaAI walked me through every step, generated the complaint draft, and connected me with a consumer law specialist.',
-    rating: 5,
-  },
-  {
-    name: 'Mohan Das', city: 'Mumbai', initials: 'MD',
-    role: 'Labour Law Dispute',
-    text: 'My employer was withholding my gratuity. The AI identified it as a clear violation of the Payment of Gratuity Act 1972 and I got my dues within 3 weeks. Incredible platform.',
-    rating: 5,
   },
 ]
 
@@ -353,9 +333,11 @@ export default function Landing() {
           color: var(--landing-gold) !important;
         }
 
-        /* Testimonial stars */
-        .landing-page .stars {
-          color: var(--landing-gold) !important;
+        /* Team cards */
+        .landing-page .team-card:hover {
+          transform: translateY(-8px);
+          border-color: rgba(212,175,55,.55) !important;
+          box-shadow: 0 24px 55px rgba(0,0,0,.50) !important;
         }
 
         /* Footer */
@@ -563,36 +545,383 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* ── Testimonials ── */}
-      <section id="about" style={{ padding: '100px 24px', borderTop: '1px solid var(--border)' }}>
-        <div style={{ maxWidth: 1200, margin: '0 auto' }}>
-          <div style={{ textAlign: 'center', marginBottom: 64 }}>
-            <span className="section-tag" style={{ marginBottom: 16, display: 'inline-flex' }}>
-              <Star size={12} /> Testimonials
+      {/* ── Our Team ── */}
+      <section id="about" style={{
+        padding: '100px 24px',
+        borderTop: '1px solid var(--border)',
+        position: 'relative',
+        overflow: 'hidden',
+      }}>
+        <div style={{
+          position: 'absolute',
+          width: 520,
+          height: 520,
+          borderRadius: '50%',
+          background: 'radial-gradient(circle, rgba(212,175,55,0.07) 0%, transparent 70%)',
+          top: -180,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          pointerEvents: 'none',
+        }} />
+
+        <div style={{ maxWidth: 1200, margin: '0 auto', position: 'relative', zIndex: 1 }}>
+          {/* Section heading */}
+          <div style={{ textAlign: 'center', marginBottom: 56 }}>
+            <span className="section-tag" style={{
+              marginBottom: 16,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 7,
+            }}>
+              <Users size={14} /> Our Team
             </span>
-            <h2 style={{ fontSize: 'clamp(1.8rem, 3vw, 2.6rem)', fontWeight: 800, color: 'var(--text)', letterSpacing: '-0.03em', marginTop: 12 }}>
-              Trusted by thousands across India
+
+            <h2 style={{
+              fontSize: 'clamp(2rem, 4vw, 3.2rem)',
+              fontWeight: 850,
+              lineHeight: 1.15,
+              letterSpacing: '-0.04em',
+              color: 'var(--text)',
+              marginTop: 12,
+              marginBottom: 16,
+            }}>
+              Meet the People Behind <span className="gradient-text">Nyaya AI</span>
             </h2>
+
+            <p style={{
+              maxWidth: 760,
+              margin: '0 auto',
+              color: 'var(--text-muted)',
+              fontSize: '1rem',
+              lineHeight: 1.7,
+            }}>
+              A passionate team combining leadership, software engineering, and
+              database expertise to build accessible and technology-driven legal
+              guidance for India.
+            </p>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 24 }} className="testimonials-grid">
-            {testimonials.map(t => (
-              <div key={t.name} className="card card-interactive" style={{ padding: 28 }}>
-                <div style={{ display: 'flex', gap: 4, marginBottom: 16 }} className="stars">
-                  {Array.from({ length: t.rating }).map((_, i) => <Star key={i} size={14} fill="currentColor" />)}
+          {/* Team cards */}
+          <div
+            className="team-grid"
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+              gap: 28,
+            }}
+          >
+            {/* Gaurav Singh — Team Lead */}
+            <div className="team-card" style={{
+              background: 'rgba(255,255,255,0.025)',
+              border: '1px solid rgba(212,175,55,0.22)',
+              borderRadius: 20,
+              padding: 24,
+              textAlign: 'center',
+              boxShadow: '0 18px 45px rgba(0,0,0,0.35)',
+              transition: 'transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease',
+            }}>
+              <div style={{
+                width: 190,
+                height: 190,
+                margin: '0 auto 22px',
+                borderRadius: '50%',
+                padding: 4,
+                background: 'linear-gradient(135deg, #D4AF37, #F5D76E, #A27B2C)',
+                boxShadow: '0 0 35px rgba(212,175,55,0.18)',
+              }}>
+                <img
+                  src="/team/gaurav.jpg"
+                  alt="Gaurav Singh - Team Lead at Nyaya AI"
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    borderRadius: '50%',
+                    objectFit: 'cover',
+                    objectPosition: 'center top',
+                    display: 'block',
+                  }}
+                />
+              </div>
+
+              <div style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 7,
+                padding: '8px 16px',
+                borderRadius: 999,
+                border: '1px solid rgba(212,175,55,0.55)',
+                background: 'rgba(212,175,55,0.06)',
+                color: '#D4AF37',
+                fontSize: '0.82rem',
+                fontWeight: 700,
+                marginBottom: 16,
+              }}>
+                <Crown size={15} /> Team Lead
+              </div>
+
+              <h3 style={{
+                color: 'var(--text)',
+                fontSize: '1.55rem',
+                fontWeight: 800,
+                margin: '0 0 12px',
+                letterSpacing: '-0.02em',
+              }}>
+                Gaurav Singh
+              </h3>
+
+              <p style={{
+                color: 'var(--text-muted)',
+                fontSize: '0.94rem',
+                lineHeight: 1.7,
+                margin: '0 0 24px',
+                minHeight: 130,
+              }}>
+                Hi, I'm Gaurav Singh, the Team Lead of Nyaya AI. I coordinate the
+                team, guide project direction, and help turn our ideas into practical
+                solutions that make legal technology more accessible.
+              </p>
+
+              <div style={{
+                height: 1,
+                background: 'rgba(212,175,55,0.18)',
+                marginBottom: 22,
+              }} />
+
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(3, 1fr)',
+                gap: 10,
+                textAlign: 'left',
+              }}>
+                <div>
+                  <Lightbulb size={22} style={{ color: '#D4AF37', marginBottom: 8 }} />
+                  <div style={{ color: 'var(--text-muted)', fontSize: '0.76rem', lineHeight: 1.4 }}>
+                    Team<br />Management
+                  </div>
                 </div>
-                <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', lineHeight: 1.7, marginBottom: 20, fontStyle: 'italic' }}>
-                  "{t.text}"
-                </p>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div className="avatar" style={{ width: 40, height: 40 }}>{t.initials}</div>
-                  <div>
-                    <div style={{ fontWeight: 700, color: 'var(--text)', fontSize: '0.875rem' }}>{t.name}</div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{t.role} · {t.city}</div>
+                <div>
+                  <Users size={22} style={{ color: '#D4AF37', marginBottom: 8 }} />
+                  <div style={{ color: 'var(--text-muted)', fontSize: '0.76rem', lineHeight: 1.4 }}>
+                    Project<br />Coordination
+                  </div>
+                </div>
+                <div>
+                  <Target size={22} style={{ color: '#D4AF37', marginBottom: 8 }} />
+                  <div style={{ color: 'var(--text-muted)', fontSize: '0.76rem', lineHeight: 1.4 }}>
+                    Strategy &amp;<br />Planning
                   </div>
                 </div>
               </div>
-            ))}
+            </div>
+
+            {/* Tarun Pokhariya — Backend & Frontend Developer */}
+            <div className="team-card" style={{
+              background: 'rgba(255,255,255,0.025)',
+              border: '1px solid rgba(212,175,55,0.22)',
+              borderRadius: 20,
+              padding: 24,
+              textAlign: 'center',
+              boxShadow: '0 18px 45px rgba(0,0,0,0.35)',
+              transition: 'transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease',
+            }}>
+              <div style={{
+                width: 190,
+                height: 190,
+                margin: '0 auto 22px',
+                borderRadius: '50%',
+                padding: 4,
+                background: 'linear-gradient(135deg, #D4AF37, #F5D76E, #A27B2C)',
+                boxShadow: '0 0 35px rgba(212,175,55,0.18)',
+              }}>
+                <img
+                  src="/team/tarun.jpg"
+                  alt="Tarun Pokhariya - Backend and Frontend Developer at Nyaya AI"
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    borderRadius: '50%',
+                    objectFit: 'cover',
+                    objectPosition: 'center top',
+                    display: 'block',
+                  }}
+                />
+              </div>
+
+              <div style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 7,
+                padding: '8px 16px',
+                borderRadius: 999,
+                border: '1px solid rgba(212,175,55,0.55)',
+                background: 'rgba(212,175,55,0.06)',
+                color: '#D4AF37',
+                fontSize: '0.82rem',
+                fontWeight: 700,
+                marginBottom: 16,
+              }}>
+                <Code2 size={15} /> Backend &amp; Frontend Developer
+              </div>
+
+              <h3 style={{
+                color: 'var(--text)',
+                fontSize: '1.55rem',
+                fontWeight: 800,
+                margin: '0 0 12px',
+                letterSpacing: '-0.02em',
+              }}>
+                Tarun Pokhariya
+              </h3>
+
+              <p style={{
+                color: 'var(--text-muted)',
+                fontSize: '0.94rem',
+                lineHeight: 1.7,
+                margin: '0 0 24px',
+                minHeight: 130,
+              }}>
+                Hi, I'm Tarun Pokhariya, the Backend and Frontend Developer of
+                Nyaya AI. I build and maintain the platform, develop user-facing
+                features, and connect the frontend with reliable backend services.
+              </p>
+
+              <div style={{
+                height: 1,
+                background: 'rgba(212,175,55,0.18)',
+                marginBottom: 22,
+              }} />
+
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(3, 1fr)',
+                gap: 10,
+                textAlign: 'left',
+              }}>
+                <div>
+                  <Code2 size={22} style={{ color: '#D4AF37', marginBottom: 8 }} />
+                  <div style={{ color: 'var(--text-muted)', fontSize: '0.76rem', lineHeight: 1.4 }}>
+                    Full-Stack<br />Development
+                  </div>
+                </div>
+                <div>
+                  <Target size={22} style={{ color: '#D4AF37', marginBottom: 8 }} />
+                  <div style={{ color: 'var(--text-muted)', fontSize: '0.76rem', lineHeight: 1.4 }}>
+                    Feature<br />Implementation
+                  </div>
+                </div>
+                <div>
+                  <ShieldCheck size={22} style={{ color: '#D4AF37', marginBottom: 8 }} />
+                  <div style={{ color: 'var(--text-muted)', fontSize: '0.76rem', lineHeight: 1.4 }}>
+                    System<br />Integration
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Pragitya Ghosh — Database Manager */}
+            <div className="team-card" style={{
+              background: 'rgba(255,255,255,0.025)',
+              border: '1px solid rgba(212,175,55,0.22)',
+              borderRadius: 20,
+              padding: 24,
+              textAlign: 'center',
+              boxShadow: '0 18px 45px rgba(0,0,0,0.35)',
+              transition: 'transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease',
+            }}>
+              <div style={{
+                width: 190,
+                height: 190,
+                margin: '0 auto 22px',
+                borderRadius: '50%',
+                padding: 4,
+                background: 'linear-gradient(135deg, #D4AF37, #F5D76E, #A27B2C)',
+                boxShadow: '0 0 35px rgba(212,175,55,0.18)',
+              }}>
+                <img
+                  src="/team/pragitya.jpg"
+                  alt="Pragitya Ghosh - Database Manager at Nyaya AI"
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    borderRadius: '50%',
+                    objectFit: 'cover',
+                    objectPosition: 'center top',
+                    display: 'block',
+                  }}
+                />
+              </div>
+
+              <div style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 7,
+                padding: '8px 16px',
+                borderRadius: 999,
+                border: '1px solid rgba(212,175,55,0.55)',
+                background: 'rgba(212,175,55,0.06)',
+                color: '#D4AF37',
+                fontSize: '0.82rem',
+                fontWeight: 700,
+                marginBottom: 16,
+              }}>
+                <Database size={15} /> Database Manager
+              </div>
+
+              <h3 style={{
+                color: 'var(--text)',
+                fontSize: '1.55rem',
+                fontWeight: 800,
+                margin: '0 0 12px',
+                letterSpacing: '-0.02em',
+              }}>
+                Pragitya Ghosh
+              </h3>
+
+              <p style={{
+                color: 'var(--text-muted)',
+                fontSize: '0.94rem',
+                lineHeight: 1.7,
+                margin: '0 0 24px',
+                minHeight: 130,
+              }}>
+                Hi, I'm Pragitya Ghosh, the Database Manager of Nyaya AI. I design
+                and manage our data systems, focus on data integrity and security,
+                and help ensure that our platform's information remains organized
+                and reliable.
+              </p>
+
+              <div style={{
+                height: 1,
+                background: 'rgba(212,175,55,0.18)',
+                marginBottom: 22,
+              }} />
+
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(3, 1fr)',
+                gap: 10,
+                textAlign: 'left',
+              }}>
+                <div>
+                  <Database size={22} style={{ color: '#D4AF37', marginBottom: 8 }} />
+                  <div style={{ color: 'var(--text-muted)', fontSize: '0.76rem', lineHeight: 1.4 }}>
+                    Database<br />Design
+                  </div>
+                </div>
+                <div>
+                  <ShieldCheck size={22} style={{ color: '#D4AF37', marginBottom: 8 }} />
+                  <div style={{ color: 'var(--text-muted)', fontSize: '0.76rem', lineHeight: 1.4 }}>
+                    Data Security<br />&amp; Integrity
+                  </div>
+                </div>
+                <div>
+                  <BarChart3 size={22} style={{ color: '#D4AF37', marginBottom: 8 }} />
+                  <div style={{ color: 'var(--text-muted)', fontSize: '0.76rem', lineHeight: 1.4 }}>
+                    Performance<br />Optimization
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -1010,14 +1339,16 @@ export default function Landing() {
           .stats-grid { grid-template-columns: repeat(2, 1fr) !important; }
           .steps-grid { grid-template-columns: repeat(2, 1fr) !important; }
           .features-grid { grid-template-columns: repeat(2, 1fr) !important; }
-          .testimonials-grid { grid-template-columns: 1fr !important; }
+          .team-grid { grid-template-columns: 1fr 1fr !important; }
           .pricing-grid { grid-template-columns: 1fr !important; }
           .footer-grid { grid-template-columns: 1fr 1fr !important; }
         }
         @media (max-width: 600px) {
+          .team-grid { grid-template-columns: 1fr !important; }
           .stats-grid { grid-template-columns: 1fr 1fr !important; }
           .steps-grid { grid-template-columns: 1fr !important; }
           .features-grid { grid-template-columns: 1fr !important; }
+          .team-grid { grid-template-columns: 1fr !important; }
           .footer-grid { grid-template-columns: 1fr !important; }
         }
       `}</style>
