@@ -163,16 +163,14 @@ export default function Landing() {
   const navigate = useNavigate()
 
   const handleProtectedNavigation = (path: string) => {
-  const token = localStorage.getItem('token')
+    const token = localStorage.getItem('token')
 
-  if (token) {
-    navigate(path)
-  } else {
-    navigate('/login', {
-      state: { from: path }
-    })
+    if (token) {
+      navigate(path)
+    } else {
+      navigate('/login')
+    }
   }
-}
 
   useEffect(() => {
     const disclaimerTimer = window.setTimeout(() => {
@@ -684,21 +682,15 @@ export default function Landing() {
               Get Started Free <ArrowRight size={18} />
             </Link>
             <button
-  type="button"
-  onClick={() => handleProtectedNavigation('/dashboard/advocates')}
-  style={{
-    padding: '14px 32px',
-    borderRadius: 12,
-    fontWeight: 600,
-    fontSize: '1rem',
-    background: 'rgba(255,255,255,0.15)',
-    color: 'white',
-    border: '1px solid rgba(255,255,255,0.3)',
-    cursor: 'pointer',
-  }}
->
-  Find an Advocate
-</button>
+              type="button"
+              onClick={() => handleProtectedNavigation('/dashboard/advocates')}
+              style={{
+                padding: '14px 32px', borderRadius: 12, fontWeight: 600, fontSize: '1rem',
+                background: 'rgba(255,255,255,0.15)', color: 'white',
+                border: '1px solid rgba(255,255,255,0.3)', cursor: 'pointer',
+              }}>
+              Find an Advocate
+            </button>
           </div>
         </div>
       </section>
@@ -1651,7 +1643,3 @@ function HeroIllustration() {
     </div>
   )
 }
-
-
-
-
