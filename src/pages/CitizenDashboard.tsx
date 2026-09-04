@@ -21,7 +21,7 @@ const quickActions = [
     icon: Plus,
     label: 'Start New Case',
     desc: 'Describe your legal issue',
-    href: '/dashboard/ai-assistant',
+    href: '/dashboard/new-case',
     color: 'var(--blue)',
     bg: 'var(--blue-subtle)',
   },
@@ -377,7 +377,7 @@ export default function CitizenDashboard() {
           borderRadius: 'var(--radius)',
           padding: '28px 32px',
           background:
-            'linear-gradient(135deg, #1E40AF 0%, #7C3AED 60%, #1E3A8A 100%)',
+            'linear-gradient(135deg, #8A6508 0%, #C9A227 45%, #F0D264 100%)',
           position: 'relative',
           overflow: 'hidden',
         }}
