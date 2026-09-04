@@ -100,7 +100,6 @@ const statusConfig = {
   },
 }
 
-
 interface CaseItem {
   id: number
   user_id: number
@@ -132,12 +131,12 @@ export default function CitizenDashboard() {
   >([])
 
   const [loadingAdvocates, setLoadingAdvocates] = useState(true)
-
   const [advocateError, setAdvocateError] = useState('')
 
   // =========================================================
   // REAL CASES FROM DATABASE
   // =========================================================
+
   const [cases, setCases] = useState<CaseItem[]>([])
   const [loadingCases, setLoadingCases] = useState(true)
   const [caseError, setCaseError] = useState('')
@@ -218,7 +217,7 @@ export default function CitizenDashboard() {
   }, [])
 
   // ==========================================
-  // LOAD REAL ADVOCATES FROM DATABASE
+  // LOAD ALL REAL ADVOCATES FROM DATABASE
   // ==========================================
 
   useEffect(() => {
@@ -230,20 +229,20 @@ export default function CitizenDashboard() {
         const token = localStorage.getItem('token')
 
         const response = await fetch(
-  'https://legal-ai-z7vb.onrender.com/api/lawyers',
-  {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
+          'https://legal-ai-z7vb.onrender.com/api/lawyers',
+          {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
 
-      ...(token
-        ? {
-            Authorization: `Bearer ${token}`,
+              ...(token
+                ? {
+                    Authorization: `Bearer ${token}`,
+                  }
+                : {}),
+            },
           }
-        : {}),
-    },
-  }
-)
+        )
 
         const result = await response.json()
 
@@ -334,8 +333,10 @@ export default function CitizenDashboard() {
             }
           )
 
+        // IMPORTANT:
+        // Show ALL registered advocates.
         setRecommendedAdvocates(
-          formattedAdvocates.slice(0, 3)
+          formattedAdvocates
         )
       } catch (error: any) {
         console.error(
@@ -875,8 +876,7 @@ export default function CitizenDashboard() {
           <div
             style={{
               display: 'flex',
-              justifyContent:
-                'space-between',
+              justifyContent: 'space-between',
               alignItems: 'center',
               marginBottom: 20,
             }}
@@ -1032,15 +1032,14 @@ export default function CitizenDashboard() {
       </div>
 
       {/* ==========================================
-          REAL RECOMMENDED ADVOCATES
+          ALL REGISTERED ADVOCATES
       ========================================== */}
 
       <div>
         <div
           style={{
             display: 'flex',
-            justifyContent:
-              'space-between',
+            justifyContent: 'space-between',
             alignItems: 'center',
             marginBottom: 14,
           }}
@@ -1124,7 +1123,7 @@ export default function CitizenDashboard() {
             </div>
           )}
 
-        {/* REAL ADVOCATES */}
+        {/* ALL REAL ADVOCATES */}
 
         {!loadingAdvocates &&
           recommendedAdvocates.length >
