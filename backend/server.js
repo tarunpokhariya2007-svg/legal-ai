@@ -55,6 +55,7 @@ const notificationRoutes = require("./routes/notificationRoutes");
 
 const authMiddleware = require("./middleware/authMiddleware");
 const masterAgent = require("./agents/masterAgent");
+const { createNotification } = require("./routes/notificationRoutes");
 
 // =====================================================
 // APP
@@ -192,12 +193,26 @@ app.post(
             console.log("USER ID:", req.user.id);
             console.log("=================================");
 
-            const result = await masterAgent({
-                ...req.body,
-                userId: req.user.id
-            });
+           const result = await masterAgent({
+    ...req.body,
+    userId: req.user.id
+});
 
-            res.json(result);
+// =====================================================
+// CREATE AI RESPONSE NOTIFICATION
+// =====================================================
+
+if (result?.success === true) {
+    await createNotification({
+        userId: req.user.id,
+        type: "ai_response",
+        title: "AI Assistant replied to your query",
+        message: "Your legal guidance is ready to view.",
+        relatedId: null
+    });
+}
+
+res.json(result);
 
         } catch (err) {
 
