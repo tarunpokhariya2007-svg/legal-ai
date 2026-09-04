@@ -23,11 +23,17 @@ const { ensureOtpTable } = require("./database/otpModel");
 const { ensureGoogleAuthSupport } = require("./database/userModel");
 
 ensureOtpTable().catch((err) => {
-    console.error("Failed to ensure otp_verifications table:", err.message);
+    console.error(
+        "Failed to ensure otp_verifications table:",
+        err.message
+    );
 });
 
 ensureGoogleAuthSupport().catch((err) => {
-    console.error("Failed to ensure Google auth support:", err.message);
+    console.error(
+        "Failed to ensure Google auth support:",
+        err.message
+    );
 });
 
 // =====================================================
@@ -41,6 +47,7 @@ const voiceRoutes = require("./routes/voiceRoutes");
 const chatRoutes = require("./routes/chatRoutes");
 const caseRoutes = require("./routes/caseRoutes");
 const profileRoutes = require("./routes/profileRoutes");
+const notificationRoutes = require("./routes/notificationRoutes");
 
 // =====================================================
 // MIDDLEWARE / AGENTS
@@ -54,6 +61,7 @@ const masterAgent = require("./agents/masterAgent");
 // =====================================================
 
 const app = express();
+
 app.get("/___NYAYA_DEBUG___", (req, res) => {
     console.log("🔥🔥🔥 NYAYA DEBUG ROUTE HIT 🔥🔥🔥");
 
@@ -136,7 +144,16 @@ app.use(
     "/api/profile",
     profileRoutes
 );
+
+// Notifications
+app.use(
+    "/api/notifications",
+    notificationRoutes
+);
+
 console.log("******** PROFILE ROUTES MOUNTED ********");
+console.log("******** NOTIFICATION ROUTES MOUNTED ********");
+
 app.get("/api/profile-direct-test", (req, res) => {
     console.log("DIRECT PROFILE TEST HIT");
 
@@ -299,6 +316,10 @@ app.listen(
 
         console.log(
             `Chat API: http://localhost:${PORT}/api/chat`
+        );
+
+        console.log(
+            `Notifications API: http://localhost:${PORT}/api/notifications`
         );
 
         console.log("=================================");
