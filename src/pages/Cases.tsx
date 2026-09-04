@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router'
+import { useNavigate } from 'react-router'
 import {
   Plus,
   Search,
@@ -55,7 +55,10 @@ const statusColor: Record<
 }
 
 export default function Cases() {
+  const navigate = useNavigate()
+
   const [cases, setCases] = useState<CaseItem[]>([])
+
   const [filter, setFilter] = useState<
     'All' | 'Active' | 'Pending' | 'Resolved'
   >('All')
@@ -105,7 +108,6 @@ export default function Cases() {
           ? data.cases
           : []
       )
-
     } catch (error) {
       console.error(
         'LOAD CASES ERROR:',
@@ -113,7 +115,6 @@ export default function Cases() {
       )
 
       setCases([])
-
     } finally {
       setLoading(false)
     }
@@ -178,7 +179,6 @@ export default function Cases() {
           c => c.id !== caseId
         )
       )
-
     } catch (error) {
       console.error(
         'DELETE CASE ERROR:',
@@ -190,7 +190,6 @@ export default function Cases() {
           ? error.message
           : 'Failed to delete case'
       )
-
     } finally {
       setDeletingId(null)
     }
@@ -202,7 +201,6 @@ export default function Cases() {
 
   const filteredCases =
     cases.filter(caseItem => {
-
       let matchesFilter = true
 
       if (filter === 'Active') {
@@ -363,6 +361,8 @@ export default function Cases() {
           }}
         >
 
+          {/* REFRESH */}
+
           <button
             onClick={loadCases}
             disabled={loading}
@@ -403,8 +403,12 @@ export default function Cases() {
 
           </button>
 
-          <Link
-            to="/dashboard/ai-assistant"
+          {/* NEW CASE */}
+
+          <button
+            onClick={() =>
+              navigate('/dashboard/new-case')
+            }
             className="btn-primary"
             style={{
               padding: '9px 16px',
@@ -415,11 +419,13 @@ export default function Cases() {
               display: 'flex',
               alignItems: 'center',
               gap: 6,
+              border: 'none',
+              cursor: 'pointer',
             }}
           >
             <Plus size={15} />
             Start New Case
-          </Link>
+          </button>
 
         </div>
 
@@ -595,8 +601,14 @@ export default function Cases() {
               <div
                 key={caseItem.id}
                 className="card card-interactive"
+                onClick={() =>
+                  navigate(
+                    `/dashboard/cases/${caseItem.id}`
+                  )
+                }
                 style={{
                   padding: 18,
+                  cursor: 'pointer',
                 }}
               >
 
@@ -675,12 +687,15 @@ export default function Cases() {
                       {status.label}
                     </span>
 
+                    {/* DELETE */}
+
                     <button
-                      onClick={() =>
+                      onClick={e => {
+                        e.stopPropagation()
                         deleteCase(
                           caseItem.id
                         )
-                      }
+                      }}
                       disabled={
                         deletingId ===
                         caseItem.id
@@ -735,7 +750,7 @@ export default function Cases() {
 
                 </div>
 
-                {/* Description */}
+                {/* DESCRIPTION */}
 
                 {caseItem.description && (
 
@@ -754,7 +769,7 @@ export default function Cases() {
 
                 )}
 
-                {/* Progress */}
+                {/* PROGRESS */}
 
                 <div
                   style={{
@@ -845,14 +860,18 @@ export default function Cases() {
                 }}
               >
                 {cases.length === 0
-                  ? 'Start a legal case with NyayaAI and it will appear here.'
+                  ? 'Create your first legal case to start organizing your legal matter.'
                   : 'Try a different filter or search term'}
               </div>
 
               {cases.length === 0 && (
 
-                <Link
-                  to="/dashboard/ai-assistant"
+                <button
+                  onClick={() =>
+                    navigate(
+                      '/dashboard/new-case'
+                    )
+                  }
                   className="btn-primary"
                   style={{
                     display:
@@ -863,8 +882,8 @@ export default function Cases() {
                     padding:
                       '9px 16px',
                     borderRadius: 8,
-                    textDecoration:
-                      'none',
+                    border: 'none',
+                    cursor: 'pointer',
                     fontWeight: 600,
                     fontSize:
                       '0.8rem',
@@ -872,7 +891,7 @@ export default function Cases() {
                 >
                   <Plus size={14} />
                   Start New Case
-                </Link>
+                </button>
 
               )}
 

@@ -11,6 +11,8 @@ import AIResearch from '../pages/AIResearch'
 import Booking from '../pages/Booking'
 import Profile from '../pages/Profile'
 import Cases from '../pages/Cases'
+import NewCase from '../pages/NewCase'
+import CaseWorkspace from '../pages/CaseWorkspace'
 import Documents from '../pages/Documents'
 import Notifications from '../pages/Notifications'
 
@@ -40,8 +42,10 @@ export const router = createBrowserRouter([
       { path: 'advocates', Component: AdvocateListing },
       { path: 'booking', Component: Booking },
       { path: 'profile', Component: Profile },
-      { path: 'cases', Component: Cases },
-      { path: 'documents', Component: Documents },
+{ path: 'cases', Component: Cases },
+{ path: 'cases/:caseId', Component: CaseWorkspace },
+{ path: 'new-case', Component: NewCase },
+{ path: 'documents', Component: Documents },
       { path: 'notifications', Component: Notifications },
       { path: 'settings', Component: Settings },
     ],
