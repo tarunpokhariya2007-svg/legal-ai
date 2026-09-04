@@ -423,15 +423,11 @@ export default function Landing() {
                 fontSize: 'clamp(2.4rem, 4.5vw, 3.6rem)', fontWeight: 900,
                 lineHeight: 1.1, letterSpacing: '-0.04em', marginBottom: 20, color: 'var(--text)',
               }}>
-                Your AI Legal<br />
-                Assistant —{' '}
-                <span className="gradient-text">Get Guidance</span>
-                <br />in Minutes.
+                AI Legal Guidance<br /><span className="gradient-text">for India</span><br />with Nyaya AI.
               </h1>
 
               <p style={{ fontSize: '1.1rem', color: 'var(--text-muted)', lineHeight: 1.7, marginBottom: 32, maxWidth: 480 }}>
-                AI-powered legal guidance, document assistance, and verified advocate connections.
-                Understand your rights. Navigate the justice system. All in your language.
+                Nyaya AI provides AI-powered legal guidance in India, helps you understand your rights, analyze legal documents, find relevant legal information, and connect with advocates — all in your language.
               </p>
 
               <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 40 }}>
@@ -1644,3 +1640,7 @@ function HeroIllustration() {
     </div>
   )
 }
+
+
+
+
