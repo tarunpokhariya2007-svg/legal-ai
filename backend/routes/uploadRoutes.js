@@ -4,6 +4,7 @@ const path = require("path");
 const fs = require("fs");
 const db = require("../db");
 const authMiddleware = require("../middleware/authMiddleware");
+const { createNotification } = require("./notificationRoutes");
 
 console.log("UPLOAD ROUTES LOADED");
 
@@ -163,7 +164,10 @@ router.post(
         req.file.filename
       );
 
-      // Save document information in MySQL
+      // ==========================================
+      // SAVE DOCUMENT INFORMATION IN MYSQL
+      // ==========================================
+
       const [result] = await db.query(
         `
         INSERT INTO documents
@@ -188,6 +192,22 @@ router.post(
         result.insertId
       );
 
+      // ==========================================
+      // CREATE UPLOAD SUCCESS NOTIFICATION
+      // ==========================================
+
+      await createNotification({
+        userId: req.user.id,
+        type: "document_upload",
+        title: "Document uploaded successfully",
+        message: `${req.file.originalname} was uploaded successfully.`,
+        relatedId: result.insertId,
+      });
+
+      // ==========================================
+      // SEND SUCCESS RESPONSE
+      // ==========================================
+
       res.json({
         success: true,
         message: "File uploaded successfully",
@@ -210,6 +230,27 @@ router.post(
         "UPLOAD ERROR:",
         err
       );
+
+      // ==========================================
+      // CREATE UPLOAD FAILURE NOTIFICATION
+      // ==========================================
+
+      try {
+        await createNotification({
+          userId: req.user?.id,
+          type: "document_upload_failed",
+          title: "Document upload failed",
+          message:
+            err.message ||
+            "Your document could not be uploaded.",
+          relatedId: null,
+        });
+      } catch (notificationError) {
+        console.error(
+          "UPLOAD FAILURE NOTIFICATION ERROR:",
+          notificationError.message
+        );
+      }
 
       res.status(500).json({
         success: false,
@@ -256,8 +297,10 @@ router.delete(
         });
       }
 
-      // Find document belonging
-      // to the logged-in user
+      // ==========================================
+      // FIND DOCUMENT BELONGING TO USER
+      // ==========================================
+
       const [rows] = await db.query(
         `
         SELECT
@@ -284,7 +327,10 @@ router.delete(
       const filePath =
         rows[0].file_path;
 
-      // Delete database record
+      // ==========================================
+      // DELETE DATABASE RECORD
+      // ==========================================
+
       await db.query(
         `
         DELETE FROM documents
@@ -301,7 +347,10 @@ router.delete(
         "DATABASE RECORD DELETED"
       );
 
-      // Delete physical file
+      // ==========================================
+      // DELETE PHYSICAL FILE
+      // ==========================================
+
       if (filePath) {
         const filename =
           path.basename(filePath);
@@ -364,24 +413,37 @@ router.put(
   authMiddleware,
   async (req, res) => {
     try {
-      const documentId = Number(req.params.id);
-      const { fileName } = req.body;
+      const documentId =
+        Number(req.params.id);
 
-      if (!documentId || !fileName) {
+      const { fileName } =
+        req.body;
+
+      if (
+        !documentId ||
+        !fileName
+      ) {
         return res.status(400).json({
           success: false,
-          message: "Document ID and new name are required",
+          message:
+            "Document ID and new name are required",
         });
       }
 
-      const newName = fileName.trim();
+      const newName =
+        fileName.trim();
 
       if (!newName) {
         return res.status(400).json({
           success: false,
-          message: "File name cannot be empty",
+          message:
+            "File name cannot be empty",
         });
       }
+
+      // ==========================================
+      // UPDATE DOCUMENT NAME
+      // ==========================================
 
       const [result] = await db.query(
         `
@@ -397,26 +459,33 @@ router.put(
         ]
       );
 
-      if (result.affectedRows === 0) {
+      if (
+        result.affectedRows === 0
+      ) {
         return res.status(404).json({
           success: false,
-          message: "Document not found",
+          message:
+            "Document not found",
         });
       }
 
       res.json({
         success: true,
-        message: "Document renamed successfully",
+        message:
+          "Document renamed successfully",
         fileName: newName,
       });
-
     } catch (err) {
-      console.error("RENAME DOCUMENT ERROR:", err);
+      console.error(
+        "RENAME DOCUMENT ERROR:",
+        err
+      );
 
       res.status(500).json({
         success: false,
         message:
-          err.message || "Failed to rename document",
+          err.message ||
+          "Failed to rename document",
       });
     }
   }
@@ -432,6 +501,27 @@ router.use(
       "UPLOAD MIDDLEWARE ERROR:",
       err
     );
+
+    // ==========================================
+    // CREATE FAILURE NOTIFICATION
+    // ==========================================
+
+    if (req.user?.id) {
+      createNotification({
+        userId: req.user.id,
+        type: "document_upload_failed",
+        title: "Document upload failed",
+        message:
+          err.message ||
+          "Your document could not be uploaded.",
+        relatedId: null,
+      }).catch((notificationError) => {
+        console.error(
+          "MULTER FAILURE NOTIFICATION ERROR:",
+          notificationError.message
+        );
+      });
+    }
 
     res.status(400).json({
       success: false,
