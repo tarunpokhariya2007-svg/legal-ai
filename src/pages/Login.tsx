@@ -843,8 +843,11 @@ if (redirectTo && redirectTo.startsWith('/')) {
           justifyContent: 'center',
           alignItems: 'center',
           padding: '60px 40px',
-          background:
-            'linear-gradient(145deg, #0F172A 0%, #1E1B4B 40%, #0D3B2E 100%)',
+          backgroundImage:
+  "linear-gradient(rgba(0,0,0,0.45), rgba(0,0,0,0.45)), url('/zx.jpeg')",
+backgroundSize: 'cover',
+backgroundPosition: 'center',
+backgroundRepeat: 'no-repeat',
           position: 'relative',
           overflow: 'hidden',
         }}
