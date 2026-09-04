@@ -51,28 +51,54 @@ function getFirstDay(year: number, month: number) {
 export default function Booking() {
   const navigate = useNavigate()
 
+  // =====================================================
+  // SELECTED ADVOCATE ID
+  // =====================================================
+
+  const advocateId = new URLSearchParams(
+    window.location.search
+  ).get('advocateId')
+
+  // =====================================================
+  // DATE / BOOKING STATE
+  // =====================================================
+
   const today = new Date()
 
   const [year, setYear] = useState(today.getFullYear())
   const [month, setMonth] = useState(today.getMonth())
-  const [selectedDay, setSelectedDay] = useState<number | null>(null)
-  const [selectedTime, setSelectedTime] = useState<string | null>(null)
-  const [mode, setMode] = useState<'video' | 'inperson'>('video')
+  const [selectedDay, setSelectedDay] =
+    useState<number | null>(null)
+  const [selectedTime, setSelectedTime] =
+    useState<string | null>(null)
+
+  const [mode, setMode] =
+    useState<'video' | 'inperson'>('video')
+
   const [booked, setBooked] = useState(false)
 
-  // Selected advocate
-  const [advocate, setAdvocate] = useState<any>(null)
-  const [loadingAdvocate, setLoadingAdvocate] = useState(true)
+  // =====================================================
+  // BOOKING LOADING STATE
+  // =====================================================
 
-  // -----------------------------------------------------
+  const [bookingLoading, setBookingLoading] =
+    useState(false)
+
+  // =====================================================
+  // SELECTED ADVOCATE
+  // =====================================================
+
+  const [advocate, setAdvocate] =
+    useState<any>(null)
+
+  const [loadingAdvocate, setLoadingAdvocate] =
+    useState(true)
+
+  // =====================================================
   // LOAD SELECTED ADVOCATE
-  // -----------------------------------------------------
+  // =====================================================
 
   useEffect(() => {
-    const advocateId = new URLSearchParams(
-      window.location.search
-    ).get('advocateId')
-
     if (!advocateId) {
       setLoadingAdvocate(false)
       return
@@ -101,7 +127,8 @@ export default function Booking() {
           const selectedAdvocate =
             data.lawyers.find(
               (lawyer: any) =>
-                String(lawyer.id) === String(advocateId)
+                String(lawyer.id) ===
+                String(advocateId)
             )
 
           if (selectedAdvocate) {
@@ -124,11 +151,11 @@ export default function Booking() {
     }
 
     loadAdvocate()
-  }, [])
+  }, [advocateId])
 
-  // -----------------------------------------------------
+  // =====================================================
   // ADVOCATE DISPLAY DATA
-  // -----------------------------------------------------
+  // =====================================================
 
   const advocateName =
     advocate?.full_name || 'Advocate'
@@ -137,7 +164,10 @@ export default function Booking() {
     advocateName
       .split(' ')
       .filter(Boolean)
-      .map((name: string) => name[0])
+      .map(
+        (name: string) =>
+          name[0]
+      )
       .join('')
       .substring(0, 2)
       .toUpperCase() || 'AD'
@@ -161,26 +191,38 @@ export default function Booking() {
     advocate?.court ||
     'High Court'
 
+  // =====================================================
+  // FEES
+  // =====================================================
+
   const consultationFee =
     Number(advocate?.fee) > 0
       ? Number(advocate.fee)
       : 1500
 
   const platformFee =
-    Math.round(consultationFee * 0.05)
+    Math.round(
+      consultationFee * 0.05
+    )
 
   const totalFee =
     consultationFee + platformFee
 
-  // -----------------------------------------------------
+  // =====================================================
   // CALENDAR
-  // -----------------------------------------------------
+  // =====================================================
 
   const daysInMonth =
-    getDaysInMonth(year, month)
+    getDaysInMonth(
+      year,
+      month
+    )
 
   const firstDay =
-    getFirstDay(year, month)
+    getFirstDay(
+      year,
+      month
+    )
 
   const unavailableDays = [
     3,
@@ -190,33 +232,174 @@ export default function Booking() {
     28
   ]
 
+  // =====================================================
+  // PREVIOUS MONTH
+  // =====================================================
+
   const prevMonth = () => {
     if (month === 0) {
-      setYear(y => y - 1)
+      setYear(
+        y => y - 1
+      )
+
       setMonth(11)
     } else {
-      setMonth(m => m - 1)
+      setMonth(
+        m => m - 1
+      )
     }
 
     setSelectedDay(null)
     setSelectedTime(null)
   }
+
+  // =====================================================
+  // NEXT MONTH
+  // =====================================================
 
   const nextMonth = () => {
     if (month === 11) {
-      setYear(y => y + 1)
+      setYear(
+        y => y + 1
+      )
+
       setMonth(0)
     } else {
-      setMonth(m => m + 1)
+      setMonth(
+        m => m + 1
+      )
     }
 
     setSelectedDay(null)
     setSelectedTime(null)
   }
 
-  // -----------------------------------------------------
+  // =====================================================
+  // CREATE APPOINTMENT
+  // =====================================================
+
+  const handleBooking = async () => {
+    if (
+      !selectedDay ||
+      !selectedTime ||
+      !advocateId
+    ) {
+      return
+    }
+
+    try {
+      setBookingLoading(true)
+
+      // -------------------------------------------------
+      // AUTH TOKEN
+      // -------------------------------------------------
+
+      const token =
+        localStorage.getItem('token')
+
+      if (!token) {
+        alert(
+          'Please login before booking an appointment.'
+        )
+
+        return
+      }
+
+      // -------------------------------------------------
+      // FORMAT DATE
+      // -------------------------------------------------
+
+      const appointmentDate = [
+        year,
+        String(month + 1).padStart(2, '0'),
+        String(selectedDay).padStart(2, '0')
+      ].join('-')
+
+      // -------------------------------------------------
+      // SEND BOOKING TO BACKEND
+      // -------------------------------------------------
+
+      const response = await fetch(
+        `${API_URL}/api/appointments`,
+        {
+          method: 'POST',
+
+          headers: {
+            'Content-Type':
+              'application/json',
+
+            Authorization:
+              `Bearer ${token}`
+          },
+
+          body: JSON.stringify({
+            advocateId:
+              Number(advocateId),
+
+            appointmentDate,
+
+            appointmentTime:
+              selectedTime,
+
+            mode,
+
+            consultationFee,
+
+            platformFee,
+
+            totalFee
+          })
+        }
+      )
+
+      const data =
+        await response.json()
+
+      // -------------------------------------------------
+      // HANDLE ERROR
+      // -------------------------------------------------
+
+      if (
+        !response.ok ||
+        !data.success
+      ) {
+        throw new Error(
+          data?.message ||
+          'Failed to book appointment.'
+        )
+      }
+
+      // -------------------------------------------------
+      // SUCCESS
+      // -------------------------------------------------
+
+      console.log(
+        'APPOINTMENT CREATED:',
+        data.appointment
+      )
+
+      setBooked(true)
+
+    } catch (error: any) {
+
+      console.error(
+        'BOOKING ERROR:',
+        error
+      )
+
+      alert(
+        error?.message ||
+        'Failed to book appointment. Please try again.'
+      )
+
+    } finally {
+      setBookingLoading(false)
+    }
+  }
+
+  // =====================================================
   // BOOKING CONFIRMATION
-  // -----------------------------------------------------
+  // =====================================================
 
   if (booked) {
     return (
@@ -237,23 +420,28 @@ export default function Booking() {
             maxWidth: 440
           }}
         >
+
           <div
             style={{
               width: 72,
               height: 72,
               borderRadius: '50%',
-              background: 'var(--emerald-subtle)',
-              border: '2px solid var(--emerald-light)',
+              background:
+                'var(--emerald-subtle)',
+              border:
+                '2px solid var(--emerald-light)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              margin: '0 auto 20px'
+              margin:
+                '0 auto 20px'
             }}
           >
             <CheckCircle
               size={34}
               style={{
-                color: 'var(--emerald)'
+                color:
+                  'var(--emerald)'
               }}
             />
           </div>
@@ -271,7 +459,8 @@ export default function Booking() {
 
           <p
             style={{
-              color: 'var(--text-muted)',
+              color:
+                'var(--text-muted)',
               marginBottom: 20,
               lineHeight: 1.6
             }}
@@ -285,9 +474,11 @@ export default function Booking() {
 
           <div
             style={{
-              padding: '14px 18px',
+              padding:
+                '14px 18px',
               borderRadius: 10,
-              background: 'var(--bg-secondary)',
+              background:
+                'var(--bg-secondary)',
               marginBottom: 24,
               textAlign: 'left'
             }}
@@ -297,53 +488,65 @@ export default function Booking() {
                 'Advocate',
                 `Adv. ${advocateName}`
               ],
+
               [
                 'Date',
                 `${selectedDay} ${months[month]} ${year}`
               ],
+
               [
                 'Time',
                 selectedTime || ''
               ],
+
               [
                 'Mode',
                 mode === 'video'
                   ? 'Video Call'
                   : 'In-Person'
               ],
+
               [
                 'Fee',
                 `₹${totalFee.toLocaleString()} (paid)`
-              ],
-            ].map(([k, v]) => (
-              <div
-                key={k}
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  padding: '4px 0',
-                  fontSize: '0.875rem'
-                }}
-              >
-                <span
-                  style={{
-                    color: 'var(--text-muted)'
-                  }}
-                >
-                  {k}
-                </span>
+              ]
 
-                <span
+            ].map(
+              ([k, v]) => (
+                <div
+                  key={k}
                   style={{
-                    fontWeight: 600,
-                    color: 'var(--text)',
-                    textAlign: 'right'
+                    display: 'flex',
+                    justifyContent:
+                      'space-between',
+                    padding: '4px 0',
+                    fontSize:
+                      '0.875rem'
                   }}
                 >
-                  {v}
-                </span>
-              </div>
-            ))}
+                  <span
+                    style={{
+                      color:
+                        'var(--text-muted)'
+                    }}
+                  >
+                    {k}
+                  </span>
+
+                  <span
+                    style={{
+                      fontWeight: 600,
+                      color:
+                        'var(--text)',
+                      textAlign:
+                        'right'
+                    }}
+                  >
+                    {v}
+                  </span>
+                </div>
+              )
+            )}
           </div>
 
           <button
@@ -362,14 +565,15 @@ export default function Booking() {
           >
             Go to Dashboard
           </button>
+
         </div>
       </div>
     )
   }
 
-  // -----------------------------------------------------
+  // =====================================================
   // LOADING
-  // -----------------------------------------------------
+  // =====================================================
 
   if (loadingAdvocate) {
     return (
@@ -385,7 +589,8 @@ export default function Booking() {
         <div
           style={{
             textAlign: 'center',
-            color: 'var(--text-muted)'
+            color:
+              'var(--text-muted)'
           }}
         >
           <div
@@ -408,9 +613,9 @@ export default function Booking() {
     )
   }
 
-  // -----------------------------------------------------
+  // =====================================================
   // MAIN BOOKING PAGE
-  // -----------------------------------------------------
+  // =====================================================
 
   return (
     <div className="page-enter">
@@ -435,19 +640,22 @@ export default function Booking() {
 
         <p
           style={{
-            color: 'var(--text-muted)',
+            color:
+              'var(--text-muted)',
             fontSize: '0.9rem',
             marginBottom: 24
           }}
         >
-          Choose your preferred date, time, and consultation mode.
+          Choose your preferred date,
+          time, and consultation mode.
         </p>
       </div>
 
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: '1fr 340px',
+          gridTemplateColumns:
+            '1fr 340px',
           gap: 20
         }}
         className="booking-grid"
@@ -477,26 +685,34 @@ export default function Booking() {
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'space-between',
+                justifyContent:
+                  'space-between',
                 marginBottom: 20
               }}
             >
+
               <button
                 onClick={prevMonth}
                 style={{
                   width: 32,
                   height: 32,
                   borderRadius: 8,
-                  border: '1px solid var(--border)',
-                  background: 'var(--bg-secondary)',
+                  border:
+                    '1px solid var(--border)',
+                  background:
+                    'var(--bg-secondary)',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center',
-                  color: 'var(--text-muted)'
+                  justifyContent:
+                    'center',
+                  color:
+                    'var(--text-muted)'
                 }}
               >
-                <ChevronLeft size={16} />
+                <ChevronLeft
+                  size={16}
+                />
               </button>
 
               <span
@@ -515,17 +731,24 @@ export default function Booking() {
                   width: 32,
                   height: 32,
                   borderRadius: 8,
-                  border: '1px solid var(--border)',
-                  background: 'var(--bg-secondary)',
+                  border:
+                    '1px solid var(--border)',
+                  background:
+                    'var(--bg-secondary)',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center',
-                  color: 'var(--text-muted)'
+                  justifyContent:
+                    'center',
+                  color:
+                    'var(--text-muted)'
                 }}
               >
-                <ChevronRight size={16} />
+                <ChevronRight
+                  size={16}
+                />
               </button>
+
             </div>
 
             {/* Weekdays */}
@@ -554,7 +777,8 @@ export default function Booking() {
                     textAlign: 'center',
                     fontSize: '0.72rem',
                     fontWeight: 700,
-                    color: 'var(--text-muted)',
+                    color:
+                      'var(--text-muted)',
                     padding: '4px 0'
                   }}
                 >
@@ -573,21 +797,29 @@ export default function Booking() {
                 gap: 2
               }}
             >
+
               {Array.from({
                 length: firstDay
               }).map((_, i) => (
-                <div key={`e${i}`} />
+                <div
+                  key={`e${i}`}
+                />
               ))}
 
               {Array.from({
                 length: daysInMonth
               }).map((_, i) => {
-                const day = i + 1
+
+                const day =
+                  i + 1
 
                 const isToday =
-                  year === today.getFullYear() &&
-                  month === today.getMonth() &&
-                  day === today.getDate()
+                  year ===
+                    today.getFullYear() &&
+                  month ===
+                    today.getMonth() &&
+                  day ===
+                    today.getDate()
 
                 const isPast =
                   new Date(
@@ -602,7 +834,9 @@ export default function Booking() {
                   )
 
                 const isUnavail =
-                  unavailableDays.includes(day)
+                  unavailableDays.includes(
+                    day
+                  )
 
                 const isSelected =
                   selectedDay === day
@@ -611,13 +845,20 @@ export default function Booking() {
                   <button
                     key={day}
                     onClick={() => {
+
                       if (
                         !isPast &&
                         !isUnavail
                       ) {
-                        setSelectedDay(day)
-                        setSelectedTime(null)
+                        setSelectedDay(
+                          day
+                        )
+
+                        setSelectedTime(
+                          null
+                        )
                       }
+
                     }}
                     disabled={
                       isPast ||
@@ -628,10 +869,12 @@ export default function Booking() {
                       borderRadius: 8,
                       border: 'none',
                       cursor:
-                        isPast || isUnavail
+                        isPast ||
+                        isUnavail
                           ? 'default'
                           : 'pointer',
-                      fontSize: '0.82rem',
+                      fontSize:
+                        '0.82rem',
                       fontWeight:
                         isSelected
                           ? 700
@@ -664,6 +907,7 @@ export default function Booking() {
                   </button>
                 )
               })}
+
             </div>
 
             {/* Legend */}
@@ -678,6 +922,7 @@ export default function Booking() {
                   '1px solid var(--border)'
               }}
             >
+
               {[
                 [
                   'var(--blue)',
@@ -691,36 +936,44 @@ export default function Booking() {
                   'var(--border)',
                   'Unavailable'
                 ]
-              ].map(([c, l]) => (
-                <div
-                  key={l}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 5
-                  }}
-                >
+              ].map(
+                ([c, l]) => (
                   <div
+                    key={l}
                     style={{
-                      width: 10,
-                      height: 10,
-                      borderRadius: 3,
-                      background: c
-                    }}
-                  />
-
-                  <span
-                    style={{
-                      fontSize: '0.7rem',
-                      color:
-                        'var(--text-muted)'
+                      display: 'flex',
+                      alignItems:
+                        'center',
+                      gap: 5
                     }}
                   >
-                    {l}
-                  </span>
-                </div>
-              ))}
+
+                    <div
+                      style={{
+                        width: 10,
+                        height: 10,
+                        borderRadius: 3,
+                        background: c
+                      }}
+                    />
+
+                    <span
+                      style={{
+                        fontSize:
+                          '0.7rem',
+                        color:
+                          'var(--text-muted)'
+                      }}
+                    >
+                      {l}
+                    </span>
+
+                  </div>
+                )
+              )}
+
             </div>
+
           </div>
 
           {/* Time Slots */}
@@ -732,6 +985,7 @@ export default function Booking() {
                 padding: 20
               }}
             >
+
               <h3
                 style={{
                   fontWeight: 700,
@@ -740,19 +994,22 @@ export default function Booking() {
                   marginBottom: 14
                 }}
               >
+
                 <Clock
                   size={15}
                   style={{
                     marginRight: 6,
                     verticalAlign:
                       'middle',
-                    color: 'var(--blue)'
+                    color:
+                      'var(--blue)'
                   }}
                 />
 
                 Available Time Slots —{' '}
                 {selectedDay}{' '}
                 {months[month]}
+
               </h3>
 
               <div
@@ -763,7 +1020,9 @@ export default function Booking() {
                   gap: 8
                 }}
               >
+
                 {timeSlots.map(t => {
+
                   const slotBooked =
                     [
                       '11:00 AM',
@@ -778,7 +1037,9 @@ export default function Booking() {
                       key={t}
                       onClick={() =>
                         !slotBooked &&
-                        setSelectedTime(t)
+                        setSelectedTime(
+                          t
+                        )
                       }
                       disabled={
                         slotBooked
@@ -821,7 +1082,9 @@ export default function Booking() {
                     </button>
                   )
                 })}
+
               </div>
+
             </div>
           )}
 
@@ -833,6 +1096,7 @@ export default function Booking() {
               padding: 20
             }}
           >
+
             <h3
               style={{
                 fontWeight: 700,
@@ -852,6 +1116,7 @@ export default function Booking() {
                 gap: 10
               }}
             >
+
               {[
                 {
                   id: 'video' as const,
@@ -866,6 +1131,7 @@ export default function Booking() {
                   sub: 'Delhi HC Chamber'
                 }
               ].map(m => (
+
                 <button
                   key={m.id}
                   onClick={() =>
@@ -890,6 +1156,7 @@ export default function Booking() {
                       'all 0.15s'
                   }}
                 >
+
                   <m.icon
                     size={18}
                     style={{
@@ -908,7 +1175,8 @@ export default function Booking() {
                         mode === m.id
                           ? 'var(--blue)'
                           : 'var(--text)',
-                      fontSize: '0.875rem'
+                      fontSize:
+                        '0.875rem'
                     }}
                   >
                     {m.label}
@@ -916,7 +1184,8 @@ export default function Booking() {
 
                   <div
                     style={{
-                      fontSize: '0.72rem',
+                      fontSize:
+                        '0.72rem',
                       color:
                         'var(--text-muted)',
                       marginTop: 2
@@ -924,10 +1193,14 @@ export default function Booking() {
                   >
                     {m.sub}
                   </div>
+
                 </button>
+
               ))}
+
             </div>
           </div>
+
         </div>
 
         {/* =================================================
@@ -950,6 +1223,7 @@ export default function Booking() {
               padding: 22
             }}
           >
+
             <div
               style={{
                 display: 'flex',
@@ -957,6 +1231,7 @@ export default function Booking() {
                 marginBottom: 16
               }}
             >
+
               <div
                 className="avatar"
                 style={{
@@ -969,6 +1244,7 @@ export default function Booking() {
               </div>
 
               <div>
+
                 <div
                   style={{
                     fontWeight: 700,
@@ -987,6 +1263,7 @@ export default function Booking() {
                     marginTop: 3
                   }}
                 >
+
                   <Award
                     size={11}
                     style={{
@@ -997,7 +1274,8 @@ export default function Booking() {
 
                   <span
                     style={{
-                      fontSize: '0.7rem',
+                      fontSize:
+                        '0.7rem',
                       color:
                         'var(--emerald)',
                       fontWeight: 600
@@ -1005,14 +1283,18 @@ export default function Booking() {
                   >
                     Registered Advocate
                   </span>
+
                 </div>
+
               </div>
+
             </div>
 
             <div
               style={{
                 fontSize: '0.8rem',
-                color: 'var(--text-muted)',
+                color:
+                  'var(--text-muted)',
                 marginBottom: 14
               }}
             >
@@ -1027,25 +1309,30 @@ export default function Booking() {
                 marginBottom: 14
               }}
             >
+
               <div
                 style={{
                   textAlign: 'center',
                   flex: 1
                 }}
               >
+
                 <div
                   style={{
                     display: 'flex',
-                    alignItems: 'center',
+                    alignItems:
+                      'center',
                     justifyContent:
                       'center',
                     gap: 3
                   }}
                 >
+
                   <Star
                     size={12}
                     style={{
-                      color: '#F59E0B'
+                      color:
+                        '#F59E0B'
                     }}
                     fill="#F59E0B"
                   />
@@ -1061,17 +1348,20 @@ export default function Booking() {
                   >
                     New
                   </span>
+
                 </div>
 
                 <div
                   style={{
-                    fontSize: '0.65rem',
+                    fontSize:
+                      '0.65rem',
                     color:
                       'var(--text-muted)'
                   }}
                 >
                   No reviews
                 </div>
+
               </div>
 
               <div
@@ -1088,6 +1378,7 @@ export default function Booking() {
                   flex: 1
                 }}
               >
+
                 <div
                   style={{
                     fontWeight: 700,
@@ -1102,13 +1393,15 @@ export default function Booking() {
 
                 <div
                   style={{
-                    fontSize: '0.65rem',
+                    fontSize:
+                      '0.65rem',
                     color:
                       'var(--text-muted)'
                   }}
                 >
                   experience
                 </div>
+
               </div>
 
               <div
@@ -1125,6 +1418,7 @@ export default function Booking() {
                   flex: 1
                 }}
               >
+
                 <div
                   style={{
                     fontWeight: 700,
@@ -1139,17 +1433,20 @@ export default function Booking() {
 
                 <div
                   style={{
-                    fontSize: '0.65rem',
+                    fontSize:
+                      '0.65rem',
                     color:
                       'var(--text-muted)'
                   }}
                 >
                   cases won
                 </div>
+
               </div>
+
             </div>
 
-            {/* Contact details if available */}
+            {/* Contact details */}
 
             {(advocateEmail ||
               advocatePhone) && (
@@ -1165,6 +1462,7 @@ export default function Booking() {
                     'var(--text-muted)'
                 }}
               >
+
                 {advocateEmail && (
                   <div
                     style={{
@@ -1196,8 +1494,10 @@ export default function Booking() {
                     </strong>
                   </div>
                 )}
+
               </div>
             )}
+
           </div>
 
           {/* Booking Summary */}
@@ -1208,6 +1508,7 @@ export default function Booking() {
               padding: 20
             }}
           >
+
             <h3
               style={{
                 fontWeight: 700,
@@ -1222,76 +1523,92 @@ export default function Booking() {
             <div
               style={{
                 display: 'flex',
-                flexDirection: 'column',
+                flexDirection:
+                  'column',
                 gap: 8,
                 marginBottom: 16
               }}
             >
+
               {[
                 [
                   'Advocate',
                   `Adv. ${advocateName}`
                 ],
+
                 [
                   'Date',
                   selectedDay
                     ? `${selectedDay} ${months[month]} ${year}`
                     : '—'
                 ],
+
                 [
                   'Time',
                   selectedTime || '—'
                 ],
+
                 [
                   'Mode',
                   mode === 'video'
                     ? 'Video Call'
                     : 'In-Person'
                 ],
+
                 [
                   'Duration',
                   '60 minutes'
                 ],
+
                 [
                   'Consultation Fee',
                   `₹${consultationFee.toLocaleString()}`
                 ],
+
                 [
                   'Platform Fee (5%)',
                   `₹${platformFee.toLocaleString()}`
-                ],
-              ].map(([k, v]) => (
-                <div
-                  key={k}
-                  style={{
-                    display: 'flex',
-                    justifyContent:
-                      'space-between',
-                    fontSize: '0.84rem',
-                    gap: 12
-                  }}
-                >
-                  <span
-                    style={{
-                      color:
-                        'var(--text-muted)'
-                    }}
-                  >
-                    {k}
-                  </span>
+                ]
 
-                  <span
+              ].map(
+                ([k, v]) => (
+                  <div
+                    key={k}
                     style={{
-                      fontWeight: 500,
-                      color:
-                        'var(--text)',
-                      textAlign: 'right'
+                      display: 'flex',
+                      justifyContent:
+                        'space-between',
+                      fontSize:
+                        '0.84rem',
+                      gap: 12
                     }}
                   >
-                    {v}
-                  </span>
-                </div>
-              ))}
+
+                    <span
+                      style={{
+                        color:
+                          'var(--text-muted)'
+                      }}
+                    >
+                      {k}
+                    </span>
+
+                    <span
+                      style={{
+                        fontWeight: 500,
+                        color:
+                          'var(--text)',
+                        textAlign:
+                          'right'
+                      }}
+                    >
+                      {v}
+                    </span>
+
+                  </div>
+                )
+              )}
+
             </div>
 
             <div
@@ -1311,10 +1628,12 @@ export default function Booking() {
                 marginBottom: 20
               }}
             >
+
               <span
                 style={{
                   fontWeight: 700,
-                  color: 'var(--text)'
+                  color:
+                    'var(--text)'
                 }}
               >
                 Total
@@ -1324,25 +1643,25 @@ export default function Booking() {
                 style={{
                   fontWeight: 800,
                   fontSize: '1.2rem',
-                  color: 'var(--text)'
+                  color:
+                    'var(--text)'
                 }}
               >
                 ₹{totalFee.toLocaleString()}
               </span>
+
             </div>
 
+            {/* =================================================
+                BOOKING BUTTON
+            ================================================= */}
+
             <button
-              onClick={() => {
-                if (
-                  selectedDay &&
-                  selectedTime
-                ) {
-                  setBooked(true)
-                }
-              }}
+              onClick={handleBooking}
               disabled={
                 !selectedDay ||
-                !selectedTime
+                !selectedTime ||
+                bookingLoading
               }
               className="btn-primary"
               style={{
@@ -1352,7 +1671,8 @@ export default function Booking() {
                 border: 'none',
                 cursor:
                   selectedDay &&
-                  selectedTime
+                  selectedTime &&
+                  !bookingLoading
                     ? 'pointer'
                     : 'not-allowed',
                 fontWeight: 700,
@@ -1364,12 +1684,15 @@ export default function Booking() {
                 gap: 8,
                 opacity:
                   selectedDay &&
-                  selectedTime
+                  selectedTime &&
+                  !bookingLoading
                     ? 1
                     : 0.5
               }}
             >
-              Pay & Confirm Booking
+              {bookingLoading
+                ? 'Booking...'
+                : 'Pay & Confirm Booking'}
             </button>
 
             <p
@@ -1383,8 +1706,11 @@ export default function Booking() {
             >
               Powered by Razorpay · 100% Secure · Refundable within 24hrs
             </p>
+
           </div>
+
         </div>
+
       </div>
 
       <style>{`
@@ -1394,6 +1720,7 @@ export default function Booking() {
           }
         }
       `}</style>
+
     </div>
   )
 }
