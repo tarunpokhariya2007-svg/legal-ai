@@ -893,18 +893,7 @@ backgroundRepeat: 'no-repeat',
 
         
 
-          <p
-            style={{
-              color: 'rgba(255,255,255,0.6)',
-              marginTop: 12,
-              lineHeight: 1.7,
-              maxWidth: 360,
-            }}
-          >
-            {tab === 'advocate'
-              ? 'AI-powered research, smart client management, and automated drafting for modern advocates.'
-              : 'AI-powered legal guidance in your language. Know your rights, connect with verified advocates.'}
-          </p>
+          
 
           <div
             style={{
