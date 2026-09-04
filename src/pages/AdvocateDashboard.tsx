@@ -472,7 +472,7 @@ export default function AdvocateDashboard() {
       <section
         style={{
           background:
-            'linear-gradient(135deg, #2563EB, #4F46E5)',
+            'linear-gradient(135deg, #8A6508 0%, #C9A227 45%, #F0D264 100%)',
 
           borderRadius:
             16,
