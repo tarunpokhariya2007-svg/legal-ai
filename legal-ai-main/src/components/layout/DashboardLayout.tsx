@@ -190,6 +190,14 @@ export default function DashboardLayout() {
     ? '/advocate/profile'
     : '/dashboard/profile'
 
+  // ==========================================
+  // HOME ROUTE FOR LOGGED-IN USER
+  // ==========================================
+
+  const homeHref = isAdvocate
+    ? '/advocate'
+    : '/dashboard'
+
   const Sidebar = () => (
     <aside
       className="sidebar"
@@ -210,7 +218,7 @@ export default function DashboardLayout() {
         }}
       >
         <Link
-          to="/"
+          to={homeHref}
           style={{
             textDecoration:
               'none',
@@ -228,10 +236,8 @@ export default function DashboardLayout() {
               background:
                 'linear-gradient(135deg, var(--blue), #7C3AED)',
               display: 'flex',
-              alignItems:
-                'center',
-              justifyContent:
-                'center',
+              alignItems: 'center',
+              justifyContent: 'center',
             }}
           >
             <Scale
