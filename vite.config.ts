@@ -170,6 +170,18 @@ function figmaSiteConfiguration(config: FigmaSiteConfiguration): Plugin {
           )
         }
 
+        tags.push({
+          tag: 'script',
+          attrs: { type: 'application/ld+json' },
+          children: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "WebSite",
+            "name": "Nyaya AI",
+            "url": "https://nyayaai.online/"
+          }),
+          injectTo: 'head',
+        })
+
         if (config.accessibility?.addBypassLinks) {
           tags.push(
             {
@@ -354,3 +366,4 @@ function figmaMakeKitPlugin(options: { storiesGlob: string | string[] }): Plugin
     },
   }
 }
+
