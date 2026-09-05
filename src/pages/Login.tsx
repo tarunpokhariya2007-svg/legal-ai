@@ -761,38 +761,81 @@ if (redirectTo && redirectTo.startsWith('/')) {
       setErrorMsg('')
 
       try {
+        // The role selected on the login page is the role the user is
+        // attempting to access. The backend remains the source of truth.
+        const requestedRole =
+          tab === 'advocate' ? 'lawyer' : 'citizen'
+
         const res = await fetch(`${API_URL}/api/auth/google`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             accessToken: tokenResponse.access_token,
-            role: tab === 'advocate' ? 'lawyer' : 'citizen',
+            role: requestedRole,
           }),
         })
 
         const data = await res.json()
 
         if (!res.ok || !data.success) {
-          throw new Error(data.message || 'Google sign-in failed.')
+          throw new Error(
+            data.message || 'Google sign-in failed.'
+          )
         }
 
-        localStorage.setItem('token', data.token)
-        localStorage.setItem('user', JSON.stringify(data.user))
+        // =====================================================
+        // IMPORTANT:
+        // Do not allow a Google account to enter the wrong portal.
+        // Example:
+        // Citizen account -> Advocate login = reject.
+        // Advocate account -> Citizen login = reject.
+        // =====================================================
 
-        const redirectTo = (location.state as { from?: string } | null)?.from
+        const actualRole = String(
+          data.user?.role || ''
+        ).toLowerCase()
+
+        if (
+          requestedRole === 'lawyer' &&
+          actualRole !== 'lawyer'
+        ) {
+          throw new Error(
+            'This account is not registered as an advocate.'
+          )
+        }
+
+        if (
+          requestedRole === 'citizen' &&
+          actualRole !== 'citizen'
+        ) {
+          throw new Error(
+            'This account is not registered as a citizen.'
+          )
+        }
+
+        // Save the session only after the role has been verified.
+        localStorage.setItem('token', data.token)
+        localStorage.setItem(
+          'user',
+          JSON.stringify(data.user)
+        )
+
+        const redirectTo = (
+          location.state as { from?: string } | null
+        )?.from
 
         if (redirectTo && redirectTo.startsWith('/')) {
           navigate(redirectTo, { replace: true })
+        } else if (actualRole === 'lawyer') {
+          navigate('/advocate')
         } else {
-          navigate(
-            data.user.role === 'lawyer'
-              ? '/advocate'
-              : '/dashboard'
-          )
+          navigate('/dashboard')
         }
       } catch (err) {
         setErrorMsg(
-          err instanceof Error ? err.message : 'Google sign-in failed.'
+          err instanceof Error
+            ? err.message
+            : 'Google sign-in failed.'
         )
       } finally {
         setGoogleLoading(false)
@@ -2437,4 +2480,4 @@ function LoginIllustration({
       />
     </svg>
   )
-}
+} 
