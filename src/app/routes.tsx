@@ -1,6 +1,8 @@
 import { createBrowserRouter } from 'react-router'
+
 import RootLayout from '../components/layout/RootLayout'
 import DashboardLayout from '../components/layout/DashboardLayout'
+
 import Landing from '../pages/Landing'
 import Login from '../pages/Login'
 import CitizenDashboard from '../pages/CitizenDashboard'
@@ -15,12 +17,14 @@ import NewCase from '../pages/NewCase'
 import CaseWorkspace from '../pages/CaseWorkspace'
 import Documents from '../pages/Documents'
 import Notifications from '../pages/Notifications'
-
 import Settings from '../pages/Settings'
+
 import AdvocateAppointments from '../pages/advocate/Appointments'
 import AdvocateClients from '../pages/advocate/Clients'
+import AdvocateConsultationRequests from '../pages/advocate/ConsultationRequests'
 import AdvocateEarnings from '../pages/advocate/Earnings'
 import AdvocateAnalytics from '../pages/advocate/Analytics'
+
 import NotFound from '../pages/NotFound'
 
 export const router = createBrowserRouter([
@@ -33,6 +37,7 @@ export const router = createBrowserRouter([
       { path: 'signup', Component: Login },
     ],
   },
+
   {
     path: 'dashboard',
     Component: DashboardLayout,
@@ -42,23 +47,30 @@ export const router = createBrowserRouter([
       { path: 'advocates', Component: AdvocateListing },
       { path: 'booking', Component: Booking },
       { path: 'profile', Component: Profile },
-{ path: 'cases', Component: Cases },
-{ path: 'cases/:caseId', Component: CaseWorkspace },
-{ path: 'new-case', Component: NewCase },
-{ path: 'documents', Component: Documents },
+
+      { path: 'cases', Component: Cases },
+      { path: 'cases/:caseId', Component: CaseWorkspace },
+      { path: 'new-case', Component: NewCase },
+
+      { path: 'documents', Component: Documents },
       { path: 'notifications', Component: Notifications },
       { path: 'settings', Component: Settings },
     ],
   },
+
   {
     path: 'advocate',
     Component: DashboardLayout,
     children: [
       { index: true, Component: AdvocateDashboard },
-      { path: 'ai-research', Component: AIResearch },
-      { path: 'profile', Component: Profile },
       { path: 'appointments', Component: AdvocateAppointments },
       { path: 'clients', Component: AdvocateClients },
+      {
+        path: 'consultation-requests',
+        Component: AdvocateConsultationRequests,
+      },
+      { path: 'ai-research', Component: AIResearch },
+      { path: 'profile', Component: Profile },
       { path: 'documents', Component: Documents },
       { path: 'earnings', Component: AdvocateEarnings },
       { path: 'analytics', Component: AdvocateAnalytics },
@@ -66,5 +78,6 @@ export const router = createBrowserRouter([
       { path: 'notifications', Component: Notifications },
     ],
   },
+
   { path: '*', Component: NotFound },
 ])

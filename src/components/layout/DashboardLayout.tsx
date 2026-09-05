@@ -19,6 +19,7 @@ import {
   BarChart2,
   DollarSign,
   BookOpen,
+  ClipboardList,
   ChevronRight,
 } from 'lucide-react'
 import { useTheme } from '../../context/ThemeContext'
@@ -89,6 +90,11 @@ const advocateNav = [
     icon: Users,
     label: 'Clients',
     href: '/advocate/clients',
+  },
+  {
+    icon: ClipboardList,
+    label: 'Consultation Requests',
+    href: '/advocate/consultation-requests',
   },
   {
     icon: BookOpen,
