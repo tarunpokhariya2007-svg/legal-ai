@@ -1043,7 +1043,19 @@ export default function Landing() {
               <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)', lineHeight: 1.7, maxWidth: 280 }}>
                 AI-powered legal assistance platform, making legal guidance simple and accessible for everyone.
               </p>
-
+              <a
+  href="mailto:nyaya.ai2007@gmail.com"
+  style={{
+    display: 'inline-block',
+    marginTop: 12,
+    fontSize: '0.875rem',
+    color: '#D4AF37',
+    textDecoration: 'none',
+    fontWeight: 600,
+  }}
+>
+  nyaya.ai2007@gmail.com
+</a>
               {/* Team social profiles */}
               <div
                 ref={socialRef}
