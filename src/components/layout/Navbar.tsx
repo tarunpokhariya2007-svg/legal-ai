@@ -13,6 +13,7 @@ const navLinks = [
 
 export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [contactOpen, setContactOpen] = useState(false)
   const location = useLocation()
   const navigate = useNavigate()
 
@@ -128,6 +129,79 @@ export default function Navbar() {
                 link.href === '/'
                   ? location.pathname === '/'
                   : location.pathname === link.href
+
+              if (link.label === 'Contact') {
+                return (
+                  <div
+                    key={link.label}
+                    style={{
+                      position: 'relative',
+                      display: 'flex',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setContactOpen((value) => !value)}
+                      style={{
+                        padding: '8px 12px',
+                        borderRadius: 8,
+                        fontSize: '0.9rem',
+                        fontWeight: 600,
+                        color: contactOpen ? '#D4AF37' : '#E2E2E2',
+                        textDecoration: 'none',
+                        background: contactOpen
+                          ? 'rgba(212,175,55,0.08)'
+                          : 'transparent',
+                        border: contactOpen
+                          ? '1px solid rgba(212,175,55,0.22)'
+                          : '1px solid transparent',
+                        transition: 'all 0.2s ease',
+                        whiteSpace: 'nowrap',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Contact
+                    </button>
+
+                    {contactOpen && (
+                      <div
+                        style={{
+                          position: 'absolute',
+                          top: 'calc(100% + 10px)',
+                          right: 0,
+                          minWidth: 250,
+                          padding: 10,
+                          borderRadius: 10,
+                          background: '#080808',
+                          border: '1px solid rgba(212,175,55,0.45)',
+                          boxShadow: '0 14px 35px rgba(0,0,0,0.6)',
+                          zIndex: 1000,
+                        }}
+                      >
+                        <a
+                          href="mailto:nyaya.ai2007@gmail.com"
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 10,
+                            padding: '10px 12px',
+                            borderRadius: 7,
+                            color: '#E2E2E2',
+                            textDecoration: 'none',
+                            fontSize: '0.85rem',
+                            fontWeight: 600,
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          <span style={{ color: '#D4AF37', fontSize: 17 }}>✉</span>
+                          nyaya.ai2007@gmail.com
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                )
+              }
 
               return (
                 <a
@@ -496,6 +570,71 @@ export default function Navbar() {
                 link.href === '/'
                   ? location.pathname === '/'
                   : location.pathname === link.href
+
+              if (link.label === 'Contact') {
+                return (
+                  <div key={link.label} style={{ position: 'relative' }}>
+                    <button
+                      type="button"
+                      onClick={() => setContactOpen((value) => !value)}
+                      style={{
+                        width: '100%',
+                        textAlign: 'left',
+                        padding: '11px 13px',
+                        borderRadius: 8,
+                        fontSize: '0.9rem',
+                        fontWeight: 600,
+                        color: contactOpen ? '#D4AF37' : '#E2E2E2',
+                        background: contactOpen
+                          ? 'rgba(212,175,55,0.08)'
+                          : 'transparent',
+                        border: contactOpen
+                          ? '1px solid rgba(212,175,55,0.18)'
+                          : '1px solid transparent',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Contact
+                    </button>
+
+                    {contactOpen && (
+                      <div
+                        style={{
+                          marginTop: 5,
+                          padding: 8,
+                          borderRadius: 8,
+                          background: '#080808',
+                          border: '1px solid rgba(212,175,55,0.35)',
+                          boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
+                        }}
+                      >
+                        <a
+                          href="mailto:nyaya.ai2007@gmail.com"
+                          onClick={() => {
+                            setContactOpen(false)
+                            setMobileOpen(false)
+                          }}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 9,
+                            padding: '9px 10px',
+                            borderRadius: 7,
+                            color: '#E2E2E2',
+                            textDecoration: 'none',
+                            fontSize: '0.82rem',
+                            fontWeight: 600,
+                            wordBreak: 'break-word',
+                          }}
+                        >
+                          <span style={{ color: '#D4AF37', fontSize: 17 }}>✉</span>
+                          nyaya.ai2007@gmail.com
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                )
+              }
 
               return (
                 <a
