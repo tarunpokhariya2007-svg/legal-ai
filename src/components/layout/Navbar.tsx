@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router'
 
 const navLinks = [
@@ -16,6 +16,26 @@ export default function Navbar() {
   const [contactOpen, setContactOpen] = useState(false)
   const location = useLocation()
   const navigate = useNavigate()
+
+  // Close the Contact popup whenever the user clicks anywhere
+  // outside the Contact button/popup itself.
+  useEffect(() => {
+    const handleOutsideClick = (event: MouseEvent) => {
+      const target = event.target as HTMLElement | null
+
+      if (target?.closest('[data-contact-control="true"]')) {
+        return
+      }
+
+      setContactOpen(false)
+    }
+
+    document.addEventListener('mousedown', handleOutsideClick)
+
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick)
+    }
+  }, [])
 
   const handleProtectedNavigation = (
     e: React.MouseEvent<HTMLAnchorElement>,
@@ -134,6 +154,7 @@ export default function Navbar() {
                 return (
                   <div
                     key={link.label}
+                    data-contact-control="true"
                     style={{
                       position: 'relative',
                       display: 'flex',
@@ -573,7 +594,11 @@ export default function Navbar() {
 
               if (link.label === 'Contact') {
                 return (
-                  <div key={link.label} style={{ position: 'relative' }}>
+                  <div
+                    key={link.label}
+                    data-contact-control="true"
+                    style={{ position: 'relative' }}
+                  >
                     <button
                       type="button"
                       onClick={() => setContactOpen((value) => !value)}
