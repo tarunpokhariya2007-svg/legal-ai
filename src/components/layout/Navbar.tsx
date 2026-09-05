@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useLocation } from 'react-router'
+import { Link, useLocation, useNavigate } from 'react-router'
 
 const navLinks = [
   { label: 'Home', href: '/' },
@@ -14,6 +14,28 @@ const navLinks = [
 export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const location = useLocation()
+  const navigate = useNavigate()
+
+  const handleProtectedNavigation = (
+    e: React.MouseEvent<HTMLAnchorElement>,
+    href: string
+  ) => {
+    if (href !== '/dashboard/advocates') return
+
+    e.preventDefault()
+
+    const token = localStorage.getItem('token')
+
+    if (token) {
+      navigate(href)
+    } else {
+      navigate('/login', {
+        state: { from: href },
+      })
+    }
+
+    setMobileOpen(false)
+  }
 
   return (
     <nav
@@ -111,6 +133,9 @@ export default function Navbar() {
                 <a
                   key={link.label}
                   href={link.href}
+                  onClick={(e) =>
+                    handleProtectedNavigation(e, link.href)
+                  }
                   style={{
                     padding: '8px 12px',
 
@@ -478,8 +503,8 @@ export default function Navbar() {
 
                   href={link.href}
 
-                  onClick={() =>
-                    setMobileOpen(false)
+                  onClick={(e) =>
+                    handleProtectedNavigation(e, link.href)
                   }
 
                   style={{
