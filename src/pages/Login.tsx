@@ -490,6 +490,22 @@ export default function Login() {
 
   const [errorMsg, setErrorMsg] = useState('')
 
+  // =====================================================
+  // FORGOT PASSWORD
+  // =====================================================
+
+  const [forgotOpen, setForgotOpen] = useState(false)
+  const [forgotStep, setForgotStep] = useState<'email' | 'otp' | 'password'>('email')
+  const [forgotEmail, setForgotEmail] = useState('')
+  const [forgotOtp, setForgotOtp] = useState('')
+  const [forgotPassword, setForgotPassword] = useState('')
+  const [forgotConfirmPassword, setForgotConfirmPassword] = useState('')
+  const [forgotLoading, setForgotLoading] = useState(false)
+  const [forgotError, setForgotError] = useState('')
+  const [forgotMessage, setForgotMessage] = useState('')
+  const [showForgotPassword, setShowForgotPassword] = useState(false)
+  const [showForgotConfirmPassword, setShowForgotConfirmPassword] = useState(false)
+
   // Reset the signup wizard whenever the role tab changes,
   // or when the page switches between login/signup.
   useEffect(() => {
@@ -532,6 +548,171 @@ export default function Login() {
   const [agreedToTerms, setAgreedToTerms] = useState(false)
 
   const [termsModalOpen, setTermsModalOpen] = useState(false)
+
+  // =====================================================
+  // FORGOT PASSWORD FLOW
+  // =====================================================
+
+  const openForgotPassword = () => {
+    setForgotOpen(true)
+    setForgotStep('email')
+    setForgotEmail(email.trim())
+    setForgotOtp('')
+    setForgotPassword('')
+    setForgotConfirmPassword('')
+    setForgotError('')
+    setForgotMessage('')
+    setShowForgotPassword(false)
+    setShowForgotConfirmPassword(false)
+  }
+
+  const closeForgotPassword = () => {
+    if (forgotLoading) return
+    setForgotOpen(false)
+    setForgotError('')
+    setForgotMessage('')
+  }
+
+  const handleForgotSendOtp = async () => {
+    setForgotError('')
+    setForgotMessage('')
+
+    if (!forgotEmail.trim()) {
+      setForgotError('Please enter your email address.')
+      return
+    }
+
+    setForgotLoading(true)
+
+    try {
+      const role = tab === 'advocate' ? 'lawyer' : 'citizen'
+
+      const res = await fetch(`${API_URL}/api/auth/forgot-password/send-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: forgotEmail.trim(),
+          role,
+        }),
+      })
+
+      const data = await res.json()
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || 'Failed to send password reset code.')
+      }
+
+      setForgotStep('otp')
+      setForgotOtp('')
+      setForgotMessage(`A verification code has been sent to ${forgotEmail.trim()}.`)
+    } catch (err) {
+      setForgotError(
+        err instanceof Error
+          ? err.message
+          : 'Failed to send password reset code.'
+      )
+    } finally {
+      setForgotLoading(false)
+    }
+  }
+
+  const handleForgotVerifyOtp = async () => {
+    setForgotError('')
+    setForgotMessage('')
+
+    if (forgotOtp.trim().length !== 6) {
+      setForgotError('Enter the 6-digit code sent to your email.')
+      return
+    }
+
+    setForgotLoading(true)
+
+    try {
+      const role = tab === 'advocate' ? 'lawyer' : 'citizen'
+
+      const res = await fetch(`${API_URL}/api/auth/forgot-password/verify-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: forgotEmail.trim(),
+          otp: forgotOtp.trim(),
+          role,
+        }),
+      })
+
+      const data = await res.json()
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || 'Incorrect verification code.')
+      }
+
+      setForgotStep('password')
+      setForgotMessage('Code verified. Create your new password below.')
+    } catch (err) {
+      setForgotError(
+        err instanceof Error
+          ? err.message
+          : 'Incorrect verification code.'
+      )
+    } finally {
+      setForgotLoading(false)
+    }
+  }
+
+  const handleForgotResetPassword = async () => {
+    setForgotError('')
+    setForgotMessage('')
+
+    if (forgotPassword.length < 6) {
+      setForgotError('Password must be at least 6 characters.')
+      return
+    }
+
+    if (forgotPassword !== forgotConfirmPassword) {
+      setForgotError('Passwords do not match.')
+      return
+    }
+
+    setForgotLoading(true)
+
+    try {
+      const role = tab === 'advocate' ? 'lawyer' : 'citizen'
+
+      const res = await fetch(`${API_URL}/api/auth/forgot-password/reset`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: forgotEmail.trim(),
+          newPassword: forgotPassword,
+          role,
+        }),
+      })
+
+      const data = await res.json()
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || 'Failed to change password.')
+      }
+
+      setForgotMessage('Password changed successfully. You can now sign in.')
+      setForgotPassword('')
+      setForgotConfirmPassword('')
+
+      setTimeout(() => {
+        setForgotOpen(false)
+        setForgotStep('email')
+        setForgotMessage('')
+      }, 1200)
+    } catch (err) {
+      setForgotError(
+        err instanceof Error
+          ? err.message
+          : 'Failed to change password.'
+      )
+    } finally {
+      setForgotLoading(false)
+    }
+  }
 
   // =====================================================
   // LOGIN (email + password only)
@@ -1769,18 +1950,22 @@ if (redirectTo && redirectTo.startsWith('/')) {
                 </label>
 
                 {!isSignup && (
-                  <a
-                    href="#"
+                  <button
+                    type="button"
+                    onClick={openForgotPassword}
                     style={{
                       fontSize: '0.78rem',
                       color: accentColor,
-                      textDecoration:
-                        'none',
+                      textDecoration: 'none',
                       fontWeight: 500,
+                      background: 'none',
+                      border: 'none',
+                      padding: 0,
+                      cursor: 'pointer',
                     }}
                   >
                     Forgot password?
-                  </a>
+                  </button>
                 )}
               </div>
 
@@ -2119,6 +2304,387 @@ if (redirectTo && redirectTo.startsWith('/')) {
           }
         }
       `}</style>
+
+      {/* =================================================
+          FORGOT PASSWORD MODAL
+      ================================================= */}
+
+      {forgotOpen && (
+        <div
+          onClick={closeForgotPassword}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.72)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 2100,
+            padding: 20,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: '100%',
+              maxWidth: 470,
+              background: 'var(--bg-card)',
+              border: '1px solid rgba(212,175,55,0.35)',
+              borderRadius: 16,
+              boxShadow: '0 25px 70px rgba(0,0,0,0.65)',
+              padding: 26,
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'flex-start',
+                gap: 16,
+                marginBottom: 20,
+              }}
+            >
+              <div>
+                <h2
+                  style={{
+                    margin: 0,
+                    color: 'var(--text)',
+                    fontSize: '1.35rem',
+                    fontWeight: 800,
+                  }}
+                >
+                  Reset your password
+                </h2>
+                <p
+                  style={{
+                    margin: '7px 0 0',
+                    color: 'var(--text-muted)',
+                    fontSize: '0.85rem',
+                    lineHeight: 1.5,
+                  }}
+                >
+                  {tab === 'advocate'
+                    ? 'Reset your Advocate Portal password securely.'
+                    : 'Reset your Citizen Portal password securely.'}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={closeForgotPassword}
+                disabled={forgotLoading}
+                aria-label="Close"
+                style={{
+                  border: 'none',
+                  background: 'transparent',
+                  color: 'var(--text-muted)',
+                  fontSize: 24,
+                  cursor: forgotLoading ? 'not-allowed' : 'pointer',
+                  lineHeight: 1,
+                  padding: 0,
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            {forgotStep === 'email' && (
+              <>
+                <label
+                  style={{
+                    display: 'block',
+                    color: 'var(--text)',
+                    fontSize: '0.8rem',
+                    fontWeight: 600,
+                    marginBottom: 7,
+                  }}
+                >
+                  Email Address
+                </label>
+
+                <div style={{ position: 'relative' }}>
+                  <Mail
+                    size={16}
+                    style={{
+                      position: 'absolute',
+                      left: 12,
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      color: 'var(--text-muted)',
+                    }}
+                  />
+                  <input
+                    className="input"
+                    type="email"
+                    placeholder="you@example.com"
+                    value={forgotEmail}
+                    onChange={(e) => setForgotEmail(e.target.value)}
+                    autoFocus
+                    style={{ paddingLeft: 36 }}
+                  />
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleForgotSendOtp}
+                  disabled={forgotLoading}
+                  style={{
+                    width: '100%',
+                    marginTop: 16,
+                    padding: '12px 16px',
+                    borderRadius: 9,
+                    border: 'none',
+                    background: accentGrad,
+                    color: '#fff',
+                    fontWeight: 700,
+                    cursor: forgotLoading ? 'not-allowed' : 'pointer',
+                    opacity: forgotLoading ? 0.7 : 1,
+                  }}
+                >
+                  {forgotLoading ? 'Sending code...' : 'Send reset code'}
+                </button>
+              </>
+            )}
+
+            {forgotStep === 'otp' && (
+              <>
+                <p
+                  style={{
+                    color: 'var(--text-muted)',
+                    fontSize: '0.82rem',
+                    lineHeight: 1.5,
+                    marginTop: 0,
+                    marginBottom: 14,
+                  }}
+                >
+                  Enter the 6-digit code sent to <strong style={{ color: 'var(--text)' }}>{forgotEmail}</strong>.
+                </p>
+
+                <input
+                  className="input"
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={6}
+                  placeholder="123456"
+                  value={forgotOtp}
+                  onChange={(e) => setForgotOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  autoFocus
+                  style={{
+                    textAlign: 'center',
+                    letterSpacing: '0.35em',
+                    fontSize: '1.1rem',
+                    fontWeight: 700,
+                  }}
+                />
+
+                <button
+                  type="button"
+                  onClick={handleForgotVerifyOtp}
+                  disabled={forgotLoading}
+                  style={{
+                    width: '100%',
+                    marginTop: 16,
+                    padding: '12px 16px',
+                    borderRadius: 9,
+                    border: 'none',
+                    background: accentGrad,
+                    color: '#fff',
+                    fontWeight: 700,
+                    cursor: forgotLoading ? 'not-allowed' : 'pointer',
+                    opacity: forgotLoading ? 0.7 : 1,
+                  }}
+                >
+                  {forgotLoading ? 'Verifying...' : 'Verify code'}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setForgotStep('email')
+                    setForgotOtp('')
+                    setForgotError('')
+                    setForgotMessage('')
+                  }}
+                  disabled={forgotLoading}
+                  style={{
+                    width: '100%',
+                    marginTop: 9,
+                    padding: 8,
+                    border: 'none',
+                    background: 'transparent',
+                    color: 'var(--text-muted)',
+                    cursor: forgotLoading ? 'not-allowed' : 'pointer',
+                    fontSize: '0.78rem',
+                  }}
+                >
+                  Use a different email
+                </button>
+              </>
+            )}
+
+            {forgotStep === 'password' && (
+              <>
+                <label
+                  style={{
+                    display: 'block',
+                    color: 'var(--text)',
+                    fontSize: '0.8rem',
+                    fontWeight: 600,
+                    marginBottom: 7,
+                  }}
+                >
+                  New Password
+                </label>
+
+                <div style={{ position: 'relative' }}>
+                  <Lock
+                    size={16}
+                    style={{
+                      position: 'absolute',
+                      left: 12,
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      color: 'var(--text-muted)',
+                    }}
+                  />
+                  <input
+                    className="input"
+                    type={showForgotPassword ? 'text' : 'password'}
+                    placeholder="At least 6 characters"
+                    value={forgotPassword}
+                    onChange={(e) => setForgotPassword(e.target.value)}
+                    autoFocus
+                    style={{ paddingLeft: 36, paddingRight: 40 }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowForgotPassword((value) => !value)}
+                    aria-label={showForgotPassword ? 'Hide password' : 'Show password'}
+                    style={{
+                      position: 'absolute',
+                      right: 10,
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      border: 'none',
+                      background: 'transparent',
+                      color: 'var(--text-muted)',
+                      cursor: 'pointer',
+                      padding: 3,
+                    }}
+                  >
+                    {showForgotPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+
+                <label
+                  style={{
+                    display: 'block',
+                    color: 'var(--text)',
+                    fontSize: '0.8rem',
+                    fontWeight: 600,
+                    margin: '14px 0 7px',
+                  }}
+                >
+                  Confirm New Password
+                </label>
+
+                <div style={{ position: 'relative' }}>
+                  <Lock
+                    size={16}
+                    style={{
+                      position: 'absolute',
+                      left: 12,
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      color: 'var(--text-muted)',
+                    }}
+                  />
+                  <input
+                    className="input"
+                    type={showForgotConfirmPassword ? 'text' : 'password'}
+                    placeholder="Enter password again"
+                    value={forgotConfirmPassword}
+                    onChange={(e) => setForgotConfirmPassword(e.target.value)}
+                    style={{ paddingLeft: 36, paddingRight: 40 }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowForgotConfirmPassword((value) => !value)}
+                    aria-label={showForgotConfirmPassword ? 'Hide password' : 'Show password'}
+                    style={{
+                      position: 'absolute',
+                      right: 10,
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      border: 'none',
+                      background: 'transparent',
+                      color: 'var(--text-muted)',
+                      cursor: 'pointer',
+                      padding: 3,
+                    }}
+                  >
+                    {showForgotConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleForgotResetPassword}
+                  disabled={forgotLoading}
+                  style={{
+                    width: '100%',
+                    marginTop: 16,
+                    padding: '12px 16px',
+                    borderRadius: 9,
+                    border: 'none',
+                    background: accentGrad,
+                    color: '#fff',
+                    fontWeight: 700,
+                    cursor: forgotLoading ? 'not-allowed' : 'pointer',
+                    opacity: forgotLoading ? 0.7 : 1,
+                  }}
+                >
+                  {forgotLoading ? 'Changing password...' : 'Change password'}
+                </button>
+              </>
+            )}
+
+            {forgotError && (
+              <div
+                style={{
+                  marginTop: 14,
+                  padding: '10px 12px',
+                  borderRadius: 8,
+                  background: 'rgba(239,68,68,0.10)',
+                  border: '1px solid rgba(239,68,68,0.25)',
+                  color: '#FCA5A5',
+                  fontSize: '0.78rem',
+                  lineHeight: 1.45,
+                }}
+              >
+                {forgotError}
+              </div>
+            )}
+
+            {forgotMessage && (
+              <div
+                style={{
+                  marginTop: 14,
+                  padding: '10px 12px',
+                  borderRadius: 8,
+                  background: 'rgba(16,185,129,0.10)',
+                  border: '1px solid rgba(16,185,129,0.25)',
+                  color: '#6EE7B7',
+                  fontSize: '0.78rem',
+                  lineHeight: 1.45,
+                }}
+              >
+                {forgotMessage}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* =================================================
           TERMS & CONDITIONS MODAL

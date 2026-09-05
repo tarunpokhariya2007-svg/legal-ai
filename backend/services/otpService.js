@@ -6,7 +6,7 @@ const {
     deleteOtp
 } = require("../database/otpModel");
 
-const { sendOtpEmail } = require("./mailerService");
+const { sendOtpEmail, sendPasswordResetOtpEmail } = require("./mailerService");
 
 const OTP_TTL_MINUTES = 10;
 const RESEND_COOLDOWN_SECONDS = 45;
@@ -54,6 +54,40 @@ async function createAndSendOtp(email, purpose = "signup") {
     await upsertOtp(email, otpCode, purpose, expiresAt);
 
     await sendOtpEmail(email, otpCode, purpose);
+
+    return { expiresInMinutes: OTP_TTL_MINUTES };
+}
+
+
+// =====================================================
+// GENERATE + SEND PASSWORD RESET OTP
+// =====================================================
+
+async function createAndSendPasswordResetOtp(email, role = "citizen") {
+
+    const purpose = "password_reset";
+    const existing = await findOtp(email, purpose);
+
+    if (existing) {
+        const secondsSinceUpdate =
+            (Date.now() - new Date(existing.updated_at || existing.created_at).getTime()) / 1000;
+
+        if (secondsSinceUpdate < RESEND_COOLDOWN_SECONDS) {
+            const waitSeconds = Math.ceil(RESEND_COOLDOWN_SECONDS - secondsSinceUpdate);
+            const err = new Error(
+                `Please wait ${waitSeconds}s before requesting another code.`
+            );
+            err.code = "OTP_COOLDOWN";
+            err.waitSeconds = waitSeconds;
+            throw err;
+        }
+    }
+
+    const otpCode = generateOtpCode();
+    const expiresAt = new Date(Date.now() + OTP_TTL_MINUTES * 60 * 1000);
+
+    await upsertOtp(email, otpCode, purpose, expiresAt);
+    await sendPasswordResetOtpEmail(email, otpCode, role);
 
     return { expiresInMinutes: OTP_TTL_MINUTES };
 }
@@ -123,6 +157,7 @@ async function clearOtp(email, purpose) {
 
 module.exports = {
     createAndSendOtp,
+    createAndSendPasswordResetOtp,
     verifyOtpCode,
     isEmailVerified,
     clearOtp

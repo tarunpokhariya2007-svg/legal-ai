@@ -225,6 +225,27 @@ async function findUserById(userId) {
 // UPDATE USER PROFILE
 // =====================================================
 
+// =====================================================
+// UPDATE USER PASSWORD
+// =====================================================
+
+async function updateUserPassword(userId, hashedPassword) {
+
+    const sql = `
+        UPDATE users
+        SET password = ?
+        WHERE id = ?
+    `;
+
+    const [result] = await db.query(
+        sql,
+        [hashedPassword, userId]
+    );
+
+    return result;
+}
+
+
 async function updateUserProfile(
     userId,
     fullName,
@@ -289,6 +310,8 @@ module.exports = {
     findUserByEmail,
 
     findUserById,
+
+    updateUserPassword,
 
     updateUserProfile
 

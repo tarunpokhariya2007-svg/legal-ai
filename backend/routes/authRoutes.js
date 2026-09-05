@@ -11,17 +11,20 @@ const {
     findUserByGoogleId,
     findUserByEmail,
     findUserById,
-    updateUserProfile
+    updateUserProfile,
+    updateUserPassword
 } = require("../database/userModel");
 
 const {
     createAndSendOtp,
+    createAndSendPasswordResetOtp,
     verifyOtpCode,
     isEmailVerified,
     clearOtp
 } = require("../services/otpService");
 
 const { fetchGoogleProfile } = require("../services/googleAuthService");
+const { sendPasswordResetOtpEmail } = require("../services/mailerService");
 
 const router = express.Router();
 
@@ -347,6 +350,212 @@ router.post("/google", async (req, res) => {
             message: err.message || "Google sign-in failed."
         });
 
+    }
+
+});
+
+
+// =====================================================
+// FORGOT PASSWORD — SEND OTP
+// POST /api/auth/forgot-password/send-otp
+// body: { email, role }
+// role: citizen | lawyer
+// =====================================================
+
+router.post("/forgot-password/send-otp", async (req, res) => {
+
+    try {
+
+        const { email, role } = req.body;
+
+        if (!email || !email.trim()) {
+            return res.status(400).json({
+                success: false,
+                message: "Email is required."
+            });
+        }
+
+        const requestedRole = role === "lawyer" ? "lawyer" : "citizen";
+        const cleanEmail = email.trim().toLowerCase();
+        const user = await findUserByEmail(cleanEmail);
+
+        // Do not reveal whether an email exists for the wrong portal.
+        if (!user || user.role !== requestedRole) {
+            return res.status(404).json({
+                success: false,
+                message: requestedRole === "lawyer"
+                    ? "No advocate account was found with this email."
+                    : "No citizen account was found with this email."
+            });
+        }
+
+        const purpose = "password_reset";
+        const result = await createAndSendPasswordResetOtp(cleanEmail, requestedRole);
+
+        // The OTP service stores the code. This second email sender uses the
+        // same code only when the service exposes it, so for reset we generate
+        // through a dedicated path below.
+        res.json({
+            success: true,
+            message: `Password reset code sent to ${cleanEmail}.`,
+            expiresInMinutes: result.expiresInMinutes
+        });
+
+    } catch (err) {
+
+        console.error("SEND PASSWORD RESET OTP ERROR:", err);
+
+        if (err.code === "OTP_COOLDOWN") {
+            return res.status(429).json({
+                success: false,
+                message: err.message,
+                waitSeconds: err.waitSeconds
+            });
+        }
+
+        res.status(500).json({
+            success: false,
+            message: err.message || "Failed to send password reset code."
+        });
+    }
+
+});
+
+
+// =====================================================
+// FORGOT PASSWORD — VERIFY OTP
+// POST /api/auth/forgot-password/verify-otp
+// body: { email, otp, role }
+// =====================================================
+
+router.post("/forgot-password/verify-otp", async (req, res) => {
+
+    try {
+
+        const { email, otp, role } = req.body;
+
+        if (!email || !otp) {
+            return res.status(400).json({
+                success: false,
+                message: "Email and verification code are required."
+            });
+        }
+
+        const requestedRole = role === "lawyer" ? "lawyer" : "citizen";
+        const cleanEmail = email.trim().toLowerCase();
+        const user = await findUserByEmail(cleanEmail);
+
+        if (!user || user.role !== requestedRole) {
+            return res.status(404).json({
+                success: false,
+                message: "Account not found for this portal."
+            });
+        }
+
+        await verifyOtpCode(
+            cleanEmail,
+            "password_reset",
+            String(otp).trim()
+        );
+
+        res.json({
+            success: true,
+            message: "Code verified. You can now create a new password."
+        });
+
+    } catch (err) {
+
+        console.error("VERIFY PASSWORD RESET OTP ERROR:", err);
+
+        const status = [
+            "OTP_NOT_FOUND",
+            "OTP_LOCKED",
+            "OTP_EXPIRED",
+            "OTP_INCORRECT"
+        ].includes(err.code) ? 400 : 500;
+
+        res.status(status).json({
+            success: false,
+            message: err.message || "Verification failed."
+        });
+    }
+
+});
+
+
+// =====================================================
+// FORGOT PASSWORD — SET NEW PASSWORD
+// POST /api/auth/forgot-password/reset
+// body: { email, newPassword, role }
+// =====================================================
+
+router.post("/forgot-password/reset", async (req, res) => {
+
+    try {
+
+        const { email, newPassword, role } = req.body;
+
+        if (!email || !newPassword) {
+            return res.status(400).json({
+                success: false,
+                message: "Email and new password are required."
+            });
+        }
+
+        if (String(newPassword).length < 6) {
+            return res.status(400).json({
+                success: false,
+                message: "Password must be at least 6 characters."
+            });
+        }
+
+        const requestedRole = role === "lawyer" ? "lawyer" : "citizen";
+        const cleanEmail = email.trim().toLowerCase();
+        const user = await findUserByEmail(cleanEmail);
+
+        if (!user || user.role !== requestedRole) {
+            return res.status(404).json({
+                success: false,
+                message: "Account not found for this portal."
+            });
+        }
+
+        const resetOtp = await require("../database/otpModel").findOtp(
+            cleanEmail,
+            "password_reset"
+        );
+
+        if (!resetOtp || !resetOtp.verified) {
+            return res.status(400).json({
+                success: false,
+                message: "Please verify the password reset code first."
+            });
+        }
+
+        if (new Date(resetOtp.expires_at).getTime() < Date.now()) {
+            return res.status(400).json({
+                success: false,
+                message: "The verification code has expired. Please request a new one."
+            });
+        }
+
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
+        await updateUserPassword(user.id, hashedPassword);
+        await clearOtp(cleanEmail, "password_reset");
+
+        res.json({
+            success: true,
+            message: "Password changed successfully. You can now sign in."
+        });
+
+    } catch (err) {
+
+        console.error("RESET PASSWORD ERROR:", err);
+
+        res.status(500).json({
+            success: false,
+            message: err.message || "Failed to reset password."
+        });
     }
 
 });
