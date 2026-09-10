@@ -9,9 +9,7 @@ import {
   Bell,
   Settings,
   LogOut,
-  Moon,
-  Sun,
-  Menu,
+Menu,
   X,
   Search,
   FileText,
@@ -23,7 +21,6 @@ import {
   Video,
   ChevronRight,
 } from 'lucide-react'
-import { useTheme } from '../../context/ThemeContext'
 import BackButton from './BackButton'
 import { getStoredUser, logout } from '../../lib/auth'
 
@@ -58,7 +55,6 @@ const advocateNav = [
 ]
 
 export default function DashboardLayout() {
-  const { theme, toggle } = useTheme()
   const location = useLocation()
   const navigate = useNavigate()
 
@@ -302,27 +298,7 @@ export default function DashboardLayout() {
             padding: '6px 4px 0',
           }}
         >
-          <button
-            onClick={toggle}
-            style={{
-              flex: 1,
-              padding: '7px',
-              borderRadius: 8,
-              border: '1px solid var(--border)',
-              background: 'var(--bg-secondary)',
-              cursor: 'pointer',
-              color: 'var(--text-muted)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            {theme === 'dark' ? (
-              <Sun size={14} />
-            ) : (
-              <Moon size={14} />
-            )}
-          </button>
+        
 
           <button
             onClick={() => {
