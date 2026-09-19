@@ -53,6 +53,9 @@ const {
     ensureDocumentHashColumn,
     ensureBlockchainColumns,
 } = require("./database/documentHashModel");
+const {
+    ensureAuditTrailTable
+} = require("./database/auditTrailModel");
 
 // =====================================================
 // AUDIT LOG INITIALIZATION
@@ -100,6 +103,12 @@ ensureDocumentHashColumn().catch((err) => {
 ensureBlockchainColumns().catch((err) => {
     console.error(
         "Failed to ensure blockchain registration columns:",
+        err.message
+    );
+});
+ensureAuditTrailTable().catch((err) => {
+    console.error(
+        "Failed to ensure audit_logs table:",
         err.message
     );
 });
