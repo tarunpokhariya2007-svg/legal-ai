@@ -232,8 +232,7 @@ async function initializeDatabaseTables() {
     await initializeAppointmentsTable();
     await initializeConsultationMeetingsTable();
     await initializeMeetingEndRequestsTable();
-
-    await ensureLegalKnowledgeTable();
+    await ensureLegalKnowledgeTable(pool);
 }
 
 initializeDatabaseTables();

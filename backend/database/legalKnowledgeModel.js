@@ -1,8 +1,6 @@
-const db = require("../db");
-
-async function ensureLegalKnowledgeTable() {
+async function ensureLegalKnowledgeTable(pool) {
     try {
-        await db.query(`
+        await pool.query(`
             CREATE TABLE IF NOT EXISTS legal_knowledge (
                 id INT NOT NULL AUTO_INCREMENT,
 
@@ -41,12 +39,10 @@ async function ensureLegalKnowledgeTable() {
         console.log("LEGAL KNOWLEDGE TABLE READY");
 
     } catch (error) {
-
         console.error(
             "FAILED TO CREATE LEGAL KNOWLEDGE TABLE:",
             error.message
         );
-
     }
 }
 
