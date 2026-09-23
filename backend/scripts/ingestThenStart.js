@@ -1,12 +1,33 @@
 const { spawn } = require("child_process");
 
-async function run() {
-    console.log("========================================");
-    console.log("NYAYA AI — STARTUP INGESTION");
-    console.log("========================================");
+console.log("========================================");
+console.log("NYAYA AI — SERVER + BACKGROUND INGESTION");
+console.log("========================================");
 
-    const ingestionArgs = [
-    "scripts/ingestCentralActs.js",
+console.log("Starting web server immediately...");
+
+const server = spawn(
+    process.execPath,
+    ["server.js"],
+    {
+        stdio: "inherit",
+        env: process.env
+    }
+);
+
+server.on("error", error => {
+    console.error(
+        "SERVER PROCESS ERROR:",
+        error.message
+    );
+});
+
+console.log(
+    "Starting legal ingestion in background..."
+);
+
+const ingestionArgs = [
+    "scripts/ingestCentralActsFast.js",
     ...process.argv.slice(2)
 ];
 
@@ -19,44 +40,63 @@ const ingestion = spawn(
     }
 );
 
-    ingestion.on("close", code => {
-        if (code !== 0) {
-            console.error(
-                
-                `Ingestion failed with exit code ${code}`
-            );
-
-            process.exit(code || 1);
-        }
-
-        console.log(
-            "\nIngestion completed successfully."
-        );
-
-        console.log(
-            "Starting Nyaya AI server...\n"
-        );
-
-        const server = spawn(
-            process.execPath,
-            ["server.js"],
-            {
-                stdio: "inherit",
-                env: process.env
-            }
-        );
-
-        server.on("close", serverCode => {
-            process.exit(serverCode || 0);
-        });
-    });
-}
-
-run().catch(error => {
+ingestion.on("error", error => {
     console.error(
-        "Startup process failed:",
-        error
+        "INGESTION PROCESS ERROR:",
+        error.message
+    );
+});
+
+ingestion.on("exit", (code, signal) => {
+    if (code === 0) {
+        console.log(
+            "LEGAL INGESTION FINISHED SUCCESSFULLY."
+        );
+    } else {
+        console.error(
+            `LEGAL INGESTION EXITED. code=${code}, signal=${signal}`
+        );
+    }
+});
+
+server.on("exit", (code, signal) => {
+    console.error(
+        `SERVER EXITED. code=${code}, signal=${signal}`
     );
 
-    process.exit(1);
+    if (!ingestion.killed) {
+        ingestion.kill("SIGTERM");
+    }
+
+    process.exit(
+        typeof code === "number" ? code : 1
+    );
+});
+
+process.on("SIGTERM", () => {
+    console.log(
+        "SIGTERM received. Stopping processes..."
+    );
+
+    if (!server.killed) {
+        server.kill("SIGTERM");
+    }
+
+    if (!ingestion.killed) {
+        ingestion.kill("SIGTERM");
+    }
+});
+
+process.on("SIGINT", () => {
+    console.log(
+        "SIGINT received. Stopping processes..."
+    );
+
+    if (!server.killed) {
+        server.kill("SIGINT");
+    }
+
+    if (!ingestion.killed) {
+        ingestion.kill("SIGINT");
+    }
 });
