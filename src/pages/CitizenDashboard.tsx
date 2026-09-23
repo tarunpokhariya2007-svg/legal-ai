@@ -563,7 +563,7 @@ export default function CitizenDashboard() {
         }
 
         const response = await fetch(
-          `${API_URL}/api/documents`,
+          `${API_URL}/api/documents/count`,
           {
             method: 'GET',
             credentials: 'include',
@@ -577,15 +577,16 @@ export default function CitizenDashboard() {
 
         if (!response.ok || !result.success) {
           throw new Error(
-            result.message || 'Failed to load documents'
+            result.message || 'Failed to load document count'
           )
         }
+const count = Number(result.count)
 
-        const documents = Array.isArray(result.documents)
-          ? result.documents
-          : []
-
-        setDocumentsCount(documents.length)
+setDocumentsCount(
+  Number.isFinite(count) && count >= 0
+    ? count
+    : 0
+)
       } catch (error) {
         console.error(
           'LOAD DOCUMENT COUNT ERROR:',

@@ -301,6 +301,37 @@ async function registerDocumentOnBlockchain(
         };
     }
 }
+router.get(
+    "/documents/count",
+    authMiddleware,
+    async (req, res) => {
+        try {
+            const [rows] = await db.query(
+                `
+                SELECT COUNT(*) AS count
+                FROM documents
+                WHERE user_id = ?
+                `,
+                [req.user.id]
+            );
+
+            return res.json({
+                success: true,
+                count: Number(rows[0]?.count || 0)
+            });
+        } catch (error) {
+            console.error(
+                "DOCUMENT COUNT ERROR:",
+                error
+            );
+
+            return res.status(500).json({
+                success: false,
+                message: "Unable to load document count."
+            });
+        }
+    }
+);
 
 router.get(
     "/documents",
