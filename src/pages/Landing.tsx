@@ -262,73 +262,7 @@ export default function Landing() {
 
         }
 
-        /* Two subtle moving particle layers */
-
-        .landing-page::before,
-
-        .landing-page::after {
-
-          content: "";
-
-          position: absolute;
-
-          inset: -120px;
-
-          pointer-events: none;
-
-          z-index: 0;
-
-          background-repeat: repeat;
-
-        }
-
-        .landing-page::before {
-
-          background-image:
-
-            radial-gradient(circle, rgba(255,255,255,.90) 0 1px, transparent 1.6px),
-
-            radial-gradient(circle, rgba(255,255,255,.50) 0 1px, transparent 1.6px);
-
-          background-size: 125px 125px, 195px 195px;
-
-          background-position: 0 0, 45px 80px;
-
-          animation: nyayaStars 38s linear infinite;
-
-        }
-
-        .landing-page::after {
-
-          background-image:
-
-            radial-gradient(circle, rgba(255,255,255,.35) 0 1px, transparent 1.6px),
-
-            radial-gradient(circle, rgba(255,255,255,.20) 0 1px, transparent 1.6px);
-
-          background-size: 165px 165px, 270px 270px;
-
-          background-position: 25px 35px, 120px 70px;
-
-          animation: nyayaStarsReverse 55s linear infinite;
-
-        }
-
-        @keyframes nyayaStars {
-
-          from { transform: translate3d(0,0,0); }
-
-          to   { transform: translate3d(130px,170px,0); }
-
-        }
-
-        @keyframes nyayaStarsReverse {
-
-          from { transform: translate3d(0,0,0); }
-
-          to   { transform: translate3d(-150px,100px,0); }
-
-        }
+        /* Background particles removed intentionally. */
 
         /* Keep every real landing element above the particles */
 
@@ -554,19 +488,6 @@ export default function Landing() {
 
         }
 
-        /* Responsive particle performance */
-
-        @media (prefers-reduced-motion: reduce) {
-
-          .landing-page::before,
-
-          .landing-page::after {
-
-            animation: none;
-
-          }
-
-        }
 
       `}</style>
 
