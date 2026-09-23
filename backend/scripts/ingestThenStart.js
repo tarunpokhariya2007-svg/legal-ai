@@ -22,6 +22,7 @@ const ingestion = spawn(
     ingestion.on("close", code => {
         if (code !== 0) {
             console.error(
+                
                 `Ingestion failed with exit code ${code}`
             );
 
