@@ -1,14 +1,13 @@
 import * as React from "react"
-import {
-  motion,
-  useInView,
-  type HTMLMotionProps,
-  type Variants,
-} from "motion/react"
+import { motion, type HTMLMotionProps, type Variants } from "motion/react"
 
 type InViewProps = HTMLMotionProps<"div"> & {
   variants?: Variants
-  viewOptions?: Parameters<typeof useInView>[1]
+  viewOptions?: {
+    once?: boolean
+    margin?: string
+    amount?: "some" | "all" | number
+  }
 }
 
 const InView = React.forwardRef<HTMLDivElement, InViewProps>(
@@ -16,31 +15,22 @@ const InView = React.forwardRef<HTMLDivElement, InViewProps>(
     {
       children,
       variants,
-      viewOptions = {
-        once: true,
-        margin: "0px 0px -100px 0px",
-      },
+      viewOptions,
       initial = "hidden",
-      animate,
       ...props
     },
     ref
   ) => {
-    const localRef = React.useRef<HTMLDivElement>(null)
-
-    const isInView = useInView(localRef, {
-      once: viewOptions.once ?? true,
-      margin: viewOptions.margin,
-      amount: viewOptions.amount,
-    })
-
-    React.useImperativeHandle(ref, () => localRef.current as HTMLDivElement)
-
     return (
       <motion.div
-        ref={localRef}
+        ref={ref}
         initial={initial}
-        animate={animate ?? (isInView ? "visible" : "hidden")}
+        whileInView="visible"
+        viewport={{
+          once: viewOptions?.once ?? true,
+          margin: viewOptions?.margin ?? "0px 0px -100px 0px",
+          amount: viewOptions?.amount ?? "some",
+        }}
         variants={
           variants ?? {
             hidden: { opacity: 0 },
