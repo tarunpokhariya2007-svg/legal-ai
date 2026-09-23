@@ -289,7 +289,6 @@ async function ingestAct(act) {
         skipped
     };
 }
-
 async function main() {
 
     console.log(
@@ -304,8 +303,182 @@ async function main() {
         "========================================\n"
     );
 
+    const args = process.argv.slice(2);
+
+    /*
+     * Supported options:
+     *
+     * --acts=bns,bsa
+     *
+     * --offset=0 --limit=5
+     *
+     * --offset=5 --limit=5
+     *
+     * --all
+     */
+
+    const actsArg = args.find(arg =>
+        arg.startsWith("--acts=")
+    );
+
+    const offsetArg = args.find(arg =>
+        arg.startsWith("--offset=")
+    );
+
+    const limitArg = args.find(arg =>
+        arg.startsWith("--limit=")
+    );
+
+    const allArg = args.includes("--all");
+
+    let selectedActIds = null;
+
+    if (actsArg) {
+
+        selectedActIds = actsArg
+            .substring("--acts=".length)
+            .split(",")
+            .map(id => id.trim())
+            .filter(Boolean);
+
+        console.log(
+            `Selected Acts: ${selectedActIds.join(", ")}`
+        );
+    }
+
+    const offset = offsetArg
+        ? Number(
+            offsetArg.substring("--offset=".length)
+        )
+        : 0;
+
+    const limit = limitArg
+        ? Number(
+            limitArg.substring("--limit=".length)
+        )
+        : null;
+
+    if (
+        Number.isNaN(offset) ||
+        offset < 0
+    ) {
+        throw new Error(
+            "Invalid --offset value."
+        );
+    }
+
+    if (
+        limit !== null &&
+        (
+            Number.isNaN(limit) ||
+            limit <= 0
+        )
+    ) {
+        throw new Error(
+            "Invalid --limit value."
+        );
+    }
+
+    if (
+        !selectedActIds &&
+        !allArg &&
+        limit === null
+    ) {
+        throw new Error(
+            `
+No ingestion scope specified.
+
+Use one of:
+
+--acts=bns,bsa
+
+OR
+
+--offset=0 --limit=5
+
+OR
+
+--all
+`
+        );
+    }
+
     const acts =
         await getCentralActs();
+
+    let inForceActs =
+        acts.filter(act =>
+            act.in_force
+        );
+
+    /*
+     * --------------------------------------------------
+     * SELECT BY ACT IDS
+     * --------------------------------------------------
+     */
+
+    if (selectedActIds) {
+
+        inForceActs =
+            inForceActs.filter(act =>
+                selectedActIds.includes(
+                    act.id
+                )
+            );
+    }
+
+    /*
+     * --------------------------------------------------
+     * SELECT BY OFFSET + LIMIT
+     * --------------------------------------------------
+     */
+
+    if (
+        !selectedActIds &&
+        !allArg &&
+        limit !== null
+    ) {
+
+        inForceActs =
+            inForceActs.slice(
+                offset,
+                offset + limit
+            );
+
+        console.log(
+            `Batch range: ${offset} → ${offset + limit - 1}`
+        );
+    }
+
+    /*
+     * --------------------------------------------------
+     * ALL IN-FORCE ACTS
+     * --------------------------------------------------
+     */
+
+    if (allArg) {
+
+        console.log(
+            "WARNING: Processing ALL in-force Central Acts."
+        );
+    }
+
+    console.log(
+        `Acts selected for ingestion: ${inForceActs.length}`
+    );
+
+    if (
+        inForceActs.length === 0
+    ) {
+
+        console.log(
+            "No Acts matched the requested scope."
+        );
+
+        await db.end();
+
+        return;
+    }
 
     let totalInserted = 0;
     let totalUpdated = 0;
@@ -313,26 +486,9 @@ async function main() {
 
     let processedActs = 0;
 
-    for (const act of acts) {
-
-    if (!act.in_force) {
-        continue;
-    }
-
-    /*
-     * First expansion batch:
-     * BNS + BSA
-     *
-     * BNSS is already present in the database.
-     */
-    const allowedActs = [
-        "bns",
-        "bsa"
-    ];
-
-    if (!allowedActs.includes(act.id)) {
-        continue;
-    }
+    for (
+        const act of inForceActs
+    ) {
 
         const result =
             await ingestAct(act);
@@ -349,7 +505,7 @@ async function main() {
         processedActs++;
 
         console.log(
-            `\nProgress: ${processedActs} in-force Acts processed`
+            `\nProgress: ${processedActs}/${inForceActs.length} selected Acts processed`
         );
     }
 
@@ -387,6 +543,8 @@ async function main() {
 
     await db.end();
 }
+
+
 
 main().catch(error => {
 

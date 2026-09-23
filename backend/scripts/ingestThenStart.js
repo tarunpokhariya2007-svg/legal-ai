@@ -5,14 +5,19 @@ async function run() {
     console.log("NYAYA AI — STARTUP INGESTION");
     console.log("========================================");
 
-    const ingestion = spawn(
-        process.execPath,
-        ["scripts/ingestCentralActs.js"],
-        {
-            stdio: "inherit",
-            env: process.env
-        }
-    );
+    const ingestionArgs = [
+    "scripts/ingestCentralActs.js",
+    ...process.argv.slice(2)
+];
+
+const ingestion = spawn(
+    process.execPath,
+    ingestionArgs,
+    {
+        stdio: "inherit",
+        env: process.env
+    }
+);
 
     ingestion.on("close", code => {
         if (code !== 0) {
