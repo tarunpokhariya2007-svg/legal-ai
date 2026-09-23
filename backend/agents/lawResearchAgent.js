@@ -11,7 +11,17 @@ function formatRetrievedLaws(laws) {
         return "No relevant provisions were found in the legal knowledge base.";
     }
 
+    const MAX_CONTENT_CHARS = 4500;
+
     return laws.map((law, index) => {
+
+        let content = law.content || "";
+
+        if (content.length > MAX_CONTENT_CHARS) {
+            content =
+                content.substring(0, MAX_CONTENT_CHARS) +
+                "\n[Legal text truncated for context-size safety.]";
+        }
 
         return `
 SOURCE ${index + 1}
@@ -29,7 +39,7 @@ Section Title:
 ${law.section_title || "Not available"}
 
 Legal Text:
-${law.content}
+${content}
 
 Source:
 ${law.source_url || law.source_name}
