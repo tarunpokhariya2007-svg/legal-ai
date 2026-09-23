@@ -314,11 +314,25 @@ async function main() {
     let processedActs = 0;
 
     for (const act of acts) {
-    if (act.id !== "bnss") continue;
 
-        if (!act.in_force) {
-            continue;
-        }
+    if (!act.in_force) {
+        continue;
+    }
+
+    /*
+     * First expansion batch:
+     * BNS + BSA
+     *
+     * BNSS is already present in the database.
+     */
+    const allowedActs = [
+        "bns",
+        "bsa"
+    ];
+
+    if (!allowedActs.includes(act.id)) {
+        continue;
+    }
 
         const result =
             await ingestAct(act);
