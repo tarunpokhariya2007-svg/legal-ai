@@ -1,6 +1,6 @@
 import { Link, useNavigate } from 'react-router'
 import { useEffect, useRef, useState } from 'react'
-import { InView } from '@/components/ui/in-view'
+import { motion } from 'motion/react'
 import { isLoggedIn } from '../lib/auth'
 import {
   Scale, ArrowRight, CheckCircle, Shield, Zap, Globe, Lock,
@@ -142,7 +142,7 @@ export default function Landing() {
           color: #fff !important;
           min-height: 100vh;
           position: relative;
-          overflow: hidden;
+          overflow-x: hidden;
           isolation: isolate;
         }
 
@@ -404,16 +404,11 @@ export default function Landing() {
       </section>
 {/* ── Stats ── */}
 <section style={{ background: 'var(--bg-secondary)', borderTop: '1px solid var(--border)', borderBottom: '1px solid var(--border)' }}>
-  <InView
-    variants={{
-      hidden: { opacity: 0, y: 24 },
-      visible: { opacity: 1, y: 0 },
-    }}
-    transition={{ duration: 0.6, ease: 'easeOut' }}
-    viewOptions={{
-      once: true,
-      margin: '0px 0px -100px 0px',
-    }}
+  <motion.div
+    initial={{ opacity: 0, y: 24 }}
+    whileInView={{ opacity: 1, y: 0 }}
+    viewport={{ once: true, amount: 0.2 }}
+    transition={{ duration: 0.8, ease: 'easeOut' }}
   >
     <div style={{ maxWidth: 1200, margin: '0 auto', padding: '48px 24px' }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 24 }} className="stats-grid">
@@ -427,7 +422,7 @@ export default function Landing() {
             ))}
           </div>
         </div>
-         </InView>
+         </motion.div>
       </section>
 
       {/* ── How It Works ── */}
