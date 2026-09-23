@@ -36,13 +36,52 @@ async function ensureLegalKnowledgeTable(pool) {
             )
         `);
 
-        console.log("LEGAL KNOWLEDGE TABLE READY");
+        /*
+         * Add FULLTEXT search to the existing table.
+         *
+         * This is checked through information_schema so the
+         * index is created only once.
+         */
+        const [indexes] = await pool.query(`
+            SELECT COUNT(*) AS count
+            FROM information_schema.statistics
+            WHERE table_schema = DATABASE()
+              AND table_name = 'legal_knowledge'
+              AND index_name = 'ft_legal_knowledge'
+        `);
+
+        if (indexes[0].count === 0) {
+
+            await pool.query(`
+                ALTER TABLE legal_knowledge
+                ADD FULLTEXT INDEX ft_legal_knowledge (
+                    section_title,
+                    content
+                )
+            `);
+
+            console.log(
+                "LEGAL KNOWLEDGE FULLTEXT INDEX CREATED"
+            );
+
+        } else {
+
+            console.log(
+                "LEGAL KNOWLEDGE FULLTEXT INDEX READY"
+            );
+        }
+
+        console.log(
+            "LEGAL KNOWLEDGE TABLE READY"
+        );
 
     } catch (error) {
+
         console.error(
             "FAILED TO CREATE LEGAL KNOWLEDGE TABLE:",
             error.message
         );
+
     }
 }
 
