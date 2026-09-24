@@ -7,29 +7,55 @@ const {
 } = require("../services/legalRetrievalService");
 
 
-function formatRetrievedLaws(laws) {
+// ============================================================
+// LEGAL CONTEXT FORMATTER
+// ============================================================
+
+function formatRetrievedLaws(
+    laws,
+    {
+        maxSources = 5,
+        maxContentCharsPerSource = 3000,
+        maxTotalChars = 14000
+    } = {}
+) {
 
     if (!laws || laws.length === 0) {
         return "No relevant provisions were found in the legal knowledge base.";
     }
 
-    const MAX_CONTENT_CHARS = 4500;
+    const selectedLaws = laws.slice(0, maxSources);
 
-    return laws.map((law, index) => {
+    let totalChars = 0;
+    const formattedSources = [];
+
+    for (let index = 0; index < selectedLaws.length; index++) {
+
+        const law = selectedLaws[index];
 
         let content = law.content || "";
 
-        if (content.length > MAX_CONTENT_CHARS) {
+        // ----------------------------------------------------
+        // Per-source safety limit
+        // ----------------------------------------------------
+
+        if (content.length > maxContentCharsPerSource) {
+
             content =
-                content.substring(0, MAX_CONTENT_CHARS) +
+                content.substring(0, maxContentCharsPerSource) +
                 "\n[Legal text truncated for context-size safety.]";
         }
 
-        return `
+
+        // ----------------------------------------------------
+        // Total context safety limit
+        // ----------------------------------------------------
+
+        const sourceHeader = `
 SOURCE ${index + 1}
 
 Act:
-${law.act_name}
+${law.act_name || "Not available"}
 
 Act Number:
 ${law.act_number || "Not available"}
@@ -41,61 +67,125 @@ Section Title:
 ${law.section_title || "Not available"}
 
 Legal Text:
-${content}
+`;
+
+        const sourceFooter = `
 
 Source:
-${law.source_url || law.source_name}
+${law.source_url || law.source_name || "Not available"}
 
 Effective Date:
 ${law.effective_date || "Not available"}
 `;
 
-    }).join("\n-----------------------------\n");
+        const remainingChars =
+            maxTotalChars - totalChars - sourceHeader.length - sourceFooter.length;
+
+        if (remainingChars <= 0) {
+            break;
+        }
+
+
+        // ----------------------------------------------------
+        // Trim content if this source would exceed total budget
+        // ----------------------------------------------------
+
+        if (content.length > remainingChars) {
+
+            if (remainingChars < 500) {
+                break;
+            }
+
+            content =
+                content.substring(0, remainingChars) +
+                "\n[Legal context truncated due to total context-size limit.]";
+        }
+
+
+        const formattedSource =
+            sourceHeader +
+            content +
+            sourceFooter;
+
+
+        formattedSources.push(formattedSource);
+
+        totalChars += formattedSource.length;
+
+
+        if (totalChars >= maxTotalChars) {
+            break;
+        }
+    }
+
+
+    return formattedSources.join(
+        "\n-----------------------------\n"
+    );
 }
 
+
+// ============================================================
+// LAW RESEARCH AGENT
+// ============================================================
 
 async function lawResearchAgent(caseDescription) {
 
     try {
 
+        // ====================================================
+        // STEP 1
+        // DETECT EXPLICIT LEGAL REFERENCES
+        // ====================================================
+
         /*
-         * STEP 1
-         * Detect explicit legal references before retrieval.
+         * This is deterministic.
          *
-         * This is deterministic. For example:
+         * Example:
          *
-         *   "Section 63 of BSA"
+         * "What is Section 63 of BSA?"
          *
-         * must resolve to:
+         * resolves to:
          *
-         *   The Bharatiya Sakshya Adhiniyam, 2023
-         *   Section 63
+         * The Bharatiya Sakshya Adhiniyam, 2023
+         * Section 63
          *
-         * The retrieval service then performs an exact DB lookup
-         * and will not substitute a similarly-worded provision
-         * from another Act.
+         * The retrieval service performs an exact database
+         * lookup before generic FULLTEXT retrieval.
          */
+
         const explicitSection =
             extractSectionNumber(caseDescription);
 
         const explicitAct =
             detectAct(caseDescription);
 
+
         if (
             explicitSection &&
             explicitAct
         ) {
+
             console.log(
                 "LEGAL RESEARCH: Explicit legal reference detected →",
                 `${explicitAct.actName} Section ${explicitSection}`
             );
         }
 
+
+        // ====================================================
+        // STEP 2
+        // RETRIEVE LEGAL PROVISIONS
+        // ====================================================
+
         /*
-         * STEP 2
-         * Retrieve relevant provisions from the
-         * authoritative legal corpus.
+         * Request a larger candidate set from the retrieval
+         * layer, but we will NOT send all candidates to the LLM.
+         *
+         * This allows the retrieval system to search broadly
+         * while keeping the final LLM context small.
          */
+
         const laws =
             await retrieveRelevantLaws(
                 caseDescription,
@@ -107,11 +197,29 @@ async function lawResearchAgent(caseDescription) {
             `LEGAL RAG: Retrieved ${laws.length} provision(s)`
         );
 
+
+        // ====================================================
+        // STEP 3
+        // HANDLE EXPLICIT ACT + SECTION FAILURE
+        // ====================================================
+
+        /*
+         * If the user explicitly requested:
+         *
+         * BSA Section 63
+         *
+         * but the exact provision was not retrieved,
+         *
+         * DO NOT substitute a similarly worded section from
+         * another Act.
+         */
+
         if (
             explicitSection &&
             explicitAct &&
             laws.length === 0
         ) {
+
             return (
                 `The requested provision could not be found in the ` +
                 `legal knowledge base: ${explicitAct.actName}, ` +
@@ -121,61 +229,104 @@ async function lawResearchAgent(caseDescription) {
         }
 
 
+        // ====================================================
+        // STEP 4
+        // BUILD CONTROLLED LEGAL CONTEXT
+        // ====================================================
+
         /*
-         * STEP 3
-         * Convert retrieved provisions into
-         * grounded context for the LLM.
+         * IMPORTANT:
+         *
+         * Previously:
+         *
+         * 8 sources × 4500 characters
+         *
+         * could produce approximately 36,000 characters,
+         * which caused the Groq request to exceed the
+         * 8,000-token limit.
+         *
+         * Now:
+         *
+         * Maximum 5 sources
+         * Maximum 3000 chars/source
+         * Maximum 14000 chars total
+         *
+         * This keeps the request comfortably below the
+         * model's input limit.
          */
+
         const legalContext =
-            formatRetrievedLaws(laws);
+            formatRetrievedLaws(
+                laws,
+                {
+                    maxSources: 5,
+                    maxContentCharsPerSource: 3000,
+                    maxTotalChars: 14000
+                }
+            );
 
 
-        /*
-         * STEP 4
-         * Ask Groq to reason ONLY from the
-         * retrieved legal material.
-         */
+        console.log(
+            `LEGAL RAG: Legal context prepared (${legalContext.length} characters)`
+        );
+
+
+        // ====================================================
+        // STEP 5
+        // BUILD GROQ PROMPT
+        // ====================================================
+
         const prompt = `
 You are the Legal Research AI Agent for Nyaya AI.
 
-Your task is to identify applicable Indian laws
-using the retrieved legal sources provided below.
+Your task is to identify applicable Indian laws using the
+retrieved legal sources provided below.
 
 IMPORTANT RULES:
 
-1. Use the retrieved legal sources as the primary
-   legal authority.
+1. Use the retrieved legal sources as the primary legal
+   authority.
 
-2. If the user explicitly names an Act abbreviation
-   and section number (for example BNS, BNSS, or BSA),
-   preserve that exact Act/section reference. Do NOT
-   reinterpret the abbreviation as another law and do
-   NOT substitute a provision from another Act.
+2. If the user explicitly names an Act abbreviation and
+   section number, such as BNS, BNSS, or BSA, preserve
+   that exact Act and section reference.
 
-3. If an explicit Act/section was requested and the
-   retrieved material is empty, say that the requested
-   provision could not be verified from the available
-   legal corpus.
+3. Do NOT reinterpret BSA, BNS, or BNSS as another law.
 
+4. Do NOT substitute a provision from another Act when
+   an explicit Act and section has been requested.
 
-4. Do NOT invent Acts, sections, punishments,
-   legal provisions, or citations.
+5. If an explicit Act and section was requested and the
+   requested provision cannot be verified from the
+   retrieved material, clearly say that it could not be
+   verified.
 
-5. Do NOT assume that a section applies merely
-   because a keyword appears.
+6. Do NOT invent Acts, sections, punishments, legal
+   provisions, citations, or statutory text.
 
-6. If the retrieved material is insufficient,
-   explicitly say that the available evidence
-   is insufficient.
+7. Do NOT assume that a section applies merely because
+   a keyword appears.
 
-7. Distinguish the legal text from your
-   interpretation.
+8. If the retrieved material is insufficient, explicitly
+   state that the available evidence is insufficient.
 
-8. Mention the exact Act and section number
-   when supported by the retrieved source.
+9. Distinguish the statutory text from your interpretation.
 
-9. Do not treat case-law summaries as the
-   text of the statute.
+10. Mention the exact Act and section number when supported
+    by the retrieved source.
+
+11. Do not treat case-law summaries as the text of a statute.
+
+12. Do not claim that a punishment exists unless the
+    retrieved legal material actually supports it.
+
+13. If the retrieved text is truncated, do not reconstruct
+    the missing portion from memory.
+
+14. Prefer the most directly relevant retrieved provision.
+
+15. Keep the final answer concise and grounded in the
+    retrieved sources.
 
 CASE DESCRIPTION:
 
@@ -192,13 +343,18 @@ RETURN:
 1. Applicable Indian laws
 2. Relevant Acts
 3. Relevant Sections
-4. Maximum punishment, only if supported
-   by the retrieved legal material
+4. Maximum punishment, only if directly supported by the
+   retrieved legal material
 5. Brief reasoning based on the retrieved text
 
-Keep the answer structured and concise.
+Do not provide unsupported legal conclusions.
 `;
 
+
+        // ====================================================
+        // STEP 6
+        // CALL GROQ
+        // ====================================================
 
         const result =
             await askAI(prompt);
@@ -209,15 +365,50 @@ Keep the answer structured and concise.
 
     } catch (err) {
 
+        // ====================================================
+        // ERROR HANDLING
+        // ====================================================
+
         console.error(
             "LAW RESEARCH AGENT ERROR:",
             err
         );
 
-        return "Unable to research applicable laws.";
 
+        // Specific handling for model context/token errors
+
+        const errorMessage =
+            err?.message ||
+            err?.error?.message ||
+            "";
+
+
+        if (
+            errorMessage.toLowerCase().includes("too large") ||
+            errorMessage.toLowerCase().includes("tokens") ||
+            errorMessage.toLowerCase().includes("rate_limit")
+        ) {
+
+            console.error(
+                "LAW RESEARCH AGENT: Model context/token limit reached."
+            );
+
+            return (
+                "The legal research request retrieved too much material " +
+                "for the AI model to process in one request. Please try " +
+                "a more specific legal question or provide an Act and " +
+                "section number."
+            );
+        }
+
+
+        return "Unable to research applicable laws.";
     }
 }
 
+
+// ============================================================
+// EXPORT
+// ============================================================
 
 module.exports = lawResearchAgent;
