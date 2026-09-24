@@ -40,7 +40,6 @@ function getPhysicalFilePath(filePath) {
     return path.join(UPLOAD_DIR, fileName);
 }
 
-
 function normalizeSupabaseReference(filePath) {
     if (!filePath || typeof filePath !== "string") {
         return null;
@@ -53,7 +52,10 @@ function normalizeSupabaseReference(filePath) {
     }
 
     // Support a full Supabase Storage object URL from older records.
-    if (value.startsWith("http://") || value.startsWith("https://")) {
+    if (
+        value.startsWith("http://") ||
+        value.startsWith("https://")
+    ) {
         try {
             const url = new URL(value);
             const marker = "/storage/v1/object/";
@@ -63,10 +65,14 @@ function normalizeSupabaseReference(filePath) {
                 const remainder = url.pathname.slice(
                     index + marker.length
                 );
-                const parts = remainder.split("/").filter(Boolean);
+
+                const parts = remainder
+                    .split("/")
+                    .filter(Boolean);
 
                 if (parts.length >= 2) {
                     const bucket = decodeURIComponent(parts[0]);
+
                     const configuredBucket =
                         process.env.SUPABASE_STORAGE_BUCKET ||
                         "nyaya-documents";
@@ -102,9 +108,67 @@ function normalizeSupabaseReference(filePath) {
     return null;
 }
 
-async function loadSharedDocumentBuffer(filePath) {
+/*
+ * The documents table is the source of truth for the current
+ * physical/storage location of the document.
+ *
+ * A document share can contain an older file_path, so we refresh
+ * the path from documents before attempting to read the file.
+ */
+async function getCurrentDocumentFilePath(documentId) {
+    if (!documentId) {
+        return null;
+    }
+
+    const [rows] = await db.query(
+        `
+        SELECT file_path
+        FROM documents
+        WHERE id = ?
+        LIMIT 1
+        `,
+        [documentId]
+    );
+
+    if (!rows || rows.length === 0) {
+        return null;
+    }
+
+    return rows[0].file_path || null;
+}
+
+async function loadSharedDocumentBuffer(
+    filePath,
+    documentId
+) {
+    let currentFilePath = filePath;
+
+    /*
+     * Prefer the current file_path from documents.
+     *
+     * This prevents an old/stale document_shares path from
+     * breaking access after the document has been moved to
+     * Supabase Storage.
+     */
+    try {
+        const databaseFilePath =
+            await getCurrentDocumentFilePath(documentId);
+
+        if (databaseFilePath) {
+            currentFilePath = databaseFilePath;
+        }
+    } catch (lookupError) {
+        console.error(
+            "SHARED DOCUMENT PATH LOOKUP ERROR:",
+            lookupError.message
+        );
+    }
+
+    /*
+     * Supabase Storage
+     */
     const normalizedReference =
-        normalizeSupabaseReference(filePath);
+        normalizeSupabaseReference(currentFilePath);
 
     if (normalizedReference) {
         return downloadDocumentBuffer(
@@ -112,8 +176,11 @@ async function loadSharedDocumentBuffer(filePath) {
         );
     }
 
+    /*
+     * Legacy/local filesystem fallback.
+     */
     const physicalPath =
-        getPhysicalFilePath(filePath);
+        getPhysicalFilePath(currentFilePath);
 
     if (
         !physicalPath ||
@@ -122,6 +189,7 @@ async function loadSharedDocumentBuffer(filePath) {
         const error = new Error(
             "Document file is no longer available."
         );
+
         error.code = "DOCUMENT_FILE_NOT_FOUND";
         throw error;
     }
@@ -137,14 +205,21 @@ function normalizeRole(value) {
 
 function isAdvocateRole(role) {
     const normalized = normalizeRole(role);
-    return normalized === "lawyer" || normalized === "advocate";
+
+    return (
+        normalized === "lawyer" ||
+        normalized === "advocate"
+    );
 }
 
 function isCitizenRole(role) {
     return normalizeRole(role) === "citizen";
 }
 
-function canShareBetweenRoles(senderRole, recipientRole) {
+function canShareBetweenRoles(
+    senderRole,
+    recipientRole
+) {
     return (
         (isCitizenRole(senderRole) &&
             isAdvocateRole(recipientRole)) ||
@@ -237,8 +312,10 @@ async function getUserById(userId) {
 //
 // Only users connected through a confirmed appointment are
 // returned. This works in both directions:
+//
 // citizen -> advocate
 // advocate -> citizen
+//
 // =====================================================
 
 router.get(
@@ -367,6 +444,7 @@ router.post(
     async (req, res) => {
         try {
             const senderId = req.user.id;
+
             const senderRole = normalizeRole(
                 req.user.role
             );
@@ -740,15 +818,19 @@ router.patch(
 // =====================================================
 // REMOVE SHARED DOCUMENT
 // DELETE /api/document-shares/:id/remove
+//
 // Recipient removes the shared entry from their list.
 // This never deletes the original document.
 // =====================================================
+
 router.delete(
     "/:id/remove",
     authMiddleware,
     async (req, res) => {
         try {
-            const shareId = Number(req.params.id);
+            const shareId = Number(
+                req.params.id
+            );
 
             if (
                 !Number.isInteger(shareId) ||
@@ -1002,7 +1084,8 @@ router.get(
             try {
                 fileBuffer =
                     await loadSharedDocumentBuffer(
-                        share.file_path
+                        share.file_path,
+                        share.document_id
                     );
             } catch (storageError) {
                 console.error(
@@ -1131,7 +1214,8 @@ router.get(
             try {
                 fileBuffer =
                     await loadSharedDocumentBuffer(
-                        share.file_path
+                        share.file_path,
+                        share.document_id
                     );
             } catch (storageError) {
                 console.error(
