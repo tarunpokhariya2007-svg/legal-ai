@@ -156,54 +156,14 @@ const teamProfileLinkStyle: React.CSSProperties = {
 
 }
 
-const teamMembers = [
-  {
-    name: 'Gaurav Singh',
-    role: 'Team Lead',
-    image: '/team/gaurav.jpg',
-    roleIcon: Crown,
-    description:
-      "Hi, I'm Gaurav Singh, the Team Lead of Nyaya AI. I coordinate the team, guide project direction, and help turn our ideas into practical solutions that make legal technology more accessible.",
-    skills: [
-      { icon: Lightbulb, lines: <>Team<br />Management</> },
-      { icon: Users, lines: <>Project<br />Coordination</> },
-      { icon: Target, lines: <>Strategy &amp;<br />Planning</> },
-    ],
-  },
-  {
-    name: 'Tarun Pokhariya',
-    role: 'Backend & Frontend Developer',
-    image: '/team/tarun.jpg',
-    roleIcon: Code2,
-    description:
-      "Hi, I'm Tarun Pokhariya, the Backend and Frontend Developer of Nyaya AI. I build and maintain the platform, develop user-facing features, and connect the frontend with reliable backend services.",
-    skills: [
-      { icon: Code2, lines: <>Full-Stack<br />Development</> },
-      { icon: Target, lines: <>Feature<br />Implementation</> },
-      { icon: ShieldCheck, lines: <>System<br />Integration</> },
-    ],
-  },
-  {
-    name: 'Pragitya Ghosh',
-    role: 'Database Manager',
-    image: '/team/pragitya.jpg',
-    roleIcon: Database,
-    description:
-      "Hi, I'm Pragitya Ghosh, the Database Manager of Nyaya AI. I design and manage our data systems, focus on data integrity and security, and help ensure that our platform's information remains organized and reliable.",
-    skills: [
-      { icon: Database, lines: <>Database<br />Design</> },
-      { icon: ShieldCheck, lines: <>Data Security<br />&amp; Integrity</> },
-      { icon: BarChart3, lines: <>Performance<br />Optimization</> },
-    ],
-  },
-]
-
 export default function Landing() {
 
   const [openSocial, setOpenSocial] = useState<'linkedin' | 'github' | null>(null)
 
   const [showDisclaimer, setShowDisclaimer] = useState(true)
+
   const socialRef = useRef<HTMLDivElement>(null)
+
   const navigate = useNavigate()
 
   const handleProtectedNavigation = (path: string) => {
@@ -483,6 +443,7 @@ export default function Landing() {
           box-shadow: 0 24px 55px rgba(0,0,0,.50) !important;
 
         }
+
         /* Footer */
 
         .landing-page footer {
@@ -676,7 +637,7 @@ export default function Landing() {
 
     whileInView={{ opacity: 1, y: 0 }}
 
-    viewport={{ once: false, amount: 0.2 }}
+    viewport={{ once: true, amount: 0.2 }}
 
     transition={{ duration: 0.8, ease: 'easeOut' }}
 
@@ -717,7 +678,7 @@ export default function Landing() {
         style={{ padding: '100px 24px' }}
         initial={{ opacity: 0, y: 28 }}
         whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: false, amount: 0.12 }}
+        viewport={{ once: true, amount: 0.12 }}
         transition={{ duration: 0.7, ease: 'easeOut' }}
       >
 
@@ -727,7 +688,7 @@ export default function Landing() {
             style={{ textAlign: 'center', marginBottom: 64 }}
             initial={{ opacity: 0, y: 22 }}
             whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: false, amount: 0.2 }}
+            viewport={{ once: true, amount: 0.2 }}
             transition={{ duration: 0.6, ease: 'easeOut' }}
           >
 
@@ -761,7 +722,7 @@ export default function Landing() {
                 style={{ padding: 28, position: 'relative' }}
                 initial={{ opacity: 0, y: 35 }}
                 whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: false, amount: 0.2 }}
+                viewport={{ once: true, amount: 0.2 }}
                 transition={{ duration: 0.55, delay: i * 0.12, ease: 'easeOut' }}
               >
 
@@ -825,7 +786,7 @@ export default function Landing() {
         style={{ padding: '100px 24px', borderTop: '1px solid var(--border)' }}
         initial={{ opacity: 0, y: 28 }}
         whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: false, amount: 0.1 }}
+        viewport={{ once: true, amount: 0.1 }}
         transition={{ duration: 0.7, ease: 'easeOut' }}
       >
 
@@ -835,7 +796,7 @@ export default function Landing() {
             style={{ textAlign: 'center', marginBottom: 64 }}
             initial={{ opacity: 0, y: 22 }}
             whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: false, amount: 0.2 }}
+            viewport={{ once: true, amount: 0.2 }}
             transition={{ duration: 0.6, ease: 'easeOut' }}
           >
 
@@ -863,7 +824,7 @@ export default function Landing() {
                 style={{ padding: 28 }}
                 initial={{ opacity: 0, y: 35 }}
                 whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: false, amount: 0.18 }}
+                viewport={{ once: true, amount: 0.18 }}
                 transition={{ duration: 0.55, delay: i * 0.09, ease: 'easeOut' }}
               >
 
@@ -1005,128 +966,617 @@ export default function Landing() {
 
           </div>
 
-          {/* Team cards — static layout with independent live particle fields */}
+          {/* Team cards */}
+
           <motion.div
             className="team-grid"
             initial={{ opacity: 0, y: 35 }}
             whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: false, amount: 0.12 }}
+            viewport={{ once: true, amount: 0.12 }}
             transition={{ duration: 0.65, ease: 'easeOut' }}
-            aria-label="Nyaya AI team members"
+
+            style={{
+
+              display: 'grid',
+
+              gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+
+              gap: 28,
+
+            }}
+
           >
-            {teamMembers.map(member => {
-              const RoleIcon = member.roleIcon
 
-              return (
-                <div
-                  className="team-card"
-                  key={member.name}
+            {/* Gaurav Singh — Team Lead */}
+
+            <div className="team-card" style={{
+
+              background: 'rgba(255,255,255,0.025)',
+
+              border: '1px solid rgba(212,175,55,0.22)',
+
+              borderRadius: 20,
+
+              padding: 24,
+
+              textAlign: 'center',
+
+              boxShadow: '0 18px 45px rgba(0,0,0,0.35)',
+
+              transition: 'transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease',
+
+            }}>
+
+              <div style={{
+
+                width: 190,
+
+                height: 190,
+
+                margin: '0 auto 22px',
+
+                borderRadius: '50%',
+
+                padding: 4,
+
+                background: 'linear-gradient(135deg, #D4AF37, #F5D76E, #A27B2C)',
+
+                boxShadow: '0 0 35px rgba(212,175,55,0.18)',
+
+              }}>
+
+                <img
+
+                  src="/team/gaurav.jpg"
+
+                  alt="Gaurav Singh - Team Lead at Nyaya AI"
+
                   style={{
-                    background: 'rgba(255,255,255,0.025)',
-                    border: '1px solid rgba(212,175,55,0.22)',
-                    borderRadius: 20,
-                    padding: 24,
-                    textAlign: 'center',
-                    boxShadow: '0 18px 45px rgba(0,0,0,0.35)',
-                    transition: 'border-color 0.25s ease, box-shadow 0.25s ease',
+
                     width: '100%',
-                    maxWidth: 380,
-                    margin: '0 auto',
-                    boxSizing: 'border-box',
-                  }}
-                >
 
-                  <div style={{
-                    width: 190,
-                    height: 190,
-                    margin: '0 auto 22px',
+                    height: '100%',
+
                     borderRadius: '50%',
-                    padding: 4,
-                    background: 'linear-gradient(135deg, #D4AF37, #F5D76E, #A27B2C)',
-                    boxShadow: '0 0 35px rgba(212,175,55,0.18)',
-                  }}>
-                    <img
-                      src={member.image}
-                      alt={`${member.name} - ${member.role} at Nyaya AI`}
-                      style={{
-                        width: '100%',
-                        height: '100%',
-                        borderRadius: '50%',
-                        objectFit: 'cover',
-                        objectPosition: 'center top',
-                        display: 'block',
-                      }}
-                    />
+
+                    objectFit: 'cover',
+
+                    objectPosition: 'center top',
+
+                    display: 'block',
+
+                  }}
+
+                />
+
+              </div>
+
+              <div style={{
+
+                display: 'inline-flex',
+
+                alignItems: 'center',
+
+                gap: 7,
+
+                padding: '8px 16px',
+
+                borderRadius: 999,
+
+                border: '1px solid rgba(212,175,55,0.55)',
+
+                background: 'rgba(212,175,55,0.06)',
+
+                color: '#D4AF37',
+
+                fontSize: '0.82rem',
+
+                fontWeight: 700,
+
+                marginBottom: 16,
+
+              }}>
+
+                <Crown size={15} /> Team Lead
+
+              </div>
+
+              <h3 style={{
+
+                color: 'var(--text)',
+
+                fontSize: '1.55rem',
+
+                fontWeight: 800,
+
+                margin: '0 0 12px',
+
+                letterSpacing: '-0.02em',
+
+              }}>
+
+                Gaurav Singh
+
+              </h3>
+
+              <p style={{
+
+                color: 'var(--text-muted)',
+
+                fontSize: '0.94rem',
+
+                lineHeight: 1.7,
+
+                margin: '0 0 24px',
+
+                minHeight: 130,
+
+              }}>
+
+                Hi, I'm Gaurav Singh, the Team Lead of Nyaya AI. I coordinate the
+
+                team, guide project direction, and help turn our ideas into practical
+
+                solutions that make legal technology more accessible.
+
+              </p>
+
+              <div style={{
+
+                height: 1,
+
+                background: 'rgba(212,175,55,0.18)',
+
+                marginBottom: 22,
+
+              }} />
+
+              <div style={{
+
+                display: 'grid',
+
+                gridTemplateColumns: 'repeat(3, 1fr)',
+
+                gap: 10,
+
+                textAlign: 'left',
+
+              }}>
+
+                <div>
+
+                  <Lightbulb size={22} style={{ color: '#D4AF37', marginBottom: 8 }} />
+
+                  <div style={{ color: 'var(--text-muted)', fontSize: '0.76rem', lineHeight: 1.4 }}>
+
+                    Team<br />Management
+
                   </div>
 
-                  <div style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 7,
-                    padding: '8px 16px',
-                    borderRadius: 999,
-                    border: '1px solid rgba(212,175,55,0.55)',
-                    background: 'rgba(212,175,55,0.06)',
-                    color: '#D4AF37',
-                    fontSize: '0.82rem',
-                    fontWeight: 700,
-                    marginBottom: 16,
-                  }}>
-                    <RoleIcon size={15} /> {member.role}
-                  </div>
-
-                  <h3 style={{
-                    color: 'var(--text)',
-                    fontSize: '1.55rem',
-                    fontWeight: 800,
-                    margin: '0 0 12px',
-                    letterSpacing: '-0.02em',
-                  }}>
-                    {member.name}
-                  </h3>
-
-                  <p style={{
-                    color: 'var(--text-muted)',
-                    fontSize: '0.94rem',
-                    lineHeight: 1.7,
-                    margin: '0 0 24px',
-                    minHeight: 130,
-                  }}>
-                    {member.description}
-                  </p>
-
-                  <div style={{
-                    height: 1,
-                    background: 'rgba(212,175,55,0.18)',
-                    marginBottom: 22,
-                  }} />
-
-                  <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(3, 1fr)',
-                    gap: 10,
-                    textAlign: 'left',
-                  }}>
-                    {member.skills.map((skill, skillIndex) => {
-                      const SkillIcon = skill.icon
-
-                      return (
-                        <div key={`${member.name}-skill-${skillIndex}`}>
-                          <SkillIcon size={22} style={{ color: '#D4AF37', marginBottom: 8 }} />
-                          <div style={{
-                            color: 'var(--text-muted)',
-                            fontSize: '0.76rem',
-                            lineHeight: 1.4,
-                          }}>
-                            {skill.lines}
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
                 </div>
-              )
-            })}
+
+                <div>
+
+                  <Users size={22} style={{ color: '#D4AF37', marginBottom: 8 }} />
+
+                  <div style={{ color: 'var(--text-muted)', fontSize: '0.76rem', lineHeight: 1.4 }}>
+
+                    Project<br />Coordination
+
+                  </div>
+
+                </div>
+
+                <div>
+
+                  <Target size={22} style={{ color: '#D4AF37', marginBottom: 8 }} />
+
+                  <div style={{ color: 'var(--text-muted)', fontSize: '0.76rem', lineHeight: 1.4 }}>
+
+                    Strategy &amp;<br />Planning
+
+                  </div>
+
+                </div>
+
+              </div>
+
+            </div>
+
+            {/* Tarun Pokhariya — Backend & Frontend Developer */}
+
+            <div className="team-card" style={{
+
+              background: 'rgba(255,255,255,0.025)',
+
+              border: '1px solid rgba(212,175,55,0.22)',
+
+              borderRadius: 20,
+
+              padding: 24,
+
+              textAlign: 'center',
+
+              boxShadow: '0 18px 45px rgba(0,0,0,0.35)',
+
+              transition: 'transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease',
+
+            }}>
+
+              <div style={{
+
+                width: 190,
+
+                height: 190,
+
+                margin: '0 auto 22px',
+
+                borderRadius: '50%',
+
+                padding: 4,
+
+                background: 'linear-gradient(135deg, #D4AF37, #F5D76E, #A27B2C)',
+
+                boxShadow: '0 0 35px rgba(212,175,55,0.18)',
+
+              }}>
+
+                <img
+
+                  src="/team/tarun.jpg"
+
+                  alt="Tarun Pokhariya - Backend and Frontend Developer at Nyaya AI"
+
+                  style={{
+
+                    width: '100%',
+
+                    height: '100%',
+
+                    borderRadius: '50%',
+
+                    objectFit: 'cover',
+
+                    objectPosition: 'center top',
+
+                    display: 'block',
+
+                  }}
+
+                />
+
+              </div>
+
+              <div style={{
+
+                display: 'inline-flex',
+
+                alignItems: 'center',
+
+                gap: 7,
+
+                padding: '8px 16px',
+
+                borderRadius: 999,
+
+                border: '1px solid rgba(212,175,55,0.55)',
+
+                background: 'rgba(212,175,55,0.06)',
+
+                color: '#D4AF37',
+
+                fontSize: '0.82rem',
+
+                fontWeight: 700,
+
+                marginBottom: 16,
+
+              }}>
+
+                <Code2 size={15} /> Backend &amp; Frontend Developer
+
+              </div>
+
+              <h3 style={{
+
+                color: 'var(--text)',
+
+                fontSize: '1.55rem',
+
+                fontWeight: 800,
+
+                margin: '0 0 12px',
+
+                letterSpacing: '-0.02em',
+
+              }}>
+
+                Tarun Pokhariya
+
+              </h3>
+
+              <p style={{
+
+                color: 'var(--text-muted)',
+
+                fontSize: '0.94rem',
+
+                lineHeight: 1.7,
+
+                margin: '0 0 24px',
+
+                minHeight: 130,
+
+              }}>
+
+                Hi, I'm Tarun Pokhariya, the Backend and Frontend Developer of
+
+                Nyaya AI. I build and maintain the platform, develop user-facing
+
+                features, and connect the frontend with reliable backend services.
+
+              </p>
+
+              <div style={{
+
+                height: 1,
+
+                background: 'rgba(212,175,55,0.18)',
+
+                marginBottom: 22,
+
+              }} />
+
+              <div style={{
+
+                display: 'grid',
+
+                gridTemplateColumns: 'repeat(3, 1fr)',
+
+                gap: 10,
+
+                textAlign: 'left',
+
+              }}>
+
+                <div>
+
+                  <Code2 size={22} style={{ color: '#D4AF37', marginBottom: 8 }} />
+
+                  <div style={{ color: 'var(--text-muted)', fontSize: '0.76rem', lineHeight: 1.4 }}>
+
+                    Full-Stack<br />Development
+
+                  </div>
+
+                </div>
+
+                <div>
+
+                  <Target size={22} style={{ color: '#D4AF37', marginBottom: 8 }} />
+
+                  <div style={{ color: 'var(--text-muted)', fontSize: '0.76rem', lineHeight: 1.4 }}>
+
+                    Feature<br />Implementation
+
+                  </div>
+
+                </div>
+
+                <div>
+
+                  <ShieldCheck size={22} style={{ color: '#D4AF37', marginBottom: 8 }} />
+
+                  <div style={{ color: 'var(--text-muted)', fontSize: '0.76rem', lineHeight: 1.4 }}>
+
+                    System<br />Integration
+
+                  </div>
+
+                </div>
+
+              </div>
+
+            </div>
+
+            {/* Pragitya Ghosh — Database Manager */}
+
+            <div className="team-card" style={{
+
+              background: 'rgba(255,255,255,0.025)',
+
+              border: '1px solid rgba(212,175,55,0.22)',
+
+              borderRadius: 20,
+
+              padding: 24,
+
+              textAlign: 'center',
+
+              boxShadow: '0 18px 45px rgba(0,0,0,0.35)',
+
+              transition: 'transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease',
+
+            }}>
+
+              <div style={{
+
+                width: 190,
+
+                height: 190,
+
+                margin: '0 auto 22px',
+
+                borderRadius: '50%',
+
+                padding: 4,
+
+                background: 'linear-gradient(135deg, #D4AF37, #F5D76E, #A27B2C)',
+
+                boxShadow: '0 0 35px rgba(212,175,55,0.18)',
+
+              }}>
+
+                <img
+
+                  src="/team/pragitya.jpg"
+
+                  alt="Pragitya Ghosh - Database Manager at Nyaya AI"
+
+                  style={{
+
+                    width: '100%',
+
+                    height: '100%',
+
+                    borderRadius: '50%',
+
+                    objectFit: 'cover',
+
+                    objectPosition: 'center top',
+
+                    display: 'block',
+
+                  }}
+
+                />
+
+              </div>
+
+              <div style={{
+
+                display: 'inline-flex',
+
+                alignItems: 'center',
+
+                gap: 7,
+
+                padding: '8px 16px',
+
+                borderRadius: 999,
+
+                border: '1px solid rgba(212,175,55,0.55)',
+
+                background: 'rgba(212,175,55,0.06)',
+
+                color: '#D4AF37',
+
+                fontSize: '0.82rem',
+
+                fontWeight: 700,
+
+                marginBottom: 16,
+
+              }}>
+
+                <Database size={15} /> Database Manager
+
+              </div>
+
+              <h3 style={{
+
+                color: 'var(--text)',
+
+                fontSize: '1.55rem',
+
+                fontWeight: 800,
+
+                margin: '0 0 12px',
+
+                letterSpacing: '-0.02em',
+
+              }}>
+
+                Pragitya Ghosh
+
+              </h3>
+
+              <p style={{
+
+                color: 'var(--text-muted)',
+
+                fontSize: '0.94rem',
+
+                lineHeight: 1.7,
+
+                margin: '0 0 24px',
+
+                minHeight: 130,
+
+              }}>
+
+                Hi, I'm Pragitya Ghosh, the Database Manager of Nyaya AI. I design
+
+                and manage our data systems, focus on data integrity and security,
+
+                and help ensure that our platform's information remains organized
+
+                and reliable.
+
+              </p>
+
+              <div style={{
+
+                height: 1,
+
+                background: 'rgba(212,175,55,0.18)',
+
+                marginBottom: 22,
+
+              }} />
+
+              <div style={{
+
+                display: 'grid',
+
+                gridTemplateColumns: 'repeat(3, 1fr)',
+
+                gap: 10,
+
+                textAlign: 'left',
+
+              }}>
+
+                <div>
+
+                  <Database size={22} style={{ color: '#D4AF37', marginBottom: 8 }} />
+
+                  <div style={{ color: 'var(--text-muted)', fontSize: '0.76rem', lineHeight: 1.4 }}>
+
+                    Database<br />Design
+
+                  </div>
+
+                </div>
+
+                <div>
+
+                  <ShieldCheck size={22} style={{ color: '#D4AF37', marginBottom: 8 }} />
+
+                  <div style={{ color: 'var(--text-muted)', fontSize: '0.76rem', lineHeight: 1.4 }}>
+
+                    Data Security<br />&amp; Integrity
+
+                  </div>
+
+                </div>
+
+                <div>
+
+                  <BarChart3 size={22} style={{ color: '#D4AF37', marginBottom: 8 }} />
+
+                  <div style={{ color: 'var(--text-muted)', fontSize: '0.76rem', lineHeight: 1.4 }}>
+
+                    Performance<br />Optimization
+
+                  </div>
+
+                </div>
+
+              </div>
+
+            </div>
+
           </motion.div>
 
         </div>
@@ -1141,7 +1591,7 @@ export default function Landing() {
         style={{ padding: '100px 24px', borderTop: '1px solid var(--border)' }}
         initial={{ opacity: 0, y: 28 }}
         whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: false, amount: 0.1 }}
+        viewport={{ once: true, amount: 0.1 }}
         transition={{ duration: 0.7, ease: 'easeOut' }}
       >
 
@@ -1151,7 +1601,7 @@ export default function Landing() {
             style={{ textAlign: 'center', marginBottom: 56 }}
             initial={{ opacity: 0, y: 22 }}
             whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: false, amount: 0.2 }}
+            viewport={{ once: true, amount: 0.2 }}
             transition={{ duration: 0.6, ease: 'easeOut' }}
           >
 
@@ -1274,7 +1724,7 @@ export default function Landing() {
                   className="card"
                   initial={{ opacity: 0, y: 35 }}
                   whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: false, amount: 0.18 }}
+                  viewport={{ once: true, amount: 0.18 }}
                   transition={{ duration: 0.55, delay: i * 0.12, ease: 'easeOut' }}
 
                   style={{
@@ -1465,7 +1915,7 @@ export default function Landing() {
         style={{ padding: '80px 24px', background: '#000000' }}
         initial={{ opacity: 0, y: 28 }}
         whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: false, amount: 0.2 }}
+        viewport={{ once: true, amount: 0.2 }}
         transition={{ duration: 0.75, ease: 'easeOut' }}
       >
 
@@ -2111,6 +2561,8 @@ export default function Landing() {
 
           .features-grid { grid-template-columns: repeat(2, 1fr) !important; }
 
+          .team-grid { grid-template-columns: 1fr 1fr !important; }
+
           .pricing-grid { grid-template-columns: 1fr !important; }
 
           .footer-grid { grid-template-columns: 1fr 1fr !important; }
@@ -2119,11 +2571,15 @@ export default function Landing() {
 
         @media (max-width: 600px) {
 
+          .team-grid { grid-template-columns: 1fr !important; }
+
           .stats-grid { grid-template-columns: 1fr 1fr !important; }
 
           .steps-grid { grid-template-columns: 1fr !important; }
 
           .features-grid { grid-template-columns: 1fr !important; }
+
+          .team-grid { grid-template-columns: 1fr !important; }
 
           .footer-grid { grid-template-columns: 1fr !important; }
 
