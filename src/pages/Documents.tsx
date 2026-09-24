@@ -739,6 +739,11 @@ export default function Documents() {
   const downloadSharedDocument = async (
     share: DocumentShare
   ) => {
+    if (share.shareType === "temporary") {
+      showToast("Download is not permitted for temporary shares.");
+      return;
+    }
+
     try {
       setShareActionId(share.id);
 
@@ -3896,54 +3901,57 @@ body: JSON.stringify({
                               Open
                             </button>
 
-                            <button
-                              type="button"
-                              disabled={
-                                shareActionId ===
-                                share.id
-                              }
-                              onClick={() =>
-                                downloadSharedDocument(
-                                  share
-                                )
-                              }
-                              style={{
-                                padding:
-                                  "6px 9px",
-                                borderRadius:
-                                  7,
-                                border:
-                                  "1px solid var(--border)",
-                                background:
-                                  "var(--bg-card)",
-                                color:
-                                  "var(--text)",
-                                cursor:
+                            {share.shareType ===
+                              "permanent" && (
+                              <button
+                                type="button"
+                                disabled={
                                   shareActionId ===
                                   share.id
-                                    ? "not-allowed"
-                                    : "pointer",
-                                fontSize:
-                                  "0.68rem",
-                                fontWeight:
-                                  650,
-                                opacity:
-                                  shareActionId ===
-                                  share.id
-                                    ? 0.55
-                                    : 1,
-                              }}
-                            >
-                              <Download
-                                size={12}
+                                }
+                                onClick={() =>
+                                  downloadSharedDocument(
+                                    share
+                                  )
+                                }
                                 style={{
-                                  verticalAlign:
-                                    "middle",
-                                  marginRight: 4,
+                                  padding:
+                                    "6px 9px",
+                                  borderRadius:
+                                    7,
+                                  border:
+                                    "1px solid var(--border)",
+                                  background:
+                                    "var(--bg-card)",
+                                  color:
+                                    "var(--text)",
+                                  cursor:
+                                    shareActionId ===
+                                    share.id
+                                      ? "not-allowed"
+                                      : "pointer",
+                                  fontSize:
+                                    "0.68rem",
+                                  fontWeight:
+                                    650,
+                                  opacity:
+                                    shareActionId ===
+                                    share.id
+                                      ? 0.55
+                                      : 1,
                                 }}
-                              />
-                              Download
-                            </button>
+                              >
+                                <Download
+                                  size={12}
+                                  style={{
+                                    verticalAlign:
+                                      "middle",
+                                    marginRight: 4,
+                                  }}
+                                />
+                                Download
+                              </button>
+                            )}
                           </>
                         )}
 
