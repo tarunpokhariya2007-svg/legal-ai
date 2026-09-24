@@ -203,6 +203,7 @@ export default function Landing() {
   const [openSocial, setOpenSocial] = useState<'linkedin' | 'github' | null>(null)
 
   const [showDisclaimer, setShowDisclaimer] = useState(true)
+  const [teamPaused, setTeamPaused] = useState(false)
 
   const socialRef = useRef<HTMLDivElement>(null)
 
@@ -511,6 +512,10 @@ export default function Landing() {
 
         .landing-page .team-marquee:hover .team-track {
           animation-play-state: paused;
+        }
+
+        .landing-page .team-marquee.team-paused .team-track {
+          animation-play-state: paused !important;
         }
 
         @keyframes nyayaTeamLoop {
@@ -1062,7 +1067,8 @@ export default function Landing() {
 
           {/* Team cards — continuously looping horizontal carousel */}
           <motion.div
-            className="team-marquee"
+            className={`team-marquee${teamPaused ? ' team-paused' : ''}`}
+            onClick={() => setTeamPaused(true)}
             initial={{ opacity: 0, y: 35 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: false, amount: 0.12 }}
