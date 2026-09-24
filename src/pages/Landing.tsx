@@ -207,99 +207,16 @@ export default function Landing() {
 
   const socialRef = useRef<HTMLDivElement>(null)
   const teamTrackRef = useRef<HTMLDivElement>(null)
-  const teamDragRef = useRef<{
-    pointerId: number
-    startX: number
-    startTranslateX: number
-    dragging: boolean
-  } | null>(null)
 
-  const navigate = useNavigate()
-
-  const getTeamTranslateX = () => {
-    const track = teamTrackRef.current
-    if (!track) return 0
-
-    const transform = getComputedStyle(track).transform
-    if (!transform || transform === 'none') return 0
-
-    const match = transform.match(/matrix3d\(([^)]+)\)/)
-    if (match) {
-      const values = match[1].split(',').map(Number)
-      return values[12] || 0
-    }
-
-    const matrix = transform.match(/matrix\(([^)]+)\)/)
-    if (matrix) {
-      const values = matrix[1].split(',').map(Number)
-      return values[4] || 0
-    }
-
-    return 0
-  }
-
-  const setTeamTranslateX = (x: number) => {
-    const track = teamTrackRef.current
-    if (track) {
-      track.style.transform = `translate3d(${x}px, 0, 0)`
-    }
-  }
-
-  const normalizeTeamTranslateX = (x: number) => {
-    const track = teamTrackRef.current
-    if (!track || !track.children.length) return x
-
-    const firstSet = track.children[0] as HTMLElement
-    const cycleDistance = firstSet.getBoundingClientRect().width + 28
-    if (!cycleDistance) return x
-
-    while (x > 0) x -= cycleDistance
-    while (x < -cycleDistance) x += cycleDistance
-
-    return x
-  }
-
-  const handleTeamPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+  const handleTeamPress = () => {
     const track = teamTrackRef.current
     if (!track) return
 
-    const currentX = getTeamTranslateX()
-
-    // Clicking freezes the carousel at its exact current position.
+    // Stop the carousel and return to the original layout:
+    // Gaurav → Tarun → Pragitya.
     setTeamPaused(true)
-    track.style.animationPlayState = 'paused'
-    track.style.transform = `translate3d(${currentX}px, 0, 0)`
-
-    teamDragRef.current = {
-      pointerId: event.pointerId,
-      startX: event.clientX,
-      startTranslateX: currentX,
-      dragging: false,
-    }
-
-    event.currentTarget.setPointerCapture(event.pointerId)
-  }
-
-  const handleTeamPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
-    const drag = teamDragRef.current
-    if (!drag || drag.pointerId !== event.pointerId) return
-
-    const deltaX = event.clientX - drag.startX
-    if (Math.abs(deltaX) > 4) drag.dragging = true
-
-    const nextX = normalizeTeamTranslateX(drag.startTranslateX + deltaX)
-    setTeamTranslateX(nextX)
-  }
-
-  const handleTeamPointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
-    const drag = teamDragRef.current
-    if (!drag || drag.pointerId !== event.pointerId) return
-
-    teamDragRef.current = null
-
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId)
-    }
+    track.style.animation = 'none'
+    track.style.transform = 'translate3d(0, 0, 0)'
   }
 
   const handleProtectedNavigation = (path: string) => {
@@ -587,6 +504,9 @@ export default function Landing() {
           position: relative;
           mask-image: linear-gradient(to right, transparent, black 4%, black 96%, transparent);
           -webkit-mask-image: linear-gradient(to right, transparent, black 4%, black 96%, transparent);
+          cursor: pointer;
+          user-select: none;
+          -webkit-user-select: none;
         }
 
         .landing-page .team-track {
@@ -603,19 +523,13 @@ export default function Landing() {
           flex: 0 0 auto;
         }
 
-        .landing-page .team-marquee {
-          cursor: grab;
-          touch-action: pan-y;
-          user-select: none;
-          -webkit-user-select: none;
-        }
-
-        .landing-page .team-marquee:active {
-          cursor: grabbing;
+        .landing-page .team-marquee.team-paused {
+          cursor: default;
         }
 
         .landing-page .team-marquee.team-paused .team-track {
-          animation-play-state: paused !important;
+          animation: none !important;
+          transform: translate3d(0, 0, 0) !important;
         }
 
         @keyframes nyayaTeamLoop {
@@ -1168,10 +1082,7 @@ export default function Landing() {
           {/* Team cards — continuously looping horizontal carousel */}
           <motion.div
             className={`team-marquee${teamPaused ? ' team-paused' : ''}`}
-            onPointerDown={handleTeamPointerDown}
-            onPointerMove={handleTeamPointerMove}
-            onPointerUp={handleTeamPointerUp}
-            onPointerCancel={handleTeamPointerUp}
+            onPointerDown={handleTeamPress}
             initial={{ opacity: 0, y: 35 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: false, amount: 0.12 }}
