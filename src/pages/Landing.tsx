@@ -207,6 +207,7 @@ export default function Landing() {
 
   const socialRef = useRef<HTMLDivElement>(null)
   const teamTrackRef = useRef<HTMLDivElement>(null)
+  const navigate = useNavigate()
 
   const handleTeamPress = () => {
     const track = teamTrackRef.current
@@ -495,6 +496,83 @@ export default function Landing() {
 
           box-shadow: 0 24px 55px rgba(0,0,0,.50) !important;
 
+        }
+
+        /* Per-card animated spark particles */
+        .landing-page .team-card {
+          position: relative;
+          overflow: hidden;
+          isolation: isolate;
+        }
+
+        .landing-page .team-card::before,
+        .landing-page .team-card::after {
+          content: "";
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+          border-radius: inherit;
+          z-index: 0;
+        }
+
+        .landing-page .team-card::before {
+          background:
+            radial-gradient(circle at 11% 18%, var(--team-particle) 0 1.4px, transparent 2.8px),
+            radial-gradient(circle at 27% 73%, var(--team-particle) 0 1.1px, transparent 2.5px),
+            radial-gradient(circle at 44% 31%, var(--team-particle) 0 1.6px, transparent 3px),
+            radial-gradient(circle at 63% 82%, var(--team-particle) 0 1.2px, transparent 2.7px),
+            radial-gradient(circle at 78% 23%, var(--team-particle) 0 1.5px, transparent 3px),
+            radial-gradient(circle at 91% 66%, var(--team-particle) 0 1px, transparent 2.4px),
+            radial-gradient(circle at 56% 55%, var(--team-particle) 0 1px, transparent 2.3px),
+            radial-gradient(circle at 18% 46%, var(--team-particle) 0 1px, transparent 2.4px);
+          background-size: 100% 100%;
+          opacity: .42;
+          filter: drop-shadow(0 0 5px var(--team-particle));
+          animation: teamParticleDrift 8s ease-in-out infinite alternate;
+        }
+
+        .landing-page .team-card::after {
+          background:
+            radial-gradient(circle at 20% 28%, var(--team-particle-soft) 0 2px, transparent 2.5px),
+            radial-gradient(circle at 72% 48%, var(--team-particle-soft) 0 1.8px, transparent 2.4px),
+            radial-gradient(circle at 38% 88%, var(--team-particle-soft) 0 1.7px, transparent 2.3px),
+            radial-gradient(circle at 88% 15%, var(--team-particle-soft) 0 1.6px, transparent 2.2px);
+          opacity: .35;
+          filter: blur(.2px) drop-shadow(0 0 7px var(--team-particle));
+          animation: teamParticleTwinkle 2.6s ease-in-out infinite;
+        }
+
+        .landing-page .team-card > * {
+          position: relative;
+          z-index: 1;
+        }
+
+        @keyframes teamParticleDrift {
+          0% {
+            transform: translate3d(0, 0, 0) scale(1);
+            background-position: 0 0;
+          }
+          50% {
+            transform: translate3d(5px, -7px, 0) scale(1.015);
+            background-position: 7px -10px;
+          }
+          100% {
+            transform: translate3d(-6px, 5px, 0) scale(1.02);
+            background-position: -9px 8px;
+          }
+        }
+
+        @keyframes teamParticleTwinkle {
+          0%, 100% { opacity: .18; transform: scale(.98); }
+          45% { opacity: .62; transform: scale(1.02); }
+          70% { opacity: .30; transform: scale(1); }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .landing-page .team-card::before,
+          .landing-page .team-card::after {
+            animation: none;
+          }
         }
 
         /* Infinite team-card marquee */
@@ -1109,7 +1187,17 @@ export default function Landing() {
                           transition: 'transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease',
                           flex: '0 0 380px',
                           boxSizing: 'border-box',
-                        }}
+                          '--team-particle': member.name === 'Gaurav Singh'
+                            ? 'rgba(255, 70, 55, 0.90)'
+                            : member.name === 'Tarun Pokhariya'
+                              ? 'rgba(175, 80, 255, 0.92)'
+                              : 'rgba(65, 155, 255, 0.92)',
+                          '--team-particle-soft': member.name === 'Gaurav Singh'
+                            ? 'rgba(255, 105, 85, 0.45)'
+                            : member.name === 'Tarun Pokhariya'
+                              ? 'rgba(205, 125, 255, 0.48)'
+                              : 'rgba(100, 190, 255, 0.48)',
+                        } as React.CSSProperties}
                       >
                         <div style={{
                           width: 190,
