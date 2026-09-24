@@ -637,7 +637,7 @@ export default function Landing() {
 
     whileInView={{ opacity: 1, y: 0 }}
 
-    viewport={{ once: true, amount: 0.2 }}
+    viewport={{ once: false, amount: 0.2 }}
 
     transition={{ duration: 0.8, ease: 'easeOut' }}
 
@@ -678,7 +678,7 @@ export default function Landing() {
         style={{ padding: '100px 24px' }}
         initial={{ opacity: 0, y: 28 }}
         whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true, amount: 0.12 }}
+        viewport={{ once: false, amount: 0.12 }}
         transition={{ duration: 0.7, ease: 'easeOut' }}
       >
 
@@ -688,7 +688,7 @@ export default function Landing() {
             style={{ textAlign: 'center', marginBottom: 64 }}
             initial={{ opacity: 0, y: 22 }}
             whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, amount: 0.2 }}
+            viewport={{ once: false, amount: 0.2 }}
             transition={{ duration: 0.6, ease: 'easeOut' }}
           >
 
@@ -722,7 +722,7 @@ export default function Landing() {
                 style={{ padding: 28, position: 'relative' }}
                 initial={{ opacity: 0, y: 35 }}
                 whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, amount: 0.2 }}
+                viewport={{ once: false, amount: 0.2 }}
                 transition={{ duration: 0.55, delay: i * 0.12, ease: 'easeOut' }}
               >
 
@@ -786,7 +786,7 @@ export default function Landing() {
         style={{ padding: '100px 24px', borderTop: '1px solid var(--border)' }}
         initial={{ opacity: 0, y: 28 }}
         whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true, amount: 0.1 }}
+        viewport={{ once: false, amount: 0.1 }}
         transition={{ duration: 0.7, ease: 'easeOut' }}
       >
 
@@ -796,7 +796,7 @@ export default function Landing() {
             style={{ textAlign: 'center', marginBottom: 64 }}
             initial={{ opacity: 0, y: 22 }}
             whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, amount: 0.2 }}
+            viewport={{ once: false, amount: 0.2 }}
             transition={{ duration: 0.6, ease: 'easeOut' }}
           >
 
@@ -824,7 +824,7 @@ export default function Landing() {
                 style={{ padding: 28 }}
                 initial={{ opacity: 0, y: 35 }}
                 whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, amount: 0.18 }}
+                viewport={{ once: false, amount: 0.18 }}
                 transition={{ duration: 0.55, delay: i * 0.09, ease: 'easeOut' }}
               >
 
@@ -972,7 +972,7 @@ export default function Landing() {
             className="team-grid"
             initial={{ opacity: 0, y: 35 }}
             whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, amount: 0.12 }}
+            viewport={{ once: false, amount: 0.12 }}
             transition={{ duration: 0.65, ease: 'easeOut' }}
 
             style={{
@@ -1591,7 +1591,7 @@ export default function Landing() {
         style={{ padding: '100px 24px', borderTop: '1px solid var(--border)' }}
         initial={{ opacity: 0, y: 28 }}
         whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true, amount: 0.1 }}
+        viewport={{ once: false, amount: 0.1 }}
         transition={{ duration: 0.7, ease: 'easeOut' }}
       >
 
@@ -1601,7 +1601,7 @@ export default function Landing() {
             style={{ textAlign: 'center', marginBottom: 56 }}
             initial={{ opacity: 0, y: 22 }}
             whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, amount: 0.2 }}
+            viewport={{ once: false, amount: 0.2 }}
             transition={{ duration: 0.6, ease: 'easeOut' }}
           >
 
@@ -1724,7 +1724,7 @@ export default function Landing() {
                   className="card"
                   initial={{ opacity: 0, y: 35 }}
                   whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true, amount: 0.18 }}
+                  viewport={{ once: false, amount: 0.18 }}
                   transition={{ duration: 0.55, delay: i * 0.12, ease: 'easeOut' }}
 
                   style={{
@@ -1915,7 +1915,7 @@ export default function Landing() {
         style={{ padding: '80px 24px', background: '#000000' }}
         initial={{ opacity: 0, y: 28 }}
         whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true, amount: 0.2 }}
+        viewport={{ once: false, amount: 0.2 }}
         transition={{ duration: 0.75, ease: 'easeOut' }}
       >
 
