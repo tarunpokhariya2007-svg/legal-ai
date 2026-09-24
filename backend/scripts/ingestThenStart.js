@@ -1,7 +1,7 @@
 const { spawn } = require("child_process");
 
 console.log("========================================");
-console.log("NYAYA AI — SERVER + BACKGROUND INGESTION");
+console.log("NYAYA AI — SERVER + BACKGROUND TASK");
 console.log("========================================");
 
 console.log("Starting web server immediately...");
@@ -22,18 +22,26 @@ server.on("error", error => {
     );
 });
 
-console.log(
-    "Starting legal ingestion in background..."
-);
+// Decide which background task to run
+const isRetryMode = process.argv.includes("--retry-missing");
 
-const ingestionArgs = [
-    "scripts/ingestCentralActsFast.js",
-    ...process.argv.slice(2)
-];
+const ingestionScript = isRetryMode
+    ? "scripts/retryMissingLegalProvisions.js"
+    : "scripts/ingestCentralActsFast.js";
+
+const ingestionArgs = isRetryMode
+    ? []
+    : process.argv.slice(2);
+
+console.log(
+    isRetryMode
+        ? "Starting MISSING PROVISION RETRY in background..."
+        : "Starting FULL LEGAL INGESTION in background..."
+);
 
 const ingestion = spawn(
     process.execPath,
-    ingestionArgs,
+    [ingestionScript, ...ingestionArgs],
     {
         stdio: "inherit",
         env: process.env
@@ -42,7 +50,7 @@ const ingestion = spawn(
 
 ingestion.on("error", error => {
     console.error(
-        "INGESTION PROCESS ERROR:",
+        "BACKGROUND TASK ERROR:",
         error.message
     );
 });
@@ -50,11 +58,13 @@ ingestion.on("error", error => {
 ingestion.on("exit", (code, signal) => {
     if (code === 0) {
         console.log(
-            "LEGAL INGESTION FINISHED SUCCESSFULLY."
+            isRetryMode
+                ? "MISSING PROVISION RETRY FINISHED SUCCESSFULLY."
+                : "LEGAL INGESTION FINISHED SUCCESSFULLY."
         );
     } else {
         console.error(
-            `LEGAL INGESTION EXITED. code=${code}, signal=${signal}`
+            `BACKGROUND TASK EXITED. code=${code}, signal=${signal}`
         );
     }
 });
