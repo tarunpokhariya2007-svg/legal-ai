@@ -10,6 +10,7 @@ const {
     listIncomingShares,
     listOutgoingShares,
     updateShareStatus,
+    removeIncomingShare,
     expireDueShares
 } = require("../database/documentShareModel");
 const {
@@ -37,6 +38,95 @@ function getPhysicalFilePath(filePath) {
     }
 
     return path.join(UPLOAD_DIR, fileName);
+}
+
+
+function normalizeSupabaseReference(filePath) {
+    if (!filePath || typeof filePath !== "string") {
+        return null;
+    }
+
+    const value = filePath.trim();
+
+    if (isSupabaseStorageReference(value)) {
+        return value;
+    }
+
+    // Support a full Supabase Storage object URL from older records.
+    if (value.startsWith("http://") || value.startsWith("https://")) {
+        try {
+            const url = new URL(value);
+            const marker = "/storage/v1/object/";
+            const index = url.pathname.indexOf(marker);
+
+            if (index >= 0) {
+                const remainder = url.pathname.slice(
+                    index + marker.length
+                );
+                const parts = remainder.split("/").filter(Boolean);
+
+                if (parts.length >= 2) {
+                    const bucket = decodeURIComponent(parts[0]);
+                    const configuredBucket =
+                        process.env.SUPABASE_STORAGE_BUCKET ||
+                        "nyaya-documents";
+
+                    if (bucket === configuredBucket) {
+                        const objectPath = parts
+                            .slice(1)
+                            .map((part) => decodeURIComponent(part))
+                            .join("/");
+
+                        if (
+                            objectPath &&
+                            !objectPath.includes("..")
+                        ) {
+                            return `supabase://${objectPath}`;
+                        }
+                    }
+                }
+            }
+        } catch {
+            return null;
+        }
+    }
+
+    // Support raw object paths produced by the current storage layout.
+    if (
+        value.startsWith("documents/") &&
+        !value.includes("..")
+    ) {
+        return `supabase://${value}`;
+    }
+
+    return null;
+}
+
+async function loadSharedDocumentBuffer(filePath) {
+    const normalizedReference =
+        normalizeSupabaseReference(filePath);
+
+    if (normalizedReference) {
+        return downloadDocumentBuffer(
+            normalizedReference
+        );
+    }
+
+    const physicalPath =
+        getPhysicalFilePath(filePath);
+
+    if (
+        !physicalPath ||
+        !fs.existsSync(physicalPath)
+    ) {
+        const error = new Error(
+            "Document file is no longer available."
+        );
+        error.code = "DOCUMENT_FILE_NOT_FOUND";
+        throw error;
+    }
+
+    return fs.promises.readFile(physicalPath);
 }
 
 function normalizeRole(value) {
@@ -648,6 +738,95 @@ router.patch(
 );
 
 // =====================================================
+// REMOVE SHARED DOCUMENT
+// DELETE /api/document-shares/:id/remove
+// Recipient removes the shared entry from their list.
+// This never deletes the original document.
+// =====================================================
+router.delete(
+    "/:id/remove",
+    authMiddleware,
+    async (req, res) => {
+        try {
+            const shareId = Number(req.params.id);
+
+            if (
+                !Number.isInteger(shareId) ||
+                shareId <= 0
+            ) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Invalid share ID."
+                });
+            }
+
+            const share =
+                await getShareById(shareId);
+
+            if (!share) {
+                return res.status(404).json({
+                    success: false,
+                    message: "Share not found."
+                });
+            }
+
+            if (
+                share.recipient_id !==
+                req.user.id
+            ) {
+                return res.status(403).json({
+                    success: false,
+                    message:
+                        "Only the recipient can remove this shared document."
+                });
+            }
+
+            const removed =
+                await removeIncomingShare(
+                    shareId,
+                    req.user.id
+                );
+
+            if (!removed) {
+                return res.status(409).json({
+                    success: false,
+                    message:
+                        "This shared document is no longer available."
+                });
+            }
+
+            await logDocumentActivity({
+                documentId: share.document_id,
+                userId: req.user.id,
+                action: "shared_document_removed",
+                req,
+                metadata: {
+                    shareId,
+                    senderId: share.sender_id
+                }
+            });
+
+            return res.json({
+                success: true,
+                message:
+                    "Shared document removed from your list."
+            });
+        } catch (error) {
+            console.error(
+                "REMOVE SHARED DOCUMENT ERROR:",
+                error
+            );
+
+            return res.status(500).json({
+                success: false,
+                message:
+                    "Unable to remove shared document."
+            });
+        }
+    }
+);
+
+// =====================================================
 // REVOKE SHARE
 // DELETE /api/document-shares/:id
 // =====================================================
@@ -821,39 +1000,10 @@ router.get(
             let fileBuffer;
 
             try {
-                if (
-                    isSupabaseStorageReference(
+                fileBuffer =
+                    await loadSharedDocumentBuffer(
                         share.file_path
-                    )
-                ) {
-                    fileBuffer =
-                        await downloadDocumentBuffer(
-                            share.file_path
-                        );
-                } else {
-                    const physicalPath =
-                        getPhysicalFilePath(
-                            share.file_path
-                        );
-
-                    if (
-                        !physicalPath ||
-                        !fs.existsSync(
-                            physicalPath
-                        )
-                    ) {
-                        return res.status(404).json({
-                            success: false,
-                            message:
-                                "Document file is no longer available."
-                        });
-                    }
-
-                    fileBuffer =
-                        await fs.promises.readFile(
-                            physicalPath
-                        );
-                }
+                    );
             } catch (storageError) {
                 console.error(
                     "SHARED DOCUMENT STORAGE ERROR:",
@@ -979,39 +1129,10 @@ router.get(
             let fileBuffer;
 
             try {
-                if (
-                    isSupabaseStorageReference(
+                fileBuffer =
+                    await loadSharedDocumentBuffer(
                         share.file_path
-                    )
-                ) {
-                    fileBuffer =
-                        await downloadDocumentBuffer(
-                            share.file_path
-                        );
-                } else {
-                    const physicalPath =
-                        getPhysicalFilePath(
-                            share.file_path
-                        );
-
-                    if (
-                        !physicalPath ||
-                        !fs.existsSync(
-                            physicalPath
-                        )
-                    ) {
-                        return res.status(404).json({
-                            success: false,
-                            message:
-                                "Document file is no longer available."
-                        });
-                    }
-
-                    fileBuffer =
-                        await fs.promises.readFile(
-                            physicalPath
-                        );
-                }
+                    );
             } catch (storageError) {
                 console.error(
                     "SHARED DOCUMENT DOWNLOAD STORAGE ERROR:",

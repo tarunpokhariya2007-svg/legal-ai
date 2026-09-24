@@ -283,6 +283,28 @@ async function updateShareStatus(
     return result.affectedRows > 0;
 }
 
+
+async function removeIncomingShare(shareId, userId) {
+    const [result] = await db.query(
+        `
+        DELETE FROM document_shares
+        WHERE id = ?
+          AND recipient_id = ?
+          AND status IN (
+              'pending',
+              'accepted',
+              'rejected',
+              'expired',
+              'revoked'
+          )
+        `,
+        [shareId, userId]
+    );
+
+    return result.affectedRows > 0;
+}
+
+
 module.exports = {
     normalizeShareType,
     createShare,
@@ -290,5 +312,6 @@ module.exports = {
     listIncomingShares,
     listOutgoingShares,
     updateShareStatus,
+    removeIncomingShare,
     expireDueShares
 };

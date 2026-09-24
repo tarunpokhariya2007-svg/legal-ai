@@ -503,6 +503,80 @@ export default function Documents() {
     }
   };
 
+  const hasActiveTemporaryShare = (
+    documentId?: number
+  ) => {
+    if (!documentId) {
+      return false;
+    }
+
+    return outgoingShares.some(
+      (share) =>
+        Number(share.documentId) ===
+          Number(documentId) &&
+        share.shareType === "temporary" &&
+        (share.status === "pending" ||
+          share.status === "accepted") &&
+        (
+          !share.expiresAt ||
+          new Date(share.expiresAt).getTime() >
+            Date.now()
+        )
+    );
+  };
+
+  const removeIncomingSharedDocument = async (
+    share: DocumentShare
+  ) => {
+    const confirmed = window.confirm(
+      "Remove this shared document from your Shared Documents list?"
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setShareActionId(share.id);
+      setSharesError(null);
+
+      const response = await fetch(
+        `${API_BASE}/api/document-shares/${share.id}/remove`,
+        {
+          method: "DELETE",
+          credentials: "include",
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        showToast(
+          result.message ||
+            "Unable to remove shared document."
+        );
+        return;
+      }
+
+      showToast(
+        "Shared document removed."
+      );
+
+      await loadDocumentShares();
+    } catch (error) {
+      console.error(
+        "REMOVE SHARED DOCUMENT ERROR:",
+        error
+      );
+
+      showToast(
+        "Unable to remove shared document."
+      );
+    } finally {
+      setShareActionId(null);
+    }
+  };
+
   const respondToDocumentShare = async (
     shareId: number,
     action: "accept" | "reject"
@@ -3127,6 +3201,8 @@ body: JSON.stringify({
 
               {/* SHARE */}
 
+              {!hasActiveTemporaryShare(d) && (
+                <>
               <button
                 title="Share document"
                 onClick={() =>
@@ -3151,6 +3227,9 @@ body: JSON.stringify({
                   size={13}
                 />
               </button>
+
+                </>
+              )}
 
               {/* BLOCKCHAIN ACTION */}
 
@@ -3866,6 +3945,61 @@ body: JSON.stringify({
                               Download
                             </button>
                           </>
+                        {(share.status ===
+                          "accepted" ||
+                          share.status ===
+                            "pending") && (
+                          <button
+                            type="button"
+                            title="Remove shared document"
+                            disabled={
+                              shareActionId ===
+                              share.id
+                            }
+                            onClick={() =>
+                              removeIncomingSharedDocument(
+                                share
+                              )
+                            }
+                            style={{
+                              padding:
+                                "6px 9px",
+                              borderRadius:
+                                7,
+                              border:
+                                "1px solid rgba(239, 68, 68, 0.22)",
+                              background:
+                                "rgba(239, 68, 68, 0.07)",
+                              color:
+                                "#EF4444",
+                              cursor:
+                                shareActionId ===
+                                share.id
+                                  ? "not-allowed"
+                                  : "pointer",
+                              display:
+                                "flex",
+                              alignItems:
+                                "center",
+                              justifyContent:
+                                "center",
+                              fontSize:
+                                "0.68rem",
+                              fontWeight:
+                                700,
+                              opacity:
+                                shareActionId ===
+                                share.id
+                                  ? 0.55
+                                  : 1,
+                            }}
+                          >
+                            <Trash2
+                              size={12}
+                            />
+                          </button>
+                        )}
+
                         )}
                       </div>
                     </div>
