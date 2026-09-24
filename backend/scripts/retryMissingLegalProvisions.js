@@ -17,6 +17,7 @@ async function fetchJson(path, attempt = 1) {
 
     try {
         const controller = new AbortController();
+
         const timeout = setTimeout(
             () => controller.abort(),
             REQUEST_TIMEOUT_MS
@@ -25,20 +26,24 @@ async function fetchJson(path, attempt = 1) {
         const response = await fetch(url, {
             signal: controller.signal,
             headers: {
-                Accept: "application/json",
-            },
+                Accept: "application/json"
+            }
         });
 
         clearTimeout(timeout);
 
         if (!response.ok) {
-            const body = await response.text().catch(() => "");
+            const body = await response
+                .text()
+                .catch(() => "");
+
             throw new Error(
                 `HTTP ${response.status} for ${url}: ${body.slice(0, 300)}`
             );
         }
 
         return await response.json();
+
     } catch (error) {
         if (attempt < MAX_RETRIES) {
             console.log(
@@ -46,6 +51,7 @@ async function fetchJson(path, attempt = 1) {
             );
 
             await sleep(1000 * attempt);
+
             return fetchJson(path, attempt + 1);
         }
 
@@ -66,10 +72,13 @@ async function mapConcurrent(items, concurrency, worker) {
             }
 
             try {
-                results[index] = await worker(items[index], index);
+                results[index] = await worker(
+                    items[index],
+                    index
+                );
             } catch (error) {
                 results[index] = {
-                    error,
+                    error
                 };
             }
         }
@@ -77,7 +86,7 @@ async function mapConcurrent(items, concurrency, worker) {
 
     const workers = Array.from(
         {
-            length: Math.min(concurrency, items.length),
+            length: Math.min(concurrency, items.length)
         },
         () => runner()
     );
@@ -94,6 +103,15 @@ function sha256(value) {
         .digest("hex");
 }
 
+/**
+ * India Code provision number.
+ *
+ * Examples:
+ * 103
+ * 124A
+ * 43-B
+ * 6A
+ */
 function getProvisionNumber(item) {
     return String(
         item?.number ??
@@ -105,26 +123,65 @@ function getProvisionNumber(item) {
     ).trim();
 }
 
+/**
+ * /acts/{act} returns:
+ *
+ * {
+ *   act: {...},
+ *   sections: [...]
+ * }
+ *
+ * Constitution/articles can use articles.
+ */
 function getProvisionList(actData) {
     return (
         actData?.sections ||
-        actData?.provisions ||
         actData?.articles ||
+        actData?.provisions ||
         actData?.units ||
         []
     );
 }
 
+/**
+ * Prefer the unit declared by India Code.
+ */
 function getUnitType(actData) {
-    if (Array.isArray(actData?.articles)) {
+    const unit = String(
+        actData?.act?.unit ||
+        ""
+    ).toLowerCase();
+
+    if (unit === "article") {
         return "article";
+    }
+
+    if (unit === "rule") {
+        return "rule";
     }
 
     return "section";
 }
 
+/**
+ * Individual provision response:
+ *
+ * {
+ *   act: {...},
+ *   section: {
+ *      number,
+ *      heading,
+ *      text
+ *   }
+ * }
+ *
+ * Articles use `article`.
+ */
 function getProvisionTitle(data) {
     return String(
+        data?.section?.heading ??
+        data?.article?.heading ??
+        data?.rule?.heading ??
         data?.heading ??
         data?.title ??
         data?.section_title ??
@@ -136,6 +193,9 @@ function getProvisionTitle(data) {
 
 function getProvisionContent(data) {
     return String(
+        data?.section?.text ??
+        data?.article?.text ??
+        data?.rule?.text ??
         data?.text ??
         data?.content ??
         data?.body ??
@@ -152,18 +212,46 @@ async function getCentralActs() {
 
     return Array.isArray(data)
         ? data
-        : data?.acts || data?.data || [];
+        : data?.acts ||
+          data?.data ||
+          [];
 }
 
 async function getActDetails(act) {
-    return fetchJson(`/acts/${act.id}`);
+    return fetchJson(
+        `/acts/${encodeURIComponent(act.id)}`
+    );
 }
 
-async function getProvisionDetails(actId, number, type) {
-    const endpoint =
-        type === "article"
-            ? `/acts/${actId}/article/${encodeURIComponent(number)}`
-            : `/acts/${actId}/section/${encodeURIComponent(number)}`;
+/**
+ * IMPORTANT:
+ *
+ * Correct India Code API:
+ *
+ * /{act}/section/{number}
+ * /{act}/article/{number}
+ *
+ * NOT:
+ *
+ * /acts/{act}/section/{number}
+ */
+async function getProvisionDetails(
+    actId,
+    number,
+    type
+) {
+    let endpoint;
+
+    if (type === "article") {
+        endpoint =
+            `/${encodeURIComponent(actId)}/article/${encodeURIComponent(number)}`;
+    } else if (type === "rule") {
+        endpoint =
+            `/${encodeURIComponent(actId)}/rule/${encodeURIComponent(number)}`;
+    } else {
+        endpoint =
+            `/${encodeURIComponent(actId)}/section/${encodeURIComponent(number)}`;
+    }
 
     return fetchJson(endpoint);
 }
@@ -180,7 +268,9 @@ async function getExistingNumbers(actName) {
 
     return new Set(
         rows
-            .map((row) => String(row.section_number).trim())
+            .map((row) =>
+                String(row.section_number).trim()
+            )
             .filter(Boolean)
     );
 }
@@ -220,7 +310,7 @@ async function insertProvision(row) {
             row.source_url,
             row.effective_date,
             row.source_version,
-            row.content_hash,
+            row.content_hash
         ]
     );
 }
@@ -228,32 +318,58 @@ async function insertProvision(row) {
 async function processAct(act) {
     const actData = await getActDetails(act);
 
+    /**
+     * India Code /acts/{act} response:
+     *
+     * {
+     *   act: {
+     *      id,
+     *      short_title,
+     *      act_number,
+     *      act_year,
+     *      unit,
+     *      ...
+     *   },
+     *   sections: [...]
+     * }
+     */
+    const actInfo = actData?.act || {};
+
     const actName = String(
-        actData?.name ??
-        actData?.act_name ??
-        act.name ??
+        actInfo?.short_title ??
+        act?.short_title ??
+        act?.name ??
         ""
     ).trim();
 
     const actNumber = String(
-        actData?.number ??
-        actData?.act_number ??
-        act.number ??
+        actInfo?.act_number ??
+        act?.act_number ??
+        act?.number ??
         ""
     ).trim();
 
     if (!actName) {
-        throw new Error(`Could not determine act name for ${act.id}`);
+        throw new Error(
+            `Could not determine act name for ${act.id}`
+        );
     }
 
     const provisions = getProvisionList(actData);
+
     const type = getUnitType(actData);
 
-    const existing = await getExistingNumbers(actName);
+    const existing = await getExistingNumbers(
+        actName
+    );
 
     const missing = provisions.filter((item) => {
         const number = getProvisionNumber(item);
-        return number && !existing.has(number);
+
+        return (
+            number &&
+            !existing.has(number)
+        );
     });
 
     console.log(
@@ -265,7 +381,7 @@ async function processAct(act) {
             act: actName,
             missing: 0,
             inserted: 0,
-            failed: 0,
+            failed: 0
         };
     }
 
@@ -276,47 +392,72 @@ async function processAct(act) {
         missing,
         SECTION_CONCURRENCY,
         async (item) => {
-            const number = getProvisionNumber(item);
+            const number =
+                getProvisionNumber(item);
 
             try {
-                const data = await getProvisionDetails(
-                    act.id,
-                    number,
-                    type
-                );
+                const data =
+                    await getProvisionDetails(
+                        act.id,
+                        number,
+                        type
+                    );
 
-                const content = getProvisionContent(data);
-                const title = getProvisionTitle(data);
+                const content =
+                    getProvisionContent(data);
+
+                const title =
+                    getProvisionTitle(data);
 
                 if (!content) {
                     throw new Error(
-                        `Empty content for ${actName} section ${number}`
+                        `Empty content for ${actName} ${type} ${number}`
                     );
                 }
 
+                const responseAct =
+                    data?.act || {};
+
                 await insertProvision({
                     act_name: actName,
-                    act_number: actNumber || null,
+
+                    act_number:
+                        actNumber || null,
+
                     section_number: number,
-                    section_title: title || null,
+
+                    section_title:
+                        title || null,
+
                     content,
+
                     source_name:
                         data?.source_name ||
-                        actData?.source_name ||
+                        responseAct?.source_name ||
+                        actInfo?.source_name ||
                         "India Code / eCourtsIndia",
+
                     source_url:
                         data?.source_url ||
-                        actData?.source_url ||
+                        data?.url ||
+                        responseAct?.url ||
+                        actInfo?.url ||
                         null,
+
                     effective_date:
                         data?.effective_date ||
-                        actData?.effective_date ||
+                        responseAct?.effective_date ||
+                        actInfo?.effective_date ||
                         null,
+
                     source_version:
                         data?.source_version ||
-                        actData?.year ||
+                        responseAct?.act_year ||
+                        actInfo?.act_year ||
                         null,
-                    content_hash: sha256(content),
+
+                    content_hash:
+                        sha256(content)
                 });
 
                 inserted++;
@@ -324,6 +465,7 @@ async function processAct(act) {
                 console.log(
                     `${actName}: recovered ${number}`
                 );
+
             } catch (error) {
                 failed++;
 
@@ -338,87 +480,148 @@ async function processAct(act) {
         act: actName,
         missing: missing.length,
         inserted,
-        failed,
+        failed
     };
 }
 
 async function main() {
-    console.log("==============================================");
-    console.log("NYAYA AI — RETRY MISSING LEGAL PROVISIONS");
-    console.log("==============================================");
-
-    const acts = await getCentralActs();
-
-    const inForceActs = acts.filter(
-        (act) =>
-            act?.in_force === true ||
-            act?.in_force === 1 ||
-            act?.in_force === "true" ||
-            act?.in_force === "1"
+    console.log(
+        "=============================================="
     );
 
-    console.log(`Central Acts found: ${acts.length}`);
-    console.log(`In-force Acts: ${inForceActs.length}`);
+    console.log(
+        "NYAYA AI — RETRY MISSING LEGAL PROVISIONS"
+    );
+
+    console.log(
+        "=============================================="
+    );
+
+    const acts =
+        await getCentralActs();
+
+    const inForceActs =
+        acts.filter(
+            (act) =>
+                act?.in_force === true ||
+                act?.in_force === 1 ||
+                act?.in_force === "true" ||
+                act?.in_force === "1"
+        );
+
+    console.log(
+        `Central Acts found: ${acts.length}`
+    );
+
+    console.log(
+        `In-force Acts: ${inForceActs.length}`
+    );
+
     console.log("");
 
     let totalMissing = 0;
     let totalInserted = 0;
     let totalFailed = 0;
 
-    const results = await mapConcurrent(
-        inForceActs,
-        ACT_CONCURRENCY,
-        async (act, index) => {
-            try {
-                const result = await processAct(act);
+    const results =
+        await mapConcurrent(
+            inForceActs,
+            ACT_CONCURRENCY,
+            async (act, index) => {
+                try {
+                    const result =
+                        await processAct(act);
 
-                console.log(
-                    `PROGRESS: ${index + 1}/${inForceActs.length}`
-                );
+                    console.log(
+                        `PROGRESS: ${index + 1}/${inForceActs.length}`
+                    );
 
-                return result;
-            } catch (error) {
-                console.error(
-                    `ACT FAILED: ${act.id}: ${error.message}`
-                );
+                    return result;
 
-                return {
-                    act: act.name || act.id,
-                    missing: 0,
-                    inserted: 0,
-                    failed: 1,
-                };
+                } catch (error) {
+                    console.error(
+                        `ACT FAILED: ${act?.id}: ${error.message}`
+                    );
+
+                    return {
+                        act:
+                            act?.short_title ||
+                            act?.name ||
+                            act?.id,
+
+                        missing: 0,
+
+                        inserted: 0,
+
+                        failed: 1
+                    };
+                }
             }
-        }
-    );
+        );
 
     for (const result of results) {
-        if (!result) continue;
+        if (!result) {
+            continue;
+        }
 
-        totalMissing += result.missing || 0;
-        totalInserted += result.inserted || 0;
-        totalFailed += result.failed || 0;
+        totalMissing +=
+            result.missing || 0;
+
+        totalInserted +=
+            result.inserted || 0;
+
+        totalFailed +=
+            result.failed || 0;
     }
 
     console.log("");
-    console.log("==============================================");
-    console.log("RETRY COMPLETE");
-    console.log("==============================================");
-    console.log(`Missing provisions detected: ${totalMissing}`);
-    console.log(`Recovered/inserted:          ${totalInserted}`);
-    console.log(`Still failed:                ${totalFailed}`);
-    console.log("==============================================");
 
-    await db.end?.();
+    console.log(
+        "=============================================="
+    );
+
+    console.log(
+        "RETRY COMPLETE"
+    );
+
+    console.log(
+        "=============================================="
+    );
+
+    console.log(
+        `Missing provisions detected: ${totalMissing}`
+    );
+
+    console.log(
+        `Recovered/inserted:          ${totalInserted}`
+    );
+
+    console.log(
+        `Still failed:                ${totalFailed}`
+    );
+
+    console.log(
+        "=============================================="
+    );
+
+    if (typeof db.end === "function") {
+        await db.end();
+    }
 }
 
 main().catch(async (error) => {
     console.error("");
-    console.error("RETRY FAILED:");
+
+    console.error(
+        "RETRY FAILED:"
+    );
+
     console.error(error);
 
     try {
-        await db.end?.();
+        if (typeof db.end === "function") {
+            await db.end();
+        }
     } catch {}
 
     process.exit(1);
