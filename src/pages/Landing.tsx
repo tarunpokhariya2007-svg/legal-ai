@@ -203,21 +203,9 @@ export default function Landing() {
   const [openSocial, setOpenSocial] = useState<'linkedin' | 'github' | null>(null)
 
   const [showDisclaimer, setShowDisclaimer] = useState(true)
-  const [teamPaused, setTeamPaused] = useState(false)
 
   const socialRef = useRef<HTMLDivElement>(null)
-  const teamTrackRef = useRef<HTMLDivElement>(null)
-
-  const handleTeamPress = () => {
-    const track = teamTrackRef.current
-    if (!track) return
-
-    // Stop the carousel and return to the original layout:
-    // Gaurav → Tarun → Pragitya.
-    setTeamPaused(true)
-    track.style.animation = 'none'
-    track.style.transform = 'translate3d(0, 0, 0)'
-  }
+  const navigate = useNavigate()
 
   const handleProtectedNavigation = (path: string) => {
 
@@ -315,9 +303,7 @@ export default function Landing() {
 
         }
 
-        /* Background particles removed intentionally. */
 
-        /* Keep every real landing element above the particles */
 
         .landing-page > * {
 
@@ -497,14 +483,14 @@ export default function Landing() {
 
         }
 
-        /* Infinite team-card marquee */
+        /* Static team-card row — no infinite loop */
         .landing-page .team-marquee {
           width: 100%;
           overflow: hidden;
           position: relative;
           mask-image: linear-gradient(to right, transparent, black 4%, black 96%, transparent);
           -webkit-mask-image: linear-gradient(to right, transparent, black 4%, black 96%, transparent);
-          cursor: pointer;
+          cursor: default;
           user-select: none;
           -webkit-user-select: none;
         }
@@ -513,8 +499,8 @@ export default function Landing() {
           display: flex;
           width: max-content;
           gap: 28px;
-          animation: nyayaTeamLoop 22s linear infinite;
-          will-change: transform;
+          animation: none !important;
+          will-change: auto;
         }
 
         .landing-page .team-set {
@@ -523,37 +509,9 @@ export default function Landing() {
           flex: 0 0 auto;
         }
 
-        .landing-page .team-marquee.team-paused {
-          cursor: default;
-        }
-
-        .landing-page .team-marquee.team-paused .team-track {
-          animation: none !important;
-          transform: translate3d(0, 0, 0) !important;
-        }
-
-        @keyframes nyayaTeamLoop {
-          from {
-            transform: translate3d(0, 0, 0);
-          }
-          to {
-            transform: translate3d(calc(-50% - 14px), 0, 0);
-          }
-        }
-
         @media (max-width: 900px) {
-          .landing-page .team-track {
-            animation-duration: 18s;
-          }
-
           .landing-page .team-card {
             flex-basis: min(380px, 82vw) !important;
-          }
-        }
-
-        @media (prefers-reduced-motion: reduce) {
-          .landing-page .team-track {
-            animation: none;
           }
         }
 
@@ -1079,26 +1037,24 @@ export default function Landing() {
 
           </div>
 
-          {/* Team cards — continuously looping horizontal carousel */}
+          {/* Team cards — static horizontal row, no looping */}
           <motion.div
-            className={`team-marquee${teamPaused ? ' team-paused' : ''}`}
-            onPointerDown={handleTeamPress}
+            className="team-marquee"
             initial={{ opacity: 0, y: 35 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: false, amount: 0.12 }}
             transition={{ duration: 0.65, ease: 'easeOut' }}
             aria-label="Nyaya AI team members"
           >
-            <div ref={teamTrackRef} className="team-track">
-              {[0, 1].map(copy => (
-                <div className="team-set" key={`team-set-${copy}`}>
-                  {teamMembers.map(member => {
+            <div className="team-track">
+              <div className="team-set">
+                {teamMembers.map(member => {
                     const RoleIcon = member.roleIcon
 
                     return (
                       <div
                         className="team-card"
-                        key={`${copy}-${member.name}`}
+                        key={member.name}
                         style={{
                           background: 'rgba(255,255,255,0.025)',
                           border: '1px solid rgba(212,175,55,0.22)',
@@ -1109,7 +1065,7 @@ export default function Landing() {
                           transition: 'transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease',
                           flex: '0 0 380px',
                           boxSizing: 'border-box',
-                        }}
+} as React.CSSProperties}
                       >
                         <div style={{
                           width: 190,
@@ -1202,8 +1158,7 @@ export default function Landing() {
                       </div>
                     )
                   })}
-                </div>
-              ))}
+              </div>
             </div>
           </motion.div>
 
