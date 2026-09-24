@@ -198,27 +198,375 @@ const teamMembers = [
   },
 ]
 
+type TeamParticle = {
+  x: number
+  y: number
+  vx: number
+  vy: number
+  size: number
+  life: number
+  maxLife: number
+  twinkle: number
+  phase: number
+  drift: number
+  previousX: number
+  previousY: number
+  recentSpawns: Array<{ x: number; y: number }>
+}
+
+type TeamParticleProps = {
+  core: string
+  bright: string
+  glow: string
+}
+
+function TeamParticles({ core, bright, glow }: TeamParticleProps) {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+
+    const host = canvas.parentElement
+    if (!host) return
+
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+
+    let cssWidth = 0
+    let cssHeight = 0
+    let dpr = Math.min(window.devicePixelRatio || 1, 2)
+    let animationFrame = 0
+    let lastTime = performance.now()
+    let destroyed = false
+
+    const reduceMotionQuery = window.matchMedia('(prefers-reduced-motion: reduce)')
+    let reducedMotion = reduceMotionQuery.matches
+
+    const particleCount = () => {
+      if (cssWidth < 360) return 20
+      if (cssWidth < 520) return 26
+      return 34
+    }
+
+    const random = (min: number, max: number) =>
+      min + Math.random() * (max - min)
+
+    const distance = (
+      x1: number,
+      y1: number,
+      x2: number,
+      y2: number,
+    ) => Math.hypot(x1 - x2, y1 - y2)
+
+    const chooseSpawnPoint = (
+      particle: TeamParticle,
+      forceFresh = false,
+    ) => {
+      const minDistanceFromPrevious = Math.max(
+        65,
+        Math.min(cssWidth, cssHeight) * 0.26,
+      )
+
+      const recent = particle.recentSpawns
+      let x = cssWidth / 2
+      let y = cssHeight / 2
+
+      for (let attempt = 0; attempt < 60; attempt += 1) {
+        x = random(8, Math.max(9, cssWidth - 8))
+        y = random(8, Math.max(9, cssHeight - 8))
+
+        const farFromLastPosition =
+          distance(x, y, particle.previousX, particle.previousY) >=
+          minDistanceFromPrevious
+
+        const farFromRecentPositions = recent.every(
+          point => distance(x, y, point.x, point.y) >= minDistanceFromPrevious * 0.72,
+        )
+
+        if ((forceFresh && farFromLastPosition && farFromRecentPositions) ||
+            (!forceFresh && farFromLastPosition)) {
+          break
+        }
+      }
+
+      particle.previousX = x
+      particle.previousY = y
+
+      recent.push({ x, y })
+      if (recent.length > 7) recent.shift()
+
+      particle.x = x
+      particle.y = y
+    }
+
+    const createParticle = (): TeamParticle => {
+      const particle: TeamParticle = {
+        x: 0,
+        y: 0,
+        vx: random(-10, 10),
+        vy: random(-16, -4),
+        size: random(1.35, 3.2),
+        life: random(3.5, 7.5),
+        maxLife: 6,
+        twinkle: random(1.2, 3.4),
+        phase: random(0, Math.PI * 2),
+        drift: random(0.45, 1.35),
+        previousX: -9999,
+        previousY: -9999,
+        recentSpawns: [],
+      }
+
+      particle.maxLife = particle.life
+      chooseSpawnPoint(particle, true)
+
+      particle.vx = random(-12, 12)
+      particle.vy = random(-15, 8)
+
+      return particle
+    }
+
+    let particles: TeamParticle[] = []
+
+    const resetParticle = (particle: TeamParticle) => {
+      // Remember the exact position where this particle disappeared.
+      // The next spawn is forced to a clearly different location.
+      particle.previousX = particle.x
+      particle.previousY = particle.y
+
+      chooseSpawnPoint(particle, true)
+      particle.life = random(3.8, 8.2)
+      particle.maxLife = particle.life
+      particle.size = random(1.35, 3.2)
+      particle.vx = random(-13, 13)
+      particle.vy = random(-17, 10)
+      particle.twinkle = random(1.1, 3.8)
+      particle.phase = random(0, Math.PI * 2)
+      particle.drift = random(0.45, 1.5)
+    }
+
+    const resize = () => {
+      const rect = host.getBoundingClientRect()
+      cssWidth = Math.max(1, rect.width)
+      cssHeight = Math.max(1, rect.height)
+      dpr = Math.min(window.devicePixelRatio || 1, 2)
+
+      canvas.width = Math.round(cssWidth * dpr)
+      canvas.height = Math.round(cssHeight * dpr)
+      canvas.style.width = `${cssWidth}px`
+      canvas.style.height = `${cssHeight}px`
+
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+
+      particles = Array.from(
+        { length: particleCount() },
+        () => createParticle(),
+      )
+
+      lastTime = performance.now()
+    }
+
+    const drawParticle = (
+      particle: TeamParticle,
+      time: number,
+    ) => {
+      const lifeProgress = 1 - particle.life / particle.maxLife
+      const fadeIn = Math.min(1, lifeProgress * 5)
+      const fadeOut = Math.min(1, particle.life * 1.8)
+      const baseAlpha = Math.min(fadeIn, fadeOut)
+
+      const twinkleWave =
+        (Math.sin(time * 0.001 * particle.twinkle + particle.phase) + 1) / 2
+
+      const sparkle = Math.pow(twinkleWave, 8)
+      const alpha = Math.min(
+        1,
+        baseAlpha * (0.48 + twinkleWave * 0.35 + sparkle * 0.35),
+      )
+
+      const size =
+        particle.size *
+        (1 + sparkle * 0.85)
+
+      ctx.save()
+      ctx.globalAlpha = alpha
+
+      // Outer colored bloom.
+      ctx.shadowBlur = 12 + sparkle * 15
+      ctx.shadowColor = glow
+      ctx.fillStyle = core
+      ctx.beginPath()
+      ctx.arc(particle.x, particle.y, size, 0, Math.PI * 2)
+      ctx.fill()
+
+      // Bright inner core.
+      ctx.shadowBlur = 0
+      ctx.globalAlpha = Math.min(1, alpha * 1.35)
+      ctx.fillStyle = bright
+      ctx.beginPath()
+      ctx.arc(
+        particle.x,
+        particle.y,
+        Math.max(0.75, size * 0.52),
+        0,
+        Math.PI * 2,
+      )
+      ctx.fill()
+
+      // Occasional four-point sparkle.
+      if (sparkle > 0.62) {
+        const ray = size * (3.5 + sparkle * 2.2)
+        ctx.globalAlpha = Math.min(1, alpha * 0.85)
+        ctx.strokeStyle = bright
+        ctx.lineWidth = 0.75 + sparkle * 0.55
+        ctx.shadowBlur = 10 + sparkle * 12
+        ctx.shadowColor = glow
+        ctx.beginPath()
+        ctx.moveTo(particle.x - ray, particle.y)
+        ctx.lineTo(particle.x + ray, particle.y)
+        ctx.moveTo(particle.x, particle.y - ray)
+        ctx.lineTo(particle.x, particle.y + ray)
+        ctx.stroke()
+      }
+
+      ctx.restore()
+    }
+
+    const drawStatic = () => {
+      ctx.clearRect(0, 0, cssWidth, cssHeight)
+
+      particles.forEach(particle => {
+        particle.x = Math.max(8, Math.min(cssWidth - 8, particle.x))
+        particle.y = Math.max(8, Math.min(cssHeight - 8, particle.y))
+        particle.life = particle.maxLife * 0.5
+        drawParticle(particle, performance.now())
+      })
+    }
+
+    const animate = (now: number) => {
+      if (destroyed) return
+
+      const dt = Math.min((now - lastTime) / 1000, 0.033)
+      lastTime = now
+
+      ctx.clearRect(0, 0, cssWidth, cssHeight)
+
+      for (const particle of particles) {
+        particle.life -= dt
+
+        if (particle.life <= 0) {
+          // A fresh randomized location is selected far away from the
+          // particle's previous spawn, so the same visual spot is not reused.
+          resetParticle(particle)
+        }
+
+        const elapsed = particle.maxLife - particle.life
+
+        // Every particle has a different slow wandering field.
+        // This prevents a synchronized/repeating loop.
+        const wanderX =
+          Math.sin(elapsed * particle.drift + particle.phase) *
+          8 *
+          dt
+
+        const wanderY =
+          Math.cos(elapsed * (particle.drift * 0.83) + particle.phase * 1.37) *
+          7 *
+          dt
+
+        particle.vx += wanderX
+        particle.vy += wanderY
+
+        // Keep movement gentle and bounded.
+        particle.vx *= 0.996
+        particle.vy *= 0.996
+
+        particle.x += particle.vx * dt
+        particle.y += particle.vy * dt
+
+        // Bounce softly from the card edges instead of teleporting.
+        const padding = 7
+
+        if (particle.x <= padding) {
+          particle.x = padding
+          particle.vx = Math.abs(particle.vx) * 0.82
+        } else if (particle.x >= cssWidth - padding) {
+          particle.x = cssWidth - padding
+          particle.vx = -Math.abs(particle.vx) * 0.82
+        }
+
+        if (particle.y <= padding) {
+          particle.y = padding
+          particle.vy = Math.abs(particle.vy) * 0.82
+        } else if (particle.y >= cssHeight - padding) {
+          particle.y = cssHeight - padding
+          particle.vy = -Math.abs(particle.vy) * 0.82
+        }
+
+        drawParticle(particle, now)
+      }
+
+      animationFrame = window.requestAnimationFrame(animate)
+    }
+
+    const handleMotionPreference = (event: MediaQueryListEvent) => {
+      reducedMotion = event.matches
+
+      if (reducedMotion) {
+        window.cancelAnimationFrame(animationFrame)
+        drawStatic()
+      } else {
+        lastTime = performance.now()
+        animationFrame = window.requestAnimationFrame(animate)
+      }
+    }
+
+    const resizeObserver = new ResizeObserver(resize)
+    resizeObserver.observe(host)
+
+    resize()
+
+    if (reducedMotion) {
+      drawStatic()
+    } else {
+      animationFrame = window.requestAnimationFrame(animate)
+    }
+
+    if (typeof reduceMotionQuery.addEventListener === 'function') {
+      reduceMotionQuery.addEventListener('change', handleMotionPreference)
+    } else {
+      reduceMotionQuery.addListener(handleMotionPreference)
+    }
+
+    return () => {
+      destroyed = true
+      window.cancelAnimationFrame(animationFrame)
+      resizeObserver.disconnect()
+
+      if (typeof reduceMotionQuery.removeEventListener === 'function') {
+        reduceMotionQuery.removeEventListener('change', handleMotionPreference)
+      } else {
+        reduceMotionQuery.removeListener(handleMotionPreference)
+      }
+    }
+  }, [bright, core, glow])
+
+  return (
+    <canvas
+      ref={canvasRef}
+      className="team-particles"
+      aria-hidden="true"
+    />
+  )
+}
+
 export default function Landing() {
 
   const [openSocial, setOpenSocial] = useState<'linkedin' | 'github' | null>(null)
 
   const [showDisclaimer, setShowDisclaimer] = useState(true)
-  const [teamPaused, setTeamPaused] = useState(false)
-
   const socialRef = useRef<HTMLDivElement>(null)
-  const teamTrackRef = useRef<HTMLDivElement>(null)
   const navigate = useNavigate()
-
-  const handleTeamPress = () => {
-    const track = teamTrackRef.current
-    if (!track) return
-
-    // Stop the carousel and return to the original layout:
-    // Gaurav → Tarun → Pragitya.
-    setTeamPaused(true)
-    track.style.animation = 'none'
-    track.style.transform = 'translate3d(0, 0, 0)'
-  }
 
   const handleProtectedNavigation = (path: string) => {
 
@@ -498,140 +846,61 @@ export default function Landing() {
 
         }
 
-        /* Per-card animated spark particles */
+        /* =====================================================
+           TEAM CARDS + LIVE PARTICLES
+           Cards stay completely still. Only the particles move.
+           ===================================================== */
+
         .landing-page .team-card {
           position: relative;
           overflow: hidden;
           isolation: isolate;
         }
 
-        .landing-page .team-card::before,
-        .landing-page .team-card::after {
-          content: "";
+        .landing-page .team-card:hover {
+          transform: none !important;
+          border-color: rgba(212,175,55,.55) !important;
+          box-shadow: 0 24px 55px rgba(0,0,0,.50) !important;
+        }
+
+        .landing-page .team-card > *:not(.team-particles) {
+          position: relative;
+          z-index: 2;
+        }
+
+        .landing-page .team-particles {
           position: absolute;
           inset: 0;
+          width: 100%;
+          height: 100%;
+          display: block;
           pointer-events: none;
-          border-radius: inherit;
           z-index: 0;
         }
 
-        .landing-page .team-card::before {
-          background:
-            radial-gradient(circle at 11% 18%, var(--team-particle) 0 1.4px, transparent 2.8px),
-            radial-gradient(circle at 27% 73%, var(--team-particle) 0 1.1px, transparent 2.5px),
-            radial-gradient(circle at 44% 31%, var(--team-particle) 0 1.6px, transparent 3px),
-            radial-gradient(circle at 63% 82%, var(--team-particle) 0 1.2px, transparent 2.7px),
-            radial-gradient(circle at 78% 23%, var(--team-particle) 0 1.5px, transparent 3px),
-            radial-gradient(circle at 91% 66%, var(--team-particle) 0 1px, transparent 2.4px),
-            radial-gradient(circle at 56% 55%, var(--team-particle) 0 1px, transparent 2.3px),
-            radial-gradient(circle at 18% 46%, var(--team-particle) 0 1px, transparent 2.4px);
-          background-size: 100% 100%;
-          opacity: .42;
-          filter: drop-shadow(0 0 5px var(--team-particle));
-          animation: teamParticleDrift 8s ease-in-out infinite alternate;
-        }
-
-        .landing-page .team-card::after {
-          background:
-            radial-gradient(circle at 20% 28%, var(--team-particle-soft) 0 2px, transparent 2.5px),
-            radial-gradient(circle at 72% 48%, var(--team-particle-soft) 0 1.8px, transparent 2.4px),
-            radial-gradient(circle at 38% 88%, var(--team-particle-soft) 0 1.7px, transparent 2.3px),
-            radial-gradient(circle at 88% 15%, var(--team-particle-soft) 0 1.6px, transparent 2.2px);
-          opacity: .35;
-          filter: blur(.2px) drop-shadow(0 0 7px var(--team-particle));
-          animation: teamParticleTwinkle 2.6s ease-in-out infinite;
-        }
-
-        .landing-page .team-card > * {
-          position: relative;
-          z-index: 1;
-        }
-
-        @keyframes teamParticleDrift {
-          0% {
-            transform: translate3d(0, 0, 0) scale(1);
-            background-position: 0 0;
-          }
-          50% {
-            transform: translate3d(5px, -7px, 0) scale(1.015);
-            background-position: 7px -10px;
-          }
-          100% {
-            transform: translate3d(-6px, 5px, 0) scale(1.02);
-            background-position: -9px 8px;
-          }
-        }
-
-        @keyframes teamParticleTwinkle {
-          0%, 100% { opacity: .18; transform: scale(.98); }
-          45% { opacity: .62; transform: scale(1.02); }
-          70% { opacity: .30; transform: scale(1); }
-        }
-
-        @media (prefers-reduced-motion: reduce) {
-          .landing-page .team-card::before,
-          .landing-page .team-card::after {
-            animation: none;
-          }
-        }
-
-        /* Infinite team-card marquee */
-        .landing-page .team-marquee {
+        .landing-page .team-grid {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 28px;
           width: 100%;
-          overflow: hidden;
-          position: relative;
-          mask-image: linear-gradient(to right, transparent, black 4%, black 96%, transparent);
-          -webkit-mask-image: linear-gradient(to right, transparent, black 4%, black 96%, transparent);
-          cursor: pointer;
-          user-select: none;
-          -webkit-user-select: none;
-        }
-
-        .landing-page .team-track {
-          display: flex;
-          width: max-content;
-          gap: 28px;
-          animation: nyayaTeamLoop 22s linear infinite;
-          will-change: transform;
-        }
-
-        .landing-page .team-set {
-          display: flex;
-          gap: 28px;
-          flex: 0 0 auto;
-        }
-
-        .landing-page .team-marquee.team-paused {
-          cursor: default;
-        }
-
-        .landing-page .team-marquee.team-paused .team-track {
-          animation: none !important;
-          transform: translate3d(0, 0, 0) !important;
-        }
-
-        @keyframes nyayaTeamLoop {
-          from {
-            transform: translate3d(0, 0, 0);
-          }
-          to {
-            transform: translate3d(calc(-50% - 14px), 0, 0);
-          }
+          align-items: stretch;
         }
 
         @media (max-width: 900px) {
-          .landing-page .team-track {
-            animation-duration: 18s;
+          .landing-page .team-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
           }
+        }
 
-          .landing-page .team-card {
-            flex-basis: min(380px, 82vw) !important;
+        @media (max-width: 600px) {
+          .landing-page .team-grid {
+            grid-template-columns: 1fr;
           }
         }
 
         @media (prefers-reduced-motion: reduce) {
-          .landing-page .team-track {
-            animation: none;
+          .landing-page .team-card {
+            transition: none !important;
           }
         }
 
@@ -1157,142 +1426,152 @@ export default function Landing() {
 
           </div>
 
-          {/* Team cards — continuously looping horizontal carousel */}
+          {/* Team cards — static layout with independent live particle fields */}
           <motion.div
-            className={`team-marquee${teamPaused ? ' team-paused' : ''}`}
-            onPointerDown={handleTeamPress}
+            className="team-grid"
             initial={{ opacity: 0, y: 35 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: false, amount: 0.12 }}
             transition={{ duration: 0.65, ease: 'easeOut' }}
             aria-label="Nyaya AI team members"
           >
-            <div ref={teamTrackRef} className="team-track">
-              {[0, 1].map(copy => (
-                <div className="team-set" key={`team-set-${copy}`}>
-                  {teamMembers.map(member => {
-                    const RoleIcon = member.roleIcon
+            {teamMembers.map(member => {
+              const RoleIcon = member.roleIcon
 
-                    return (
-                      <div
-                        className="team-card"
-                        key={`${copy}-${member.name}`}
-                        style={{
-                          background: 'rgba(255,255,255,0.025)',
-                          border: '1px solid rgba(212,175,55,0.22)',
-                          borderRadius: 20,
-                          padding: 24,
-                          textAlign: 'center',
-                          boxShadow: '0 18px 45px rgba(0,0,0,0.35)',
-                          transition: 'transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease',
-                          flex: '0 0 380px',
-                          boxSizing: 'border-box',
-                          '--team-particle': member.name === 'Gaurav Singh'
-                            ? 'rgba(255, 70, 55, 0.90)'
-                            : member.name === 'Tarun Pokhariya'
-                              ? 'rgba(175, 80, 255, 0.92)'
-                              : 'rgba(65, 155, 255, 0.92)',
-                          '--team-particle-soft': member.name === 'Gaurav Singh'
-                            ? 'rgba(255, 105, 85, 0.45)'
-                            : member.name === 'Tarun Pokhariya'
-                              ? 'rgba(205, 125, 255, 0.48)'
-                              : 'rgba(100, 190, 255, 0.48)',
-                        } as React.CSSProperties}
-                      >
-                        <div style={{
-                          width: 190,
-                          height: 190,
-                          margin: '0 auto 22px',
-                          borderRadius: '50%',
-                          padding: 4,
-                          background: 'linear-gradient(135deg, #D4AF37, #F5D76E, #A27B2C)',
-                          boxShadow: '0 0 35px rgba(212,175,55,0.18)',
-                        }}>
-                          <img
-                            src={member.image}
-                            alt={`${member.name} - ${member.role} at Nyaya AI`}
-                            style={{
-                              width: '100%',
-                              height: '100%',
-                              borderRadius: '50%',
-                              objectFit: 'cover',
-                              objectPosition: 'center top',
-                              display: 'block',
-                            }}
-                          />
+              const particlePalette =
+                member.name === 'Gaurav Singh'
+                  ? {
+                      core: '#FF3B30',
+                      bright: '#FF6B5F',
+                      glow: 'rgba(255,59,48,0.95)',
+                    }
+                  : member.name === 'Tarun Pokhariya'
+                    ? {
+                        core: '#B44CFF',
+                        bright: '#D58AFF',
+                        glow: 'rgba(180,76,255,0.95)',
+                      }
+                    : {
+                        core: '#2196FF',
+                        bright: '#65C7FF',
+                        glow: 'rgba(33,150,255,0.95)',
+                      }
+
+              return (
+                <div
+                  className="team-card"
+                  key={member.name}
+                  style={{
+                    background: 'rgba(255,255,255,0.025)',
+                    border: '1px solid rgba(212,175,55,0.22)',
+                    borderRadius: 20,
+                    padding: 24,
+                    textAlign: 'center',
+                    boxShadow: '0 18px 45px rgba(0,0,0,0.35)',
+                    transition: 'border-color 0.25s ease, box-shadow 0.25s ease',
+                    width: '100%',
+                    maxWidth: 380,
+                    margin: '0 auto',
+                    boxSizing: 'border-box',
+                  }}
+                >
+                  <TeamParticles
+                    core={particlePalette.core}
+                    bright={particlePalette.bright}
+                    glow={particlePalette.glow}
+                  />
+
+                  <div style={{
+                    width: 190,
+                    height: 190,
+                    margin: '0 auto 22px',
+                    borderRadius: '50%',
+                    padding: 4,
+                    background: 'linear-gradient(135deg, #D4AF37, #F5D76E, #A27B2C)',
+                    boxShadow: '0 0 35px rgba(212,175,55,0.18)',
+                  }}>
+                    <img
+                      src={member.image}
+                      alt={`${member.name} - ${member.role} at Nyaya AI`}
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        borderRadius: '50%',
+                        objectFit: 'cover',
+                        objectPosition: 'center top',
+                        display: 'block',
+                      }}
+                    />
+                  </div>
+
+                  <div style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 7,
+                    padding: '8px 16px',
+                    borderRadius: 999,
+                    border: '1px solid rgba(212,175,55,0.55)',
+                    background: 'rgba(212,175,55,0.06)',
+                    color: '#D4AF37',
+                    fontSize: '0.82rem',
+                    fontWeight: 700,
+                    marginBottom: 16,
+                  }}>
+                    <RoleIcon size={15} /> {member.role}
+                  </div>
+
+                  <h3 style={{
+                    color: 'var(--text)',
+                    fontSize: '1.55rem',
+                    fontWeight: 800,
+                    margin: '0 0 12px',
+                    letterSpacing: '-0.02em',
+                  }}>
+                    {member.name}
+                  </h3>
+
+                  <p style={{
+                    color: 'var(--text-muted)',
+                    fontSize: '0.94rem',
+                    lineHeight: 1.7,
+                    margin: '0 0 24px',
+                    minHeight: 130,
+                  }}>
+                    {member.description}
+                  </p>
+
+                  <div style={{
+                    height: 1,
+                    background: 'rgba(212,175,55,0.18)',
+                    marginBottom: 22,
+                  }} />
+
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(3, 1fr)',
+                    gap: 10,
+                    textAlign: 'left',
+                  }}>
+                    {member.skills.map((skill, skillIndex) => {
+                      const SkillIcon = skill.icon
+
+                      return (
+                        <div key={`${member.name}-skill-${skillIndex}`}>
+                          <SkillIcon size={22} style={{ color: '#D4AF37', marginBottom: 8 }} />
+                          <div style={{
+                            color: 'var(--text-muted)',
+                            fontSize: '0.76rem',
+                            lineHeight: 1.4,
+                          }}>
+                            {skill.lines}
+                          </div>
                         </div>
-
-                        <div style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: 7,
-                          padding: '8px 16px',
-                          borderRadius: 999,
-                          border: '1px solid rgba(212,175,55,0.55)',
-                          background: 'rgba(212,175,55,0.06)',
-                          color: '#D4AF37',
-                          fontSize: '0.82rem',
-                          fontWeight: 700,
-                          marginBottom: 16,
-                        }}>
-                          <RoleIcon size={15} /> {member.role}
-                        </div>
-
-                        <h3 style={{
-                          color: 'var(--text)',
-                          fontSize: '1.55rem',
-                          fontWeight: 800,
-                          margin: '0 0 12px',
-                          letterSpacing: '-0.02em',
-                        }}>
-                          {member.name}
-                        </h3>
-
-                        <p style={{
-                          color: 'var(--text-muted)',
-                          fontSize: '0.94rem',
-                          lineHeight: 1.7,
-                          margin: '0 0 24px',
-                          minHeight: 130,
-                        }}>
-                          {member.description}
-                        </p>
-
-                        <div style={{
-                          height: 1,
-                          background: 'rgba(212,175,55,0.18)',
-                          marginBottom: 22,
-                        }} />
-
-                        <div style={{
-                          display: 'grid',
-                          gridTemplateColumns: 'repeat(3, 1fr)',
-                          gap: 10,
-                          textAlign: 'left',
-                        }}>
-                          {member.skills.map((skill, skillIndex) => {
-                            const SkillIcon = skill.icon
-
-                            return (
-                              <div key={`${member.name}-skill-${skillIndex}`}>
-                                <SkillIcon size={22} style={{ color: '#D4AF37', marginBottom: 8 }} />
-                                <div style={{
-                                  color: 'var(--text-muted)',
-                                  fontSize: '0.76rem',
-                                  lineHeight: 1.4,
-                                }}>
-                                  {skill.lines}
-                                </div>
-                              </div>
-                            )
-                          })}
-                        </div>
-                      </div>
-                    )
-                  })}
+                      )
+                    })}
+                  </div>
                 </div>
-              ))}
-            </div>
+              )
+            })}
           </motion.div>
 
         </div>
@@ -2277,8 +2556,6 @@ export default function Landing() {
 
           .features-grid { grid-template-columns: repeat(2, 1fr) !important; }
 
-          .team-grid { grid-template-columns: 1fr 1fr !important; }
-
           .pricing-grid { grid-template-columns: 1fr !important; }
 
           .footer-grid { grid-template-columns: 1fr 1fr !important; }
@@ -2287,15 +2564,11 @@ export default function Landing() {
 
         @media (max-width: 600px) {
 
-          .team-grid { grid-template-columns: 1fr !important; }
-
           .stats-grid { grid-template-columns: 1fr 1fr !important; }
 
           .steps-grid { grid-template-columns: 1fr !important; }
 
           .features-grid { grid-template-columns: 1fr !important; }
-
-          .team-grid { grid-template-columns: 1fr !important; }
 
           .footer-grid { grid-template-columns: 1fr !important; }
 
