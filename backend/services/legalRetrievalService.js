@@ -17,10 +17,23 @@ const db = require("../db");
  * 8. Rank results
  * 9. Return structured legal evidence
  *
+ * IMPORTANT:
+ * If an Act is explicitly detected, natural-language retrieval
+ * is constrained to that Act at the SQL level.
+ *
+ * This prevents queries such as:
+ *
+ * "requirements for admitting electronic records under BSA"
+ *
+ * from returning unrelated provisions from:
+ * - Income-tax Rules
+ * - Information Technology Act
+ * - Public Records Act
+ * - other Acts
+ *
  * This service DOES NOT generate legal conclusions.
  * It only retrieves legal provisions from the database.
  *
- * The database contains the ingested legal corpus.
  * ============================================================
  */
 
@@ -41,9 +54,6 @@ const BOOLEAN_FETCH_MULTIPLIER = 3;
 
 /* ============================================================
  * ACT ALIASES
- *
- * These aliases help convert common user terminology into
- * the actual Act names stored in legal_knowledge.
  * ============================================================
  */
 
@@ -112,10 +122,6 @@ const ACT_ALIASES = [
 
 /* ============================================================
  * COMMON LEGAL TERM EXPANSION
- *
- * This is deliberately deterministic.
- *
- * We are NOT asking another LLM to invent search terms.
  * ============================================================
  */
 
@@ -228,6 +234,7 @@ function normalizeQuery(query) {
 
 /* ============================================================
  * EXTRACT SECTION NUMBER
+ * ============================================================
  *
  * Supports:
  *
@@ -237,6 +244,7 @@ function normalizeQuery(query) {
  * Section 36A
  * Sec. 302
  * Sec 302
+ *
  * ============================================================
  */
 
@@ -273,6 +281,7 @@ function detectAct(query) {
      * This prevents "bns" from being detected inside
      * "bnss".
      */
+
     const aliases =
         [...ACT_ALIASES]
             .sort(
@@ -286,11 +295,10 @@ function detectAct(query) {
         for (const alias of entry.aliases) {
 
             const escapedAlias =
-                alias
-                    .replace(
-                        /[.*+?^${}()|[\]\\]/g,
-                        "\\$&"
-                    );
+                alias.replace(
+                    /[.*+?^${}()|[\]\\]/g,
+                    "\\$&"
+                );
 
             const pattern =
                 new RegExp(
@@ -317,13 +325,12 @@ function detectAct(query) {
     }
 
     return null;
+
 }
 
 
 /* ============================================================
  * LEGAL QUERY EXPANSION
- *
- * Adds deterministic legal terminology.
  * ============================================================
  */
 
@@ -364,18 +371,6 @@ function expandLegalTerms(query) {
 
 /* ============================================================
  * BUILD BOOLEAN QUERY
- *
- * We use optional terms rather than forcing every term.
- *
- * Example:
- *
- * cheating fraud deception punishment
- *
- * becomes:
- *
- * cheating fraud deception punishment
- *
- * with MySQL BOOLEAN MODE ranking the matching terms.
  * ============================================================
  */
 
@@ -389,8 +384,10 @@ function buildBooleanQuery(query) {
             .split(/\s+/)
             .map(
                 token =>
-                    token
-                        .replace(/[^\p{L}\p{N}]/gu, "")
+                    token.replace(
+                        /[^\p{L}\p{N}]/gu,
+                        ""
+                    )
             )
             .filter(
                 token =>
@@ -400,6 +397,7 @@ function buildBooleanQuery(query) {
     /*
      * Remove duplicate tokens.
      */
+
     const unique =
         Array.from(
             new Set(tokens)
@@ -408,6 +406,7 @@ function buildBooleanQuery(query) {
     /*
      * Limit query size.
      */
+
     return unique
         .slice(0, 40)
         .join(" ");
@@ -417,17 +416,6 @@ function buildBooleanQuery(query) {
 
 /* ============================================================
  * EXACT SECTION RETRIEVAL
- *
- * If an Act is known:
- *
- * section + Act
- *
- * If Act is not known:
- *
- * section only
- *
- * The latter is intentionally limited because section numbers
- * can exist in many Acts.
  * ============================================================
  */
 
@@ -538,18 +526,77 @@ async function retrieveExactSection(
 /* ============================================================
  * NATURAL LANGUAGE FULLTEXT RETRIEVAL
  * ============================================================
+ *
+ * IMPORTANT FIX:
+ *
+ * If actName is supplied, the SQL query contains:
+ *
+ *     AND act_name = ?
+ *
+ * Therefore unrelated Acts are never included in the
+ * natural-language candidate set.
+ *
+ * ============================================================
  */
 
 async function retrieveNaturalLanguage(
     query,
-    fetchLimit
+    fetchLimit,
+    actName = null
 ) {
 
     try {
 
-        const [rows] =
-            await db.query(
-                `
+        let sql;
+
+        let params;
+
+        if (actName) {
+
+            sql = `
+                SELECT
+                    id,
+                    act_name,
+                    act_number,
+                    section_number,
+                    section_title,
+                    content,
+                    source_name,
+                    source_url,
+                    effective_date,
+                    source_version,
+
+                    MATCH(section_title, content)
+                    AGAINST (
+                        ?
+                        IN NATURAL LANGUAGE MODE
+                    ) AS relevance
+
+                FROM legal_knowledge
+
+                WHERE MATCH(section_title, content)
+                    AGAINST (
+                        ?
+                        IN NATURAL LANGUAGE MODE
+                    )
+
+                  AND act_name = ?
+
+                ORDER BY relevance DESC
+
+                LIMIT ?
+            `;
+
+            params = [
+                query,
+                query,
+                actName,
+                fetchLimit
+            ];
+
+        } else {
+
+            sql = `
                 SELECT
                     id,
                     act_name,
@@ -579,17 +626,26 @@ async function retrieveNaturalLanguage(
                 ORDER BY relevance DESC
 
                 LIMIT ?
-                `,
-                [
-                    query,
-                    query,
-                    fetchLimit
-                ]
+            `;
+
+            params = [
+                query,
+                query,
+                fetchLimit
+            ];
+
+        }
+
+        const [rows] =
+            await db.query(
+                sql,
+                params
             );
 
         return rows.map(
             row => ({
                 ...row,
+
                 retrieval_type:
                     "fulltext_natural"
             })
@@ -612,11 +668,23 @@ async function retrieveNaturalLanguage(
 /* ============================================================
  * BOOLEAN FULLTEXT RETRIEVAL
  * ============================================================
+ *
+ * IMPORTANT FIX:
+ *
+ * If actName is supplied, the SQL query contains:
+ *
+ *     AND act_name = ?
+ *
+ * Therefore unrelated Acts are never included in the
+ * boolean candidate set.
+ *
+ * ============================================================
  */
 
 async function retrieveBoolean(
     query,
-    fetchLimit
+    fetchLimit,
+    actName = null
 ) {
 
     const booleanQuery =
@@ -628,9 +696,56 @@ async function retrieveBoolean(
 
     try {
 
-        const [rows] =
-            await db.query(
-                `
+        let sql;
+
+        let params;
+
+        if (actName) {
+
+            sql = `
+                SELECT
+                    id,
+                    act_name,
+                    act_number,
+                    section_number,
+                    section_title,
+                    content,
+                    source_name,
+                    source_url,
+                    effective_date,
+                    source_version,
+
+                    MATCH(section_title, content)
+                    AGAINST (
+                        ?
+                        IN BOOLEAN MODE
+                    ) AS relevance
+
+                FROM legal_knowledge
+
+                WHERE MATCH(section_title, content)
+                    AGAINST (
+                        ?
+                        IN BOOLEAN MODE
+                    )
+
+                  AND act_name = ?
+
+                ORDER BY relevance DESC
+
+                LIMIT ?
+            `;
+
+            params = [
+                booleanQuery,
+                booleanQuery,
+                actName,
+                fetchLimit
+            ];
+
+        } else {
+
+            sql = `
                 SELECT
                     id,
                     act_name,
@@ -660,12 +775,20 @@ async function retrieveBoolean(
                 ORDER BY relevance DESC
 
                 LIMIT ?
-                `,
-                [
-                    booleanQuery,
-                    booleanQuery,
-                    fetchLimit
-                ]
+            `;
+
+            params = [
+                booleanQuery,
+                booleanQuery,
+                fetchLimit
+            ];
+
+        }
+
+        const [rows] =
+            await db.query(
+                sql,
+                params
             );
 
         return rows.map(
@@ -692,14 +815,14 @@ async function retrieveBoolean(
 
 
 /* ============================================================
- * ACT FILTERING
+ * ACT FILTERING / METADATA
+ * ============================================================
  *
- * If the user mentioned an Act without an explicit section,
- * prefer results from that Act during broad retrieval.
+ * At this point SQL retrieval has already been constrained when
+ * an Act was detected.
  *
- * Explicit Act + section references are handled earlier by
- * the authoritative exact-retrieval path and are NOT allowed
- * to fall through to cross-Act lexical ranking.
+ * This function is retained as an additional deterministic
+ * metadata/ranking layer.
  * ============================================================
  */
 
@@ -775,9 +898,6 @@ function normalizeScores(rows) {
 
 /* ============================================================
  * MERGE RESULTS
- *
- * Same legal provision can be returned by both natural and
- * boolean retrieval.
  * ============================================================
  */
 
@@ -941,7 +1061,10 @@ function mergeResults(
 
     /*
      * If the user explicitly named an Act,
-     * add a modest ranking preference.
+     * add a small ranking preference.
+     *
+     * Normally every result will already be from that Act
+     * because the SQL layer is constrained.
      */
 
     results =
@@ -988,9 +1111,6 @@ function mergeResults(
 
 /* ============================================================
  * CLEAN RESULT
- *
- * Prevent internal ranking implementation details from being
- * unnecessarily exposed to the LLM.
  * ============================================================
  */
 
@@ -1039,7 +1159,10 @@ function cleanResult(row) {
 
         retrieval_methods:
             row.retrieval_methods ||
-            [row.retrieval_type || "fulltext"]
+            [
+                row.retrieval_type ||
+                "fulltext"
+            ]
 
     };
 
@@ -1073,7 +1196,8 @@ async function retrieveRelevantLaws(
     const safeLimit =
         Math.min(
             Math.max(
-                Number(limit) || DEFAULT_LIMIT,
+                Number(limit) ||
+                DEFAULT_LIMIT,
                 1
             ),
             20
@@ -1176,12 +1300,10 @@ async function retrieveRelevantLaws(
          * ----------------------------------------------------
          *
          * When the user explicitly names both an Act and a
-         * section (for example: "Section 63 of BSA"), the
-         * exact database match is authoritative.
+         * section, the exact database match is authoritative.
          *
          * Do NOT fall back to generic FULLTEXT retrieval in
-         * this situation. Generic lexical search can return
-         * a similarly-worded provision from another Act.
+         * this situation.
          *
          * This prevents an acronym such as BSA from being
          * reinterpreted as an unrelated law.
@@ -1271,6 +1393,19 @@ async function retrieveRelevantLaws(
         );
 
 
+        /*
+         * IMPORTANT:
+         *
+         * When an Act is detected, pass the Act name into
+         * retrieveNaturalLanguage().
+         *
+         * The SQL query will then contain:
+         *
+         *     AND act_name = ?
+         *
+         * This prevents cross-Act retrieval.
+         */
+
         const naturalResults =
             await retrieveNaturalLanguage(
                 expandedQuery,
@@ -1278,13 +1413,25 @@ async function retrieveRelevantLaws(
                     safeLimit *
                     NATURAL_FETCH_MULTIPLIER,
                     50
-                )
+                ),
+                detectedAct
+                    ? detectedAct.actName
+                    : null
             );
 
 
         console.log(
             `LEGAL RAG: Natural FULLTEXT → ${naturalResults.length}`
         );
+
+
+        if (detectedAct) {
+
+            console.log(
+                `LEGAL RAG: Natural FULLTEXT constrained to Act → ${detectedAct.actName}`
+            );
+
+        }
 
 
         /*
@@ -1300,13 +1447,25 @@ async function retrieveRelevantLaws(
                     safeLimit *
                     BOOLEAN_FETCH_MULTIPLIER,
                     50
-                )
+                ),
+                detectedAct
+                    ? detectedAct.actName
+                    : null
             );
 
 
         console.log(
             `LEGAL RAG: Boolean FULLTEXT → ${booleanResults.length}`
         );
+
+
+        if (detectedAct) {
+
+            console.log(
+                `LEGAL RAG: Boolean FULLTEXT constrained to Act → ${detectedAct.actName}`
+            );
+
+        }
 
 
         /*
