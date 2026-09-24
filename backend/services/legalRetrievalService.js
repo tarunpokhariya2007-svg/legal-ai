@@ -694,11 +694,12 @@ async function retrieveBoolean(
 /* ============================================================
  * ACT FILTERING
  *
- * If the user explicitly mentioned an Act, prioritize results
- * from that Act.
+ * If the user mentioned an Act without an explicit section,
+ * prefer results from that Act during broad retrieval.
  *
- * We do NOT discard all other results because Act names can
- * sometimes be written incorrectly by users.
+ * Explicit Act + section references are handled earlier by
+ * the authoritative exact-retrieval path and are NOT allowed
+ * to fall through to cross-Act lexical ranking.
  * ============================================================
  */
 
@@ -1165,6 +1166,90 @@ async function retrieveRelevantLaws(
                 );
 
             }
+
+        }
+
+
+        /*
+         * ----------------------------------------------------
+         * AUTHORITATIVE EXPLICIT REFERENCE PATH
+         * ----------------------------------------------------
+         *
+         * When the user explicitly names both an Act and a
+         * section (for example: "Section 63 of BSA"), the
+         * exact database match is authoritative.
+         *
+         * Do NOT fall back to generic FULLTEXT retrieval in
+         * this situation. Generic lexical search can return
+         * a similarly-worded provision from another Act.
+         *
+         * This prevents an acronym such as BSA from being
+         * reinterpreted as an unrelated law.
+         */
+
+        if (
+            sectionNumber &&
+            detectedAct
+        ) {
+
+            if (
+                exactResults.length > 0
+            ) {
+
+                const authoritativeResults =
+                    exactResults
+                        .slice(0, safeLimit)
+                        .map(cleanResult);
+
+                console.log(
+                    "LEGAL RAG: Explicit Act + section resolved deterministically."
+                );
+
+                authoritativeResults
+                    .forEach(
+                        (law, index) => {
+
+                            console.log(
+                                `${index + 1}. ` +
+                                `${law.act_name} ` +
+                                `Section ${law.section_number} ` +
+                                "(authoritative_exact)"
+                            );
+
+                        }
+                    );
+
+                console.log(
+                    "================================================"
+                );
+
+                return authoritativeResults;
+
+            }
+
+            /*
+             * The requested Act/section is known, but the
+             * corpus has no text for that exact provision.
+             *
+             * Never substitute another Act's section merely
+             * because its wording looks similar.
+             */
+
+            console.warn(
+                "LEGAL RAG: Explicit Act + section was not found in the legal corpus.",
+                detectedAct.actName,
+                sectionNumber
+            );
+
+            console.log(
+                "LEGAL RAG: Returning no substitute provision."
+            );
+
+            console.log(
+                "================================================"
+            );
+
+            return [];
 
         }
 

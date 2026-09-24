@@ -1,7 +1,9 @@
 const askAI = require("../services/groqService");
 
 const {
-    retrieveRelevantLaws
+    retrieveRelevantLaws,
+    extractSectionNumber,
+    detectAct
 } = require("../services/legalRetrievalService");
 
 
@@ -58,6 +60,39 @@ async function lawResearchAgent(caseDescription) {
 
         /*
          * STEP 1
+         * Detect explicit legal references before retrieval.
+         *
+         * This is deterministic. For example:
+         *
+         *   "Section 63 of BSA"
+         *
+         * must resolve to:
+         *
+         *   The Bharatiya Sakshya Adhiniyam, 2023
+         *   Section 63
+         *
+         * The retrieval service then performs an exact DB lookup
+         * and will not substitute a similarly-worded provision
+         * from another Act.
+         */
+        const explicitSection =
+            extractSectionNumber(caseDescription);
+
+        const explicitAct =
+            detectAct(caseDescription);
+
+        if (
+            explicitSection &&
+            explicitAct
+        ) {
+            console.log(
+                "LEGAL RESEARCH: Explicit legal reference detected →",
+                `${explicitAct.actName} Section ${explicitSection}`
+            );
+        }
+
+        /*
+         * STEP 2
          * Retrieve relevant provisions from the
          * authoritative legal corpus.
          */
@@ -72,9 +107,22 @@ async function lawResearchAgent(caseDescription) {
             `LEGAL RAG: Retrieved ${laws.length} provision(s)`
         );
 
+        if (
+            explicitSection &&
+            explicitAct &&
+            laws.length === 0
+        ) {
+            return (
+                `The requested provision could not be found in the ` +
+                `legal knowledge base: ${explicitAct.actName}, ` +
+                `Section ${explicitSection}. ` +
+                `No substitute provision from another Act will be used.`
+            );
+        }
+
 
         /*
-         * STEP 2
+         * STEP 3
          * Convert retrieved provisions into
          * grounded context for the LLM.
          */
@@ -83,7 +131,7 @@ async function lawResearchAgent(caseDescription) {
 
 
         /*
-         * STEP 3
+         * STEP 4
          * Ask Groq to reason ONLY from the
          * retrieved legal material.
          */
@@ -98,23 +146,35 @@ IMPORTANT RULES:
 1. Use the retrieved legal sources as the primary
    legal authority.
 
-2. Do NOT invent Acts, sections, punishments,
+2. If the user explicitly names an Act abbreviation
+   and section number (for example BNS, BNSS, or BSA),
+   preserve that exact Act/section reference. Do NOT
+   reinterpret the abbreviation as another law and do
+   NOT substitute a provision from another Act.
+
+3. If an explicit Act/section was requested and the
+   retrieved material is empty, say that the requested
+   provision could not be verified from the available
+   legal corpus.
+
+
+4. Do NOT invent Acts, sections, punishments,
    legal provisions, or citations.
 
-3. Do NOT assume that a section applies merely
+5. Do NOT assume that a section applies merely
    because a keyword appears.
 
-4. If the retrieved material is insufficient,
+6. If the retrieved material is insufficient,
    explicitly say that the available evidence
    is insufficient.
 
-5. Distinguish the legal text from your
+7. Distinguish the legal text from your
    interpretation.
 
-6. Mention the exact Act and section number
+8. Mention the exact Act and section number
    when supported by the retrieved source.
 
-7. Do not treat case-law summaries as the
+9. Do not treat case-law summaries as the
    text of the statute.
 
 CASE DESCRIPTION:
