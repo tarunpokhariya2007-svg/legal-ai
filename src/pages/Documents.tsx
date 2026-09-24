@@ -3201,7 +3201,7 @@ body: JSON.stringify({
 
               {/* SHARE */}
 
-              {!hasActiveTemporaryShare(d) && (
+              {!hasActiveTemporaryShare(d.id) && (
                 <>
               <button
                 title="Share document"
@@ -3945,10 +3945,12 @@ body: JSON.stringify({
                               Download
                             </button>
                           </>
+                        )}
+
                         {(share.status ===
-                          "accepted" ||
-                          share.status ===
-                            "pending") && (
+                            "accepted" ||
+                            share.status ===
+                              "pending") && (
                           <button
                             type="button"
                             title="Remove shared document"
@@ -4000,7 +4002,6 @@ body: JSON.stringify({
                           </button>
                         )}
 
-                        )}
                       </div>
                     </div>
                   </div>
