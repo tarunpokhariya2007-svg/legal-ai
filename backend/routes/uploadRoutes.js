@@ -1,41 +1,101 @@
-const express = require("express"); const multer = require("multer"); const path = require("path"); const fs = require("fs"); const bcrypt = require("bcrypt"); const db = require("../db"); const authMiddleware = require("../middleware/authMiddleware"); const { hashDocument, anchorHashOnChain, verifyHashOnChain, isBlockchainEnabled } = require("../services/blockchainService"); const { getNetworkName } = require("../utils/blockchainConfig"); const { setBlockchainRegistration, getDocumentForBlockchain } = require("../database/documentHashModel"); const { logDocumentActivity } = require("../database/auditLogModel"); const { createDocumentStoragePath, toStorageReference, isSupabaseStorageReference, uploadDocumentBuffer, downloadDocumentBuffer, deleteDocumentFromStorage } = require("../services/supabaseStorageService");
+const express = require("express");
+const multer = require("multer");
+const path = require("path");
+const fs = require("fs");
+const bcrypt = require("bcrypt");
+
+const db = require("../db");
+const authMiddleware = require("../middleware/authMiddleware");
+
+const {
+    hashDocument,
+    anchorHashOnChain,
+    verifyHashOnChain,
+    isBlockchainEnabled
+} = require("../services/blockchainService");
+
+const { getNetworkName } = require("../utils/blockchainConfig");
+
+const {
+    setBlockchainRegistration,
+    getDocumentForBlockchain
+} = require("../database/documentHashModel");
+
+const {
+    logDocumentActivity
+} = require("../database/auditLogModel");
+
+const {
+    createDocumentStoragePath,
+    toStorageReference,
+    isSupabaseStorageReference,
+    uploadDocumentBuffer,
+    downloadDocumentBuffer,
+    deleteDocumentFromStorage
+} = require("../services/supabaseStorageService");
 
 const router = express.Router();
 
-const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(__dirname, "..", "uploads");
+/* =========================================================
+   CONFIGURATION
+========================================================= */
+
+const UPLOAD_DIR =
+    process.env.UPLOAD_DIR ||
+    path.join(__dirname, "..", "uploads");
+
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
+/*
+ * Keep legacy local storage available for old documents.
+ * New uploads are stored in Supabase Storage.
+ */
 if (!fs.existsSync(UPLOAD_DIR)) {
-    fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+    fs.mkdirSync(UPLOAD_DIR, {
+        recursive: true
+    });
 }
+
+/* =========================================================
+   ALLOWED MIME TYPES
+========================================================= */
 
 const ALLOWED_MIME_TYPES = new Set([
     "application/pdf",
+
     "image/png",
     "image/jpeg",
     "image/jpg",
     "image/webp",
     "image/gif",
+
     "audio/mpeg",
     "audio/mp3",
     "audio/wav",
     "audio/x-wav",
     "audio/mp4",
     "audio/x-m4a",
+
     "video/mp4",
     "video/quicktime",
     "video/webm"
 ]);
 
+/* =========================================================
+   MULTER
+========================================================= */
+
 const storage = multer.memoryStorage();
 
 const upload = multer({
     storage,
+
     limits: {
         fileSize: MAX_FILE_SIZE,
         files: 1
     },
-    fileFilter: function (req, file, cb) {
+
+    fileFilter(req, file, cb) {
         if (!ALLOWED_MIME_TYPES.has(file.mimetype)) {
             return cb(
                 new Error(
@@ -48,13 +108,32 @@ const upload = multer({
     }
 });
 
-function matchesSignature(buffer, signature, offset = 0) {
-    if (buffer.length < offset + signature.length) {
+/* =========================================================
+   FILE SIGNATURE VALIDATION
+========================================================= */
+
+function matchesSignature(
+    buffer,
+    signature,
+    offset = 0
+) {
+    if (
+        !Buffer.isBuffer(buffer) ||
+        buffer.length <
+            offset + signature.length
+    ) {
         return false;
     }
 
-    for (let i = 0; i < signature.length; i++) {
-        if (buffer[offset + i] !== signature[i]) {
+    for (
+        let i = 0;
+        i < signature.length;
+        i++
+    ) {
+        if (
+            buffer[offset + i] !==
+            signature[i]
+        ) {
             return false;
         }
     }
@@ -62,53 +141,144 @@ function matchesSignature(buffer, signature, offset = 0) {
     return true;
 }
 
-function fileSignatureMatchesMimeType(buffer, mimetype) {
+function fileSignatureMatchesMimeType(
+    buffer,
+    mimetype
+) {
     switch (mimetype) {
         case "application/pdf":
-            return matchesSignature(buffer, [0x25, 0x50, 0x44, 0x46]);
+            return matchesSignature(
+                buffer,
+                [
+                    0x25,
+                    0x50,
+                    0x44,
+                    0x46
+                ]
+            );
 
         case "image/png":
             return matchesSignature(
                 buffer,
-                [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]
+                [
+                    0x89,
+                    0x50,
+                    0x4e,
+                    0x47,
+                    0x0d,
+                    0x0a,
+                    0x1a,
+                    0x0a
+                ]
             );
 
         case "image/jpeg":
         case "image/jpg":
-            return matchesSignature(buffer, [0xff, 0xd8, 0xff]);
+            return matchesSignature(
+                buffer,
+                [
+                    0xff,
+                    0xd8,
+                    0xff
+                ]
+            );
 
         case "image/webp":
             return (
-                matchesSignature(buffer, [0x52, 0x49, 0x46, 0x46]) &&
-                matchesSignature(buffer, [0x57, 0x45, 0x42, 0x50], 8)
+                matchesSignature(
+                    buffer,
+                    [
+                        0x52,
+                        0x49,
+                        0x46,
+                        0x46
+                    ]
+                ) &&
+                matchesSignature(
+                    buffer,
+                    [
+                        0x57,
+                        0x45,
+                        0x42,
+                        0x50
+                    ],
+                    8
+                )
             );
 
         case "image/gif":
             return (
                 matchesSignature(
                     buffer,
-                    [0x47, 0x49, 0x46, 0x38, 0x37, 0x61]
+                    [
+                        0x47,
+                        0x49,
+                        0x46,
+                        0x38,
+                        0x37,
+                        0x61
+                    ]
                 ) ||
                 matchesSignature(
                     buffer,
-                    [0x47, 0x49, 0x46, 0x38, 0x39, 0x61]
+                    [
+                        0x47,
+                        0x49,
+                        0x46,
+                        0x38,
+                        0x39,
+                        0x61
+                    ]
                 )
             );
 
         case "audio/mpeg":
         case "audio/mp3":
             return (
-                matchesSignature(buffer, [0x49, 0x44, 0x33]) ||
-                matchesSignature(buffer, [0xff, 0xfb]) ||
-                matchesSignature(buffer, [0xff, 0xf3]) ||
-                matchesSignature(buffer, [0xff, 0xf2])
+                matchesSignature(
+                    buffer,
+                    [
+                        0x49,
+                        0x44,
+                        0x33
+                    ]
+                ) ||
+                matchesSignature(
+                    buffer,
+                    [0xff, 0xfb]
+                ) ||
+                matchesSignature(
+                    buffer,
+                    [0xff, 0xf3]
+                ) ||
+                matchesSignature(
+                    buffer,
+                    [0xff, 0xf2]
+                )
             );
 
         case "audio/wav":
         case "audio/x-wav":
-            return matchesSignature(
-                buffer,
-                [0x52, 0x49, 0x46, 0x46]
+            return (
+                matchesSignature(
+                    buffer,
+                    [
+                        0x52,
+                        0x49,
+                        0x46,
+                        0x46
+                    ]
+                ) &&
+                matchesSignature(
+                    buffer,
+                    [
+                        0x57,
+                        0x41,
+                        0x56,
+                        0x45
+                    ],
+                    8
+                )
             );
 
         case "audio/mp4":
@@ -117,14 +287,24 @@ function fileSignatureMatchesMimeType(buffer, mimetype) {
         case "video/quicktime":
             return matchesSignature(
                 buffer,
-                [0x66, 0x74, 0x79, 0x70],
+                [
+                    0x66,
+                    0x74,
+                    0x79,
+                    0x70
+                ],
                 4
             );
 
         case "video/webm":
             return matchesSignature(
                 buffer,
-                [0x1a, 0x45, 0xdf, 0xa3]
+                [
+                    0x1a,
+                    0x45,
+                    0xdf,
+                    0xa3
+                ]
             );
 
         default:
@@ -132,20 +312,26 @@ function fileSignatureMatchesMimeType(buffer, mimetype) {
     }
 }
 
-async function verifyUploadedFileSignature(req, res, next) {
+async function verifyUploadedFileSignature(
+    req,
+    res,
+    next
+) {
     if (!req.file) {
         return next();
     }
 
     try {
-        const headerBuffer = req.file.buffer.subarray(0, 16);
+        const headerBuffer =
+            req.file.buffer.subarray(0, 16);
 
-        if (
-            !fileSignatureMatchesMimeType(
+        const valid =
+            fileSignatureMatchesMimeType(
                 headerBuffer,
                 req.file.mimetype
-            )
-        ) {
+            );
+
+        if (!valid) {
             return res.status(400).json({
                 success: false,
                 message:
@@ -162,14 +348,26 @@ async function verifyUploadedFileSignature(req, res, next) {
 
         return res.status(500).json({
             success: false,
-            message: "Unable to validate uploaded file."
+            message:
+                "Unable to validate uploaded file."
         });
     }
 }
 
-async function documentPasswordMiddleware(req, res, next) {
+/* =========================================================
+   DOCUMENT SECURITY PASSWORD
+========================================================= */
+
+async function documentPasswordMiddleware(
+    req,
+    res,
+    next
+) {
     try {
-        const password = req.headers["x-document-password"];
+        const password =
+            req.headers[
+                "x-document-password"
+            ];
 
         if (
             typeof password !== "string" ||
@@ -182,17 +380,21 @@ async function documentPasswordMiddleware(req, res, next) {
             });
         }
 
-        const [rows] = await db.query(
-            `
-            SELECT password_hash
-            FROM document_security
-            WHERE user_id = ?
-            LIMIT 1
-            `,
-            [req.user.id]
-        );
+        const [rows] =
+            await db.query(
+                `
+                SELECT password_hash
+                FROM document_security
+                WHERE user_id = ?
+                LIMIT 1
+                `,
+                [req.user.id]
+            );
 
-        if (!rows || rows.length === 0) {
+        if (
+            !rows ||
+            rows.length === 0
+        ) {
             return res.status(403).json({
                 success: false,
                 message:
@@ -200,10 +402,11 @@ async function documentPasswordMiddleware(req, res, next) {
             });
         }
 
-        const passwordMatches = await bcrypt.compare(
-            password,
-            rows[0].password_hash
-        );
+        const passwordMatches =
+            await bcrypt.compare(
+                password,
+                rows[0].password_hash
+            );
 
         if (!passwordMatches) {
             return res.status(403).json({
@@ -228,25 +431,363 @@ async function documentPasswordMiddleware(req, res, next) {
     }
 }
 
-function getPhysicalFilePath(filePath) {
-    if (!filePath) {
+/* =========================================================
+   LOCAL FILE PATH
+========================================================= */
+
+function getPhysicalFilePath(
+    filePath
+) {
+    if (
+        !filePath ||
+        typeof filePath !== "string"
+    ) {
         return null;
     }
 
-    const fileName = path.basename(filePath);
+    const fileName =
+        path.basename(filePath);
 
-    if (!fileName) {
+    if (
+        !fileName ||
+        fileName === "." ||
+        fileName === ".."
+    ) {
         return null;
     }
 
-    return path.join(UPLOAD_DIR, fileName);
+    return path.join(
+        UPLOAD_DIR,
+        fileName
+    );
 }
+
+/* =========================================================
+   SUPABASE REFERENCE NORMALIZATION
+
+   Supports:
+
+   1. supabase://documents/...
+   2. documents/...
+   3. https://PROJECT.supabase.co/storage/v1/object/...
+========================================================= */
+
+function normalizeSupabaseReference(
+    filePath
+) {
+    if (
+        !filePath ||
+        typeof filePath !== "string"
+    ) {
+        return null;
+    }
+
+    const value =
+        filePath.trim();
+
+    if (
+        isSupabaseStorageReference(
+            value
+        )
+    ) {
+        return value;
+    }
+
+    /*
+     * Raw Supabase object path.
+     */
+    if (
+        value.startsWith(
+            "documents/"
+        ) &&
+        !value.includes("..")
+    ) {
+        return toStorageReference(
+            value
+        );
+    }
+
+    /*
+     * Full Supabase Storage URL.
+     */
+    if (
+        value.startsWith(
+            "http://"
+        ) ||
+        value.startsWith(
+            "https://"
+        )
+    ) {
+        try {
+            const url =
+                new URL(value);
+
+            const marker =
+                "/storage/v1/object/";
+
+            const index =
+                url.pathname.indexOf(
+                    marker
+                );
+
+            if (index < 0) {
+                return null;
+            }
+
+            const remainder =
+                url.pathname.slice(
+                    index +
+                        marker.length
+                );
+
+            const parts =
+                remainder
+                    .split("/")
+                    .filter(Boolean);
+
+            if (parts.length < 2) {
+                return null;
+            }
+
+            const bucket =
+                decodeURIComponent(
+                    parts[0]
+                );
+
+            const configuredBucket =
+                process.env
+                    .SUPABASE_STORAGE_BUCKET ||
+                "nyaya-documents";
+
+            if (
+                bucket !==
+                configuredBucket
+            ) {
+                return null;
+            }
+
+            const objectPath =
+                parts
+                    .slice(1)
+                    .map((part) =>
+                        decodeURIComponent(
+                            part
+                        )
+                    )
+                    .join("/");
+
+            if (
+                !objectPath ||
+                objectPath.includes(
+                    ".."
+                )
+            ) {
+                return null;
+            }
+
+            return toStorageReference(
+                objectPath
+            );
+        } catch {
+            return null;
+        }
+    }
+
+    return null;
+}
+
+/* =========================================================
+   LOAD DOCUMENT BUFFER
+
+   THIS IS THE MAIN FIX FOR OPEN/DOWNLOAD.
+
+   Supabase is always tried first when the database points
+   to a Supabase object.
+
+   Legacy local files are still supported.
+========================================================= */
+
+async function loadDocumentBuffer(
+    filePath,
+    documentId = null
+) {
+    if (
+        !filePath ||
+        typeof filePath !== "string"
+    ) {
+        const error =
+            new Error(
+                "Document file path is missing."
+            );
+
+        error.code =
+            "DOCUMENT_FILE_PATH_MISSING";
+
+        throw error;
+    }
+
+    const normalizedReference =
+        normalizeSupabaseReference(
+            filePath
+        );
+
+    /*
+     * SUPABASE
+     */
+    if (
+        normalizedReference
+    ) {
+        console.log(
+            "DOCUMENT STORAGE: Loading from Supabase:",
+            normalizedReference
+        );
+
+        try {
+            const buffer =
+                await downloadDocumentBuffer(
+                    normalizedReference
+                );
+
+            if (
+                !Buffer.isBuffer(
+                    buffer
+                ) ||
+                buffer.length === 0
+            ) {
+                throw new Error(
+                    "Supabase returned an empty document."
+                );
+            }
+
+            return buffer;
+        } catch (error) {
+            console.error(
+                "SUPABASE DOCUMENT READ ERROR:",
+                {
+                    documentId,
+                    reference:
+                        normalizedReference,
+                    message:
+                        error.message
+                }
+            );
+
+            throw error;
+        }
+    }
+
+    /*
+     * LEGACY LOCAL FILE
+     */
+    const physicalPath =
+        getPhysicalFilePath(
+            filePath
+        );
+
+    if (
+        !physicalPath ||
+        !fs.existsSync(
+            physicalPath
+        )
+    ) {
+        const error =
+            new Error(
+                "Document file is no longer available."
+            );
+
+        error.code =
+            "DOCUMENT_FILE_NOT_FOUND";
+
+        throw error;
+    }
+
+    console.log(
+        "DOCUMENT STORAGE: Loading legacy local file:",
+        physicalPath
+    );
+
+    const buffer =
+        await fs.promises.readFile(
+            physicalPath
+        );
+
+    if (
+        !Buffer.isBuffer(
+            buffer
+        ) ||
+        buffer.length === 0
+    ) {
+        const error =
+            new Error(
+                "Document file is empty."
+            );
+
+        error.code =
+            "DOCUMENT_FILE_EMPTY";
+
+        throw error;
+    }
+
+    return buffer;
+}
+
+/* =========================================================
+   DELETE STORAGE OBJECT
+========================================================= */
+
+async function deleteStoredDocument(
+    filePath
+) {
+    if (
+        !filePath ||
+        typeof filePath !== "string"
+    ) {
+        return;
+    }
+
+    const normalizedReference =
+        normalizeSupabaseReference(
+            filePath
+        );
+
+    if (
+        normalizedReference
+    ) {
+        await deleteDocumentFromStorage(
+            normalizedReference
+        );
+
+        return;
+    }
+
+    const physicalPath =
+        getPhysicalFilePath(
+            filePath
+        );
+
+    if (
+        physicalPath &&
+        fs.existsSync(
+            physicalPath
+        )
+    ) {
+        await fs.promises.unlink(
+            physicalPath
+        );
+    }
+}
+
+/* =========================================================
+   BLOCKCHAIN REGISTRATION
+========================================================= */
 
 async function registerDocumentOnBlockchain(
     documentId,
     documentHash
 ) {
-    if (!isBlockchainEnabled()) {
+    if (
+        !isBlockchainEnabled()
+    ) {
         return {
             attempted: false,
             status: null,
@@ -256,26 +797,30 @@ async function registerDocumentOnBlockchain(
 
     try {
         const anchorResult =
-            await anchorHashOnChain(documentHash);
+            await anchorHashOnChain(
+                documentHash
+            );
 
         await setBlockchainRegistration(
             documentId,
             {
                 status: "registered",
-                txHash: anchorResult.txHash
+                txHash:
+                    anchorResult.txHash
             }
         );
 
         return {
             attempted: true,
             status: "registered",
-            txHash: anchorResult.txHash
+            txHash:
+                anchorResult.txHash
         };
-    } catch (blockchainError) {
+    } catch (
+        blockchainError
+    ) {
         console.error(
-            "BLOCKCHAIN REGISTRATION ERROR (document " +
-                documentId +
-                "):",
+            "BLOCKCHAIN REGISTRATION ERROR:",
             blockchainError.message
         );
 
@@ -287,7 +832,9 @@ async function registerDocumentOnBlockchain(
                     txHash: null
                 }
             );
-        } catch (dbError) {
+        } catch (
+            dbError
+        ) {
             console.error(
                 "BLOCKCHAIN STATUS UPDATE ERROR:",
                 dbError.message
@@ -301,23 +848,31 @@ async function registerDocumentOnBlockchain(
         };
     }
 }
+
+/* =========================================================
+   DOCUMENT COUNT
+========================================================= */
+
 router.get(
     "/documents/count",
     authMiddleware,
     async (req, res) => {
         try {
-            const [rows] = await db.query(
-                `
-                SELECT COUNT(*) AS count
-                FROM documents
-                WHERE user_id = ?
-                `,
-                [req.user.id]
-            );
+            const [rows] =
+                await db.query(
+                    `
+                    SELECT COUNT(*) AS count
+                    FROM documents
+                    WHERE user_id = ?
+                    `,
+                    [req.user.id]
+                );
 
             return res.json({
                 success: true,
-                count: Number(rows[0]?.count || 0)
+                count: Number(
+                    rows[0]?.count || 0
+                )
             });
         } catch (error) {
             console.error(
@@ -327,11 +882,16 @@ router.get(
 
             return res.status(500).json({
                 success: false,
-                message: "Unable to load document count."
+                message:
+                    "Unable to load document count."
             });
         }
     }
 );
+
+/* =========================================================
+   GET USER DOCUMENTS
+========================================================= */
 
 router.get(
     "/documents",
@@ -339,47 +899,68 @@ router.get(
     documentPasswordMiddleware,
     async (req, res) => {
         try {
-            const [documents] = await db.query(
-                `
-                SELECT
-                    id,
-                    user_id,
-                    file_name,
-                    file_path,
-                    file_type,
-                    uploaded_at,
-                    document_hash,
-                    blockchain_tx_hash,
-                    blockchain_status
-                FROM documents
-                WHERE user_id = ?
-                ORDER BY uploaded_at DESC
-                `,
-                [req.user.id]
-            );
+            const [documents] =
+                await db.query(
+                    `
+                    SELECT
+                        id,
+                        user_id,
+                        file_name,
+                        file_path,
+                        file_type,
+                        uploaded_at,
+                        document_hash,
+                        blockchain_tx_hash,
+                        blockchain_status
+                    FROM documents
+                    WHERE user_id = ?
+                    ORDER BY uploaded_at DESC
+                    `,
+                    [req.user.id]
+                );
 
             const safeDocuments =
-                documents.map((document) => ({
-                    id: document.id,
-                    user_id: document.user_id,
-                    file_name: document.file_name,
-                    file_type: document.file_type,
-                    uploaded_at: document.uploaded_at,
-                    document_hash:
-                        document.document_hash || null,
-                    blockchain_tx_hash:
-                        document.blockchain_tx_hash || null,
-                    blockchain_status:
-                        document.blockchain_status || null,
-                    blockchain_network:
-                        document.blockchain_tx_hash
-                            ? getNetworkName() || null
-                            : null
-                }));
+                documents.map(
+                    (document) => ({
+                        id:
+                            document.id,
+
+                        user_id:
+                            document.user_id,
+
+                        file_name:
+                            document.file_name,
+
+                        file_type:
+                            document.file_type,
+
+                        uploaded_at:
+                            document.uploaded_at,
+
+                        document_hash:
+                            document.document_hash ||
+                            null,
+
+                        blockchain_tx_hash:
+                            document.blockchain_tx_hash ||
+                            null,
+
+                        blockchain_status:
+                            document.blockchain_status ||
+                            null,
+
+                        blockchain_network:
+                            document.blockchain_tx_hash
+                                ? getNetworkName() ||
+                                  null
+                                : null
+                    })
+                );
 
             return res.json({
                 success: true,
-                documents: safeDocuments
+                documents:
+                    safeDocuments
             });
         } catch (error) {
             console.error(
@@ -389,11 +970,16 @@ router.get(
 
             return res.status(500).json({
                 success: false,
-                message: "Failed to load documents."
+                message:
+                    "Failed to load documents."
             });
         }
     }
 );
+
+/* =========================================================
+   UPLOAD DOCUMENT
+========================================================= */
 
 router.post(
     "/upload",
@@ -402,14 +988,18 @@ router.post(
     upload.single("document"),
     verifyUploadedFileSignature,
     async (req, res) => {
-        let storageObjectPath = null;
-        let externalFileUploaded = false;
+        let storageObjectPath =
+            null;
+
+        let externalFileUploaded =
+            false;
 
         try {
             if (!req.file) {
                 return res.status(400).json({
                     success: false,
-                    message: "No file was uploaded."
+                    message:
+                        "No file was uploaded."
                 });
             }
 
@@ -423,7 +1013,13 @@ router.post(
                 req.file.buffer;
 
             const documentHash =
-                hashDocument(fileBuffer);
+                hashDocument(
+                    fileBuffer
+                );
+
+            /*
+             * NEW DOCUMENTS ALWAYS GO TO SUPABASE.
+             */
 
             storageObjectPath =
                 createDocumentStoragePath(
@@ -442,7 +1038,8 @@ router.post(
                 fileType
             );
 
-            externalFileUploaded = true;
+            externalFileUploaded =
+                true;
 
             const [result] =
                 await db.query(
@@ -478,8 +1075,10 @@ router.post(
 
             await logDocumentActivity({
                 documentId,
-                userId: req.user.id,
-                action: "document_uploaded",
+                userId:
+                    req.user.id,
+                action:
+                    "document_uploaded",
                 req,
                 metadata: {
                     fileName,
@@ -492,9 +1091,12 @@ router.post(
                 message:
                     "Document uploaded successfully.",
                 file: {
-                    id: documentId,
-                    name: fileName,
-                    type: fileType
+                    id:
+                        documentId,
+                    name:
+                        fileName,
+                    type:
+                        fileType
                 },
                 blockchain: {
                     status:
@@ -517,7 +1119,9 @@ router.post(
                             storageObjectPath
                         )
                     );
-                } catch (cleanupError) {
+                } catch (
+                    cleanupError
+                ) {
                     console.error(
                         "SUPABASE UPLOAD CLEANUP ERROR:",
                         cleanupError.message
@@ -527,11 +1131,17 @@ router.post(
 
             return res.status(500).json({
                 success: false,
-                message: "File upload failed."
+                message:
+                    error.message ||
+                    "File upload failed."
             });
         }
     }
 );
+
+/* =========================================================
+   BLOCKCHAIN REGISTER
+========================================================= */
 
 router.post(
     "/documents/:id/blockchain/register",
@@ -540,9 +1150,15 @@ router.post(
     async (req, res) => {
         try {
             const documentId =
-                Number(req.params.id);
+                Number(
+                    req.params.id
+                );
 
-            if (!Number.isInteger(documentId)) {
+            if (
+                !Number.isInteger(
+                    documentId
+                )
+            ) {
                 return res.status(400).json({
                     success: false,
                     message:
@@ -564,7 +1180,9 @@ router.post(
                 });
             }
 
-            if (!document.document_hash) {
+            if (
+                !document.document_hash
+            ) {
                 return res.status(400).json({
                     success: false,
                     message:
@@ -587,7 +1205,9 @@ router.post(
                 });
             }
 
-            if (!isBlockchainEnabled()) {
+            if (
+                !isBlockchainEnabled()
+            ) {
                 return res.status(400).json({
                     success: false,
                     message:
@@ -629,7 +1249,7 @@ router.post(
             });
         } catch (error) {
             console.error(
-                "BLOCKCHAIN REGISTER ENDPOINT ERROR:",
+                "BLOCKCHAIN REGISTER ERROR:",
                 error
             );
 
@@ -642,6 +1262,10 @@ router.post(
     }
 );
 
+/* =========================================================
+   BLOCKCHAIN VERIFY
+========================================================= */
+
 router.post(
     "/documents/:id/blockchain/verify",
     authMiddleware,
@@ -649,9 +1273,15 @@ router.post(
     async (req, res) => {
         try {
             const documentId =
-                Number(req.params.id);
+                Number(
+                    req.params.id
+                );
 
-            if (!Number.isInteger(documentId)) {
+            if (
+                !Number.isInteger(
+                    documentId
+                )
+            ) {
                 return res.status(400).json({
                     success: false,
                     message:
@@ -680,7 +1310,8 @@ router.post(
             ) {
                 await logDocumentActivity({
                     documentId,
-                    userId: req.user.id,
+                    userId:
+                        req.user.id,
                     action:
                         "blockchain_verified",
                     req,
@@ -700,40 +1331,14 @@ router.post(
             let fileBuffer;
 
             try {
-                if (
-                    isSupabaseStorageReference(
-                        document.file_path
-                    )
-                ) {
-                    fileBuffer =
-                        await downloadDocumentBuffer(
-                            document.file_path
-                        );
-                } else {
-                    const physicalPath =
-                        getPhysicalFilePath(
-                            document.file_path
-                        );
-
-                    if (
-                        !physicalPath ||
-                        !fs.existsSync(
-                            physicalPath
-                        )
-                    ) {
-                        return res.status(404).json({
-                            success: false,
-                            message:
-                                "Document file is no longer available."
-                        });
-                    }
-
-                    fileBuffer =
-                        await fs.promises.readFile(
-                            physicalPath
-                        );
-                }
-            } catch (storageError) {
+                fileBuffer =
+                    await loadDocumentBuffer(
+                        document.file_path,
+                        documentId
+                    );
+            } catch (
+                storageError
+            ) {
                 console.error(
                     "BLOCKCHAIN VERIFY FILE READ ERROR:",
                     storageError.message
@@ -747,7 +1352,9 @@ router.post(
             }
 
             const currentHash =
-                hashDocument(fileBuffer);
+                hashDocument(
+                    fileBuffer
+                );
 
             let onChainResult;
 
@@ -756,7 +1363,9 @@ router.post(
                     await verifyHashOnChain(
                         document.blockchain_tx_hash
                     );
-            } catch (blockchainError) {
+            } catch (
+                blockchainError
+            ) {
                 console.error(
                     "BLOCKCHAIN VERIFY ON-CHAIN ERROR:",
                     blockchainError.message
@@ -764,7 +1373,8 @@ router.post(
 
                 await logDocumentActivity({
                     documentId,
-                    userId: req.user.id,
+                    userId:
+                        req.user.id,
                     action:
                         "blockchain_verified",
                     req,
@@ -786,18 +1396,6 @@ router.post(
                 !onChainResult.found ||
                 !onChainResult.documentHash
             ) {
-                await logDocumentActivity({
-                    documentId,
-                    userId: req.user.id,
-                    action:
-                        "blockchain_verified",
-                    req,
-                    metadata: {
-                        status:
-                            "blockchain_unavailable"
-                    }
-                });
-
                 return res.status(200).json({
                     success: true,
                     status:
@@ -816,33 +1414,39 @@ router.post(
 
             await logDocumentActivity({
                 documentId,
-                userId: req.user.id,
+                userId:
+                    req.user.id,
                 action:
                     "blockchain_verified",
                 req,
                 metadata: {
-                    status: matches
-                        ? "verified"
-                        : "tampered"
+                    status:
+                        matches
+                            ? "verified"
+                            : "tampered"
                 }
             });
 
             if (matches) {
                 return res.status(200).json({
                     success: true,
-                    status: "verified",
-                    verified: true
+                    status:
+                        "verified",
+                    verified:
+                        true
                 });
             }
 
             return res.status(200).json({
                 success: true,
-                status: "tampered",
-                verified: false
+                status:
+                    "tampered",
+                verified:
+                    false
             });
         } catch (error) {
             console.error(
-                "BLOCKCHAIN VERIFY ENDPOINT ERROR:",
+                "BLOCKCHAIN VERIFY ERROR:",
                 error
             );
 
@@ -855,6 +1459,12 @@ router.post(
     }
 );
 
+/* =========================================================
+   OPEN / VIEW DOCUMENT
+
+   GET /api/documents/:id/content
+========================================================= */
+
 router.get(
     "/documents/:id/content",
     authMiddleware,
@@ -862,9 +1472,15 @@ router.get(
     async (req, res) => {
         try {
             const documentId =
-                Number(req.params.id);
+                Number(
+                    req.params.id
+                );
 
-            if (!Number.isInteger(documentId)) {
+            if (
+                !Number.isInteger(
+                    documentId
+                )
+            ) {
                 return res.status(400).json({
                     success: false,
                     message:
@@ -891,7 +1507,10 @@ router.get(
                     ]
                 );
 
-            if (!rows || rows.length === 0) {
+            if (
+                !rows ||
+                rows.length === 0
+            ) {
                 return res.status(404).json({
                     success: false,
                     message:
@@ -899,55 +1518,44 @@ router.get(
                 });
             }
 
-            const document = rows[0];
+            const document =
+                rows[0];
+
+            console.log(
+                "OPEN DOCUMENT REQUEST:",
+                {
+                    documentId,
+                    fileName:
+                        document.file_name,
+                    filePath:
+                        document.file_path,
+                    fileType:
+                        document.file_type
+                }
+            );
 
             let fileBuffer;
 
             try {
-                if (
-                    isSupabaseStorageReference(
-                        document.file_path
-                    )
-                ) {
-                    fileBuffer =
-                        await downloadDocumentBuffer(
-                            document.file_path
-                        );
-                } else {
-                    const physicalPath =
-                        getPhysicalFilePath(
-                            document.file_path
-                        );
-
-                    if (!physicalPath) {
-                        return res.status(404).json({
-                            success: false,
-                            message:
-                                "Document file path is invalid."
-                        });
-                    }
-
-                    if (
-                        !fs.existsSync(
-                            physicalPath
-                        )
-                    ) {
-                        return res.status(404).json({
-                            success: false,
-                            message:
-                                "Document file is no longer available."
-                        });
-                    }
-
-                    fileBuffer =
-                        await fs.promises.readFile(
-                            physicalPath
-                        );
-                }
-            } catch (storageError) {
+                fileBuffer =
+                    await loadDocumentBuffer(
+                        document.file_path,
+                        documentId
+                    );
+            } catch (
+                storageError
+            ) {
                 console.error(
                     "VIEW DOCUMENT STORAGE ERROR:",
-                    storageError.message
+                    {
+                        documentId,
+                        filePath:
+                            document.file_path,
+                        error:
+                            storageError.message,
+                        code:
+                            storageError.code
+                    }
                 );
 
                 return res.status(404).json({
@@ -963,6 +1571,9 @@ router.get(
                     "application/octet-stream"
             );
 
+            /*
+             * Inline is important for browser viewing.
+             */
             res.setHeader(
                 "Content-Disposition",
                 `inline; filename="${encodeURIComponent(
@@ -970,9 +1581,17 @@ router.get(
                 )}"`
             );
 
+            res.setHeader(
+                "Content-Length",
+                String(
+                    fileBuffer.length
+                )
+            );
+
             await logDocumentActivity({
                 documentId,
-                userId: req.user.id,
+                userId:
+                    req.user.id,
                 action:
                     "document_viewed",
                 req,
@@ -982,7 +1601,9 @@ router.get(
                 }
             });
 
-            return res.send(fileBuffer);
+            return res.send(
+                fileBuffer
+            );
         } catch (error) {
             console.error(
                 "VIEW DOCUMENT ERROR:",
@@ -998,6 +1619,10 @@ router.get(
     }
 );
 
+/* =========================================================
+   DOWNLOAD DOCUMENT
+========================================================= */
+
 router.get(
     "/documents/:id/download",
     authMiddleware,
@@ -1005,9 +1630,15 @@ router.get(
     async (req, res) => {
         try {
             const documentId =
-                Number(req.params.id);
+                Number(
+                    req.params.id
+                );
 
-            if (!Number.isInteger(documentId)) {
+            if (
+                !Number.isInteger(
+                    documentId
+                )
+            ) {
                 return res.status(400).json({
                     success: false,
                     message:
@@ -1034,7 +1665,10 @@ router.get(
                     ]
                 );
 
-            if (!rows || rows.length === 0) {
+            if (
+                !rows ||
+                rows.length === 0
+            ) {
                 return res.status(404).json({
                     success: false,
                     message:
@@ -1042,55 +1676,23 @@ router.get(
                 });
             }
 
-            const document = rows[0];
+            const document =
+                rows[0];
 
             let fileBuffer;
 
             try {
-                if (
-                    isSupabaseStorageReference(
-                        document.file_path
-                    )
-                ) {
-                    fileBuffer =
-                        await downloadDocumentBuffer(
-                            document.file_path
-                        );
-                } else {
-                    const physicalPath =
-                        getPhysicalFilePath(
-                            document.file_path
-                        );
-
-                    if (!physicalPath) {
-                        return res.status(404).json({
-                            success: false,
-                            message:
-                                "Document file path is invalid."
-                        });
-                    }
-
-                    if (
-                        !fs.existsSync(
-                            physicalPath
-                        )
-                    ) {
-                        return res.status(404).json({
-                            success: false,
-                            message:
-                                "Document file is no longer available."
-                        });
-                    }
-
-                    fileBuffer =
-                        await fs.promises.readFile(
-                            physicalPath
-                        );
-                }
-            } catch (storageError) {
+                fileBuffer =
+                    await loadDocumentBuffer(
+                        document.file_path,
+                        documentId
+                    );
+            } catch (
+                storageError
+            ) {
                 console.error(
                     "DOWNLOAD DOCUMENT STORAGE ERROR:",
-                    storageError.message
+                    storageError
                 );
 
                 return res.status(404).json({
@@ -1102,7 +1704,8 @@ router.get(
 
             await logDocumentActivity({
                 documentId,
-                userId: req.user.id,
+                userId:
+                    req.user.id,
                 action:
                     "document_downloaded",
                 req,
@@ -1125,7 +1728,16 @@ router.get(
                 )}"`
             );
 
-            return res.send(fileBuffer);
+            res.setHeader(
+                "Content-Length",
+                String(
+                    fileBuffer.length
+                )
+            );
+
+            return res.send(
+                fileBuffer
+            );
         } catch (error) {
             console.error(
                 "DOWNLOAD DOCUMENT ERROR:",
@@ -1141,6 +1753,10 @@ router.get(
     }
 );
 
+/* =========================================================
+   DELETE DOCUMENT
+========================================================= */
+
 router.delete(
     "/documents/:id",
     authMiddleware,
@@ -1148,9 +1764,15 @@ router.delete(
     async (req, res) => {
         try {
             const documentId =
-                Number(req.params.id);
+                Number(
+                    req.params.id
+                );
 
-            if (!Number.isInteger(documentId)) {
+            if (
+                !Number.isInteger(
+                    documentId
+                )
+            ) {
                 return res.status(400).json({
                     success: false,
                     message:
@@ -1176,7 +1798,10 @@ router.delete(
                     ]
                 );
 
-            if (!rows || rows.length === 0) {
+            if (
+                !rows ||
+                rows.length === 0
+            ) {
                 return res.status(404).json({
                     success: false,
                     message:
@@ -1184,8 +1809,12 @@ router.delete(
                 });
             }
 
-            const document = rows[0];
+            const document =
+                rows[0];
 
+            /*
+             * Remove database record first.
+             */
             await db.query(
                 `
                 DELETE FROM documents
@@ -1198,42 +1827,26 @@ router.delete(
                 ]
             );
 
+            /*
+             * Then remove physical/Supabase file.
+             */
             try {
-                if (
-                    isSupabaseStorageReference(
-                        document.file_path
-                    )
-                ) {
-                    await deleteDocumentFromStorage(
-                        document.file_path
-                    );
-                } else {
-                    const physicalPath =
-                        getPhysicalFilePath(
-                            document.file_path
-                        );
-
-                    if (
-                        physicalPath &&
-                        fs.existsSync(
-                            physicalPath
-                        )
-                    ) {
-                        fs.unlinkSync(
-                            physicalPath
-                        );
-                    }
-                }
-            } catch (fileError) {
+                await deleteStoredDocument(
+                    document.file_path
+                );
+            } catch (
+                storageError
+            ) {
                 console.error(
                     "DELETE DOCUMENT STORAGE ERROR:",
-                    fileError.message
+                    storageError.message
                 );
             }
 
             await logDocumentActivity({
                 documentId,
-                userId: req.user.id,
+                userId:
+                    req.user.id,
                 action:
                     "document_deleted",
                 req,
@@ -1263,6 +1876,10 @@ router.delete(
     }
 );
 
+/* =========================================================
+   RENAME DOCUMENT
+========================================================= */
+
 router.put(
     "/documents/:id",
     authMiddleware,
@@ -1270,15 +1887,22 @@ router.put(
     async (req, res) => {
         try {
             const documentId =
-                Number(req.params.id);
+                Number(
+                    req.params.id
+                );
 
             const newName =
-                typeof req.body?.file_name ===
+                typeof req.body
+                    ?.file_name ===
                 "string"
                     ? req.body.file_name.trim()
                     : "";
 
-            if (!Number.isInteger(documentId)) {
+            if (
+                !Number.isInteger(
+                    documentId
+                )
+            ) {
                 return res.status(400).json({
                     success: false,
                     message:
@@ -1294,7 +1918,9 @@ router.put(
                 });
             }
 
-            if (newName.length > 255) {
+            if (
+                newName.length > 255
+            ) {
                 return res.status(400).json({
                     success: false,
                     message:
@@ -1303,7 +1929,9 @@ router.put(
             }
 
             const cleanedName =
-                path.basename(newName);
+                path.basename(
+                    newName
+                );
 
             if (
                 !cleanedName ||
@@ -1332,7 +1960,9 @@ router.put(
                     ]
                 );
 
-            if (result.affectedRows === 0) {
+            if (
+                result.affectedRows === 0
+            ) {
                 return res.status(404).json({
                     success: false,
                     message:
@@ -1340,11 +1970,25 @@ router.put(
                 });
             }
 
+            await logDocumentActivity({
+                documentId,
+                userId:
+                    req.user.id,
+                action:
+                    "document_renamed",
+                req,
+                metadata: {
+                    fileName:
+                        cleanedName
+                }
+            });
+
             return res.json({
                 success: true,
                 message:
                     "Document renamed successfully.",
-                file_name: cleanedName
+                file_name:
+                    cleanedName
             });
         } catch (error) {
             console.error(
@@ -1361,56 +2005,9 @@ router.put(
     }
 );
 
-router.use((error, req, res, next) => {
-    console.error(
-        "DOCUMENT ROUTE ERROR:",
-        error
-    );
-
-    if (
-        error instanceof multer.MulterError
-    ) {
-        if (
-            error.code ===
-            "LIMIT_FILE_SIZE"
-        ) {
-            return res.status(413).json({
-                success: false,
-                message:
-                    "File is too large. Maximum allowed size is 10 MB per file."
-            });
-        }
-
-        if (
-            error.code ===
-            "LIMIT_FILE_COUNT"
-        ) {
-            return res.status(400).json({
-                success: false,
-                message:
-                    "Only one file can be uploaded at a time."
-            });
-        }
-
-        return res.status(400).json({
-            success: false,
-            message:
-                error.message ||
-                "File upload error."
-        });
-    }
-
-    if (error) {
-        return res.status(400).json({
-            success: false,
-            message:
-                error.message ||
-                "File upload failed."
-        });
-    }
-
-    next();
-});
+/* =========================================================
+   DOCUMENT AUDIT HISTORY
+========================================================= */
 
 router.get(
     "/documents/:id/audit",
@@ -1418,9 +2015,15 @@ router.get(
     async (req, res) => {
         try {
             const documentId =
-                Number(req.params.id);
+                Number(
+                    req.params.id
+                );
 
-            if (!Number.isInteger(documentId)) {
+            if (
+                !Number.isInteger(
+                    documentId
+                )
+            ) {
                 return res.status(400).json({
                     success: false,
                     message:
@@ -1473,7 +2076,9 @@ router.get(
                 );
 
             const history =
-                (auditRows || []).map(
+                (
+                    auditRows || []
+                ).map(
                     (row) => {
                         let parsedMetadata =
                             null;
@@ -1493,9 +2098,7 @@ router.get(
                                         JSON.parse(
                                             row.metadata
                                         );
-                                } catch (
-                                    parseError
-                                ) {
+                                } catch {
                                     parsedMetadata =
                                         null;
                                 }
@@ -1506,15 +2109,21 @@ router.get(
                         }
 
                         return {
-                            id: row.id,
+                            id:
+                                row.id,
+
                             description:
                                 row.description,
+
                             created_at:
                                 row.created_at,
+
                             ip_address:
                                 row.ip_address,
+
                             user_agent:
                                 row.user_agent,
+
                             metadata:
                                 parsedMetadata
                         };
@@ -1524,7 +2133,8 @@ router.get(
             return res.json({
                 success: true,
                 documentId,
-                count: history.length,
+                count:
+                    history.length,
                 history
             });
         } catch (error) {
@@ -1541,5 +2151,72 @@ router.get(
         }
     }
 );
+
+/* =========================================================
+   MULTER / ROUTE ERROR HANDLER
+========================================================= */
+
+router.use(
+    (
+        error,
+        req,
+        res,
+        next
+    ) => {
+        console.error(
+            "DOCUMENT ROUTE ERROR:",
+            error
+        );
+
+        if (
+            error instanceof
+            multer.MulterError
+        ) {
+            if (
+                error.code ===
+                "LIMIT_FILE_SIZE"
+            ) {
+                return res.status(413).json({
+                    success: false,
+                    message:
+                        "File is too large. Maximum allowed size is 10 MB per file."
+                });
+            }
+
+            if (
+                error.code ===
+                "LIMIT_FILE_COUNT"
+            ) {
+                return res.status(400).json({
+                    success: false,
+                    message:
+                        "Only one file can be uploaded at a time."
+                });
+            }
+
+            return res.status(400).json({
+                success: false,
+                message:
+                    error.message ||
+                    "File upload error."
+            });
+        }
+
+        if (error) {
+            return res.status(400).json({
+                success: false,
+                message:
+                    error.message ||
+                    "File upload failed."
+            });
+        }
+
+        next();
+    }
+);
+
+/* =========================================================
+   EXPORT
+========================================================= */
 
 module.exports = router;
