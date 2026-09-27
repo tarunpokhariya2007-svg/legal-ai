@@ -271,6 +271,19 @@ export default function Landing() {
 
     <div className="landing-page" style={{ overflowX: 'hidden' }}>
 
+      {/* Fixed cinematic background video: the page content scrolls over it. */}
+      <div className="landing-video-background" aria-hidden="true">
+        <video
+          src="/hero-scale.mp4"
+          autoPlay
+          muted
+          loop
+          playsInline
+          preload="auto"
+        />
+        <div className="landing-video-overlay" />
+      </div>
+
       <style>{`
 
         /* =====================================================
@@ -305,6 +318,38 @@ export default function Landing() {
 
 
 
+        /* The video is fixed to the viewport, so it stays in one place while
+           every landing-page section scrolls above it. */
+        .landing-page .landing-video-background {
+          position: fixed !important;
+          inset: 0 !important;
+          width: 100vw !important;
+          height: 100vh !important;
+          z-index: 0 !important;
+          pointer-events: none !important;
+          overflow: hidden !important;
+          background: #000;
+        }
+
+        .landing-page .landing-video-background video {
+          position: absolute;
+          inset: 0;
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          object-position: center center;
+          opacity: 0.38;
+          filter: saturate(0.95) contrast(1.08);
+        }
+
+        .landing-page .landing-video-overlay {
+          position: absolute;
+          inset: 0;
+          background:
+            linear-gradient(180deg, rgba(0,0,0,0.58) 0%, rgba(0,0,0,0.42) 45%, rgba(0,0,0,0.72) 100%),
+            radial-gradient(circle at 50% 35%, rgba(212,175,55,0.08), transparent 55%);
+        }
+
         .landing-page > * {
 
           position: relative;
@@ -319,7 +364,7 @@ export default function Landing() {
 
         .landing-page .mesh-gradient {
 
-          background: #000 !important;
+          background: transparent !important;
 
         }
 
@@ -329,8 +374,13 @@ export default function Landing() {
 
         .landing-page footer {
 
-          background-color: #000 !important;
+          background-color: transparent !important;
 
+        }
+
+        /* Keep content readable while allowing the fixed video to remain visible. */
+        .landing-page section {
+          position: relative;
         }
 
         /* White typography */
@@ -515,6 +565,23 @@ export default function Landing() {
           }
         }
 
+        @media (max-width: 700px) {
+
+          .landing-page .landing-video-background video {
+            object-position: center center;
+            opacity: 0.30;
+          }
+
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+
+          .landing-page .landing-video-background video {
+            display: none;
+          }
+
+        }
+
         /* Footer */
 
         .landing-page footer {
@@ -590,13 +657,13 @@ export default function Landing() {
 
         <div style={{ maxWidth: 1200, margin: '0 auto', padding: '80px 24px', width: '100%' }}>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 60, alignItems: 'center' }}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 60, alignItems: 'center' }}
 
             className="hero-grid">
 
             {/* Left */}
 
-            <div>
+            <div style={{ maxWidth: 780, position: 'relative', zIndex: 2 }}>
 
               <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginBottom: 24 }}>
 
@@ -681,14 +748,6 @@ export default function Landing() {
                 ))}
 
               </div>
-
-            </div>
-
-            {/* Right – Illustration */}
-
-            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-
-              <HeroVideo />
 
             </div>
 
@@ -2165,214 +2224,6 @@ export default function Landing() {
           .team-grid { grid-template-columns: 1fr !important; }
 
           .footer-grid { grid-template-columns: 1fr !important; }
-
-        }
-
-      `}</style>
-
-    </div>
-
-  )
-
-}
-
-function HeroVideo() {
-
-  const videoARef = useRef<HTMLVideoElement>(null)
-
-  const videoBRef = useRef<HTMLVideoElement>(null)
-
-  const [activeVideo, setActiveVideo] = useState<'A' | 'B'>('A')
-
-  useEffect(() => {
-
-    const videoA = videoARef.current
-
-    const videoB = videoBRef.current
-
-    if (!videoA || !videoB) return
-
-    let switching = false
-
-    const handleTimeUpdate = () => {
-
-      const currentVideo = activeVideo === 'A' ? videoA : videoB
-
-      const nextVideo = activeVideo === 'A' ? videoB : videoA
-
-      if (
-
-        !switching &&
-
-        Number.isFinite(currentVideo.duration) &&
-
-        currentVideo.duration > 0 &&
-
-        currentVideo.currentTime >= currentVideo.duration - 0.45
-
-      ) {
-
-        switching = true
-
-        nextVideo.currentTime = 0
-
-        nextVideo.play().catch(() => {})
-
-        setActiveVideo(activeVideo === 'A' ? 'B' : 'A')
-
-        window.setTimeout(() => {
-
-          currentVideo.pause()
-
-          currentVideo.currentTime = 0
-
-          switching = false
-
-        }, 450)
-
-      }
-
-    }
-
-    const activeVideoElement = activeVideo === 'A' ? videoA : videoB
-
-    activeVideoElement.addEventListener('timeupdate', handleTimeUpdate)
-
-    return () => {
-
-      activeVideoElement.removeEventListener('timeupdate', handleTimeUpdate)
-
-    }
-
-  }, [activeVideo])
-
-  return (
-
-    <div
-
-      className="legal-scale-video"
-
-      style={{
-
-        position: 'relative',
-
-        width: 560,
-
-        height: 460,
-
-        maxWidth: '100%',
-
-        display: 'flex',
-
-        justifyContent: 'center',
-
-        alignItems: 'center',
-
-      }}
-
-    >
-
-      <video
-
-        ref={videoARef}
-
-        src="/hero-scale.mp4"
-
-        muted
-
-        autoPlay
-
-        playsInline
-
-        preload="auto"
-
-        aria-hidden="true"
-
-        style={{
-
-          position: 'absolute',
-
-          inset: 0,
-
-          width: '100%',
-
-          height: '100%',
-
-          objectFit: 'contain',
-
-          opacity: activeVideo === 'A' ? 1 : 0,
-
-          transition: 'opacity 450ms ease-in-out',
-
-          pointerEvents: 'none',
-
-        }}
-
-      />
-
-      <video
-
-        ref={videoBRef}
-
-        src="/hero-scale.mp4"
-
-        muted
-
-        playsInline
-
-        preload="auto"
-
-        aria-hidden="true"
-
-        style={{
-
-          position: 'absolute',
-
-          inset: 0,
-
-          width: '100%',
-
-          height: '100%',
-
-          objectFit: 'contain',
-
-          opacity: activeVideo === 'B' ? 1 : 0,
-
-          transition: 'opacity 450ms ease-in-out',
-
-          pointerEvents: 'none',
-
-        }}
-
-      />
-
-      <style>{`
-
-        .legal-scale-video {
-
-          overflow: visible;
-
-        }
-
-        @media (max-width: 700px) {
-
-          .legal-scale-video {
-
-            width: 100% !important;
-
-            height: 420px !important;
-
-          }
-
-        }
-
-        @media (prefers-reduced-motion: reduce) {
-
-          .legal-scale-video video {
-
-            transition: none !important;
-
-          }
 
         }
 
