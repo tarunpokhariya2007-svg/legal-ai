@@ -338,7 +338,7 @@ export default function Landing() {
           height: 100%;
           object-fit: cover;
           object-position: center center;
-          opacity: 0.38;
+          opacity: 0.48;
           filter: saturate(0.95) contrast(1.08);
         }
 
@@ -346,16 +346,23 @@ export default function Landing() {
           position: absolute;
           inset: 0;
           background:
-            linear-gradient(180deg, rgba(0,0,0,0.58) 0%, rgba(0,0,0,0.42) 45%, rgba(0,0,0,0.72) 100%),
+            linear-gradient(180deg, rgba(0,0,0,0.50) 0%, rgba(0,0,0,0.38) 45%, rgba(0,0,0,0.68) 100%),
             radial-gradient(circle at 50% 35%, rgba(212,175,55,0.08), transparent 55%);
         }
 
-        .landing-page > * {
+        .landing-page > *:not(.landing-video-background) {
 
           position: relative;
 
           z-index: 1;
 
+        }
+
+        /* Keep the cinematic video permanently behind the page content. */
+        .landing-page > .landing-video-background {
+          position: fixed !important;
+          inset: 0 !important;
+          z-index: 0 !important;
         }
 
         /* Remove old hero/mesh blue backgrounds */
