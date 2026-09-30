@@ -20,7 +20,7 @@ import {
 
 const stats = [
 
-  { value: '5+', label: 'AI Agents', icon: Bot },
+  { value: '', label: 'Multi-Agent Legal AI ', icon: Bot },
 
   { value: '24/7', label: 'AI Assistance', icon: Clock },
 
@@ -80,7 +80,7 @@ const features = [
 
     icon: MessageSquare, title: 'AI Legal Assistant',
 
-    desc: 'ChatGPT-style interface trained on Indian law. Ask anything about your rights and get instant, accurate guidance.',
+    desc: 'Understand Indian law with AI-powered guidance, legal research, and contextual answers.',
 
     color: '#D4AF37', bg: 'rgba(212,175,55,0.08)',
 
@@ -90,7 +90,7 @@ const features = [
 
     icon: Users, title: 'Advocate Marketplace',
 
-    desc: 'Connect with 1,840+ verified advocates filtered by specialization, city, language, and consultation fee.',
+    desc: 'Discover advocates by practice area, location, court, language, and consultation preferences.',
 
     color: '#8A6A24', bg: 'rgba(162,123,44,0.08)',
 
