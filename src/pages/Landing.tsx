@@ -46,7 +46,7 @@ const steps = [
 
     step: '02', title: 'AI Analyzes Your Case',
 
-    desc: 'Our Agentic AI cross-references thousands of statutes, IPC sections, and precedents instantly.',
+    desc: 'Our legal AI retrieves relevant provisions from Indian legal sources and analyzes them against your case.',
 
     color: '#8A6A24',
 
