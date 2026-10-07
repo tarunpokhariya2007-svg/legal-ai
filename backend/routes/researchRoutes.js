@@ -5,6 +5,7 @@ const authMiddleware = require("../middleware/authMiddleware");
 const { extractDocument } = require("../services/researchDocumentService");
 const { researchChatAgent } = require("../agents/researchChatAgent");
 const { tinyFishSearch } = require("../services/tinyfishService");
+
 const {
   createResearchConversation,
   getResearchConversations,
@@ -19,6 +20,13 @@ const {
 } = require("../database/researchModel");
 
 const router = express.Router();
+
+/*
+|--------------------------------------------------------------------------
+| TinyFish Test
+|--------------------------------------------------------------------------
+*/
+
 router.get("/tinyfish-test", authMiddleware, async (req, res) => {
   try {
     const query =
@@ -46,7 +54,7 @@ router.get("/tinyfish-test", authMiddleware, async (req, res) => {
 
 /*
 |--------------------------------------------------------------------------
-| CONSTANTS
+| Constants
 |--------------------------------------------------------------------------
 */
 
@@ -54,9 +62,7 @@ const MAX_FILE_SIZE = 25 * 1024 * 1024;
 
 const ALLOWED_MIME_TYPES = new Set([
   "application/pdf",
-
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-
   "image/png",
   "image/jpeg",
   "image/jpg",
@@ -76,13 +82,12 @@ const ALLOWED_EXTENSIONS = new Set([
 
 /*
 |--------------------------------------------------------------------------
-| HELPERS
+| Helpers
 |--------------------------------------------------------------------------
 */
 
 function isValidConversationId(value) {
   const id = Number(value);
-
   return Number.isInteger(id) && id > 0;
 }
 
@@ -110,6 +115,7 @@ function isAllowedFile(file) {
   }
 
   const mimeAllowed = ALLOWED_MIME_TYPES.has(file.mimetype);
+
   const extensionAllowed = ALLOWED_EXTENSIONS.has(
     getFileExtension(file.originalname)
   );
@@ -119,12 +125,8 @@ function isAllowedFile(file) {
 
 /*
 |--------------------------------------------------------------------------
-| MULTER CONFIGURATION
+| Multer Configuration
 |--------------------------------------------------------------------------
-|
-| Files are kept in memory because the research service immediately
-| extracts/analyzes their contents.
-|
 */
 
 const upload = multer({
@@ -152,9 +154,6 @@ const upload = multer({
 |--------------------------------------------------------------------------
 | GET ALL RESEARCH CONVERSATIONS
 |--------------------------------------------------------------------------
-|
-| Used by the Advocate AI Research sidebar/history.
-|
 */
 
 router.get("/conversations", authMiddleware, async (req, res) => {
@@ -186,9 +185,6 @@ router.get("/conversations", authMiddleware, async (req, res) => {
 |--------------------------------------------------------------------------
 | CREATE NEW RESEARCH CONVERSATION
 |--------------------------------------------------------------------------
-|
-| Every "New Research" creates an independent research session.
-|
 */
 
 router.post("/conversations", authMiddleware, async (req, res) => {
@@ -227,12 +223,6 @@ router.post("/conversations", authMiddleware, async (req, res) => {
 |--------------------------------------------------------------------------
 | GET ONE RESEARCH CONVERSATION
 |--------------------------------------------------------------------------
-|
-| Returns:
-| - conversation information
-| - complete message history
-| - uploaded research documents
-|
 */
 
 router.get(
@@ -250,10 +240,11 @@ router.get(
         });
       }
 
-      const conversation = await getResearchConversation(
-        conversationId,
-        userId
-      );
+      const conversation =
+        await getResearchConversation(
+          conversationId,
+          userId
+        );
 
       if (!conversation) {
         return res.status(404).json({
@@ -262,13 +253,15 @@ router.get(
         });
       }
 
-      const [messages, documents] = await Promise.all([
-        getResearchMessages(conversationId),
-        getResearchDocuments(
-          conversationId,
-          userId
-        ),
-      ]);
+      const [messages, documents] =
+        await Promise.all([
+          getResearchMessages(conversationId),
+
+          getResearchDocuments(
+            conversationId,
+            userId
+          ),
+        ]);
 
       return res.json({
         success: true,
@@ -313,22 +306,6 @@ router.get(
 |--------------------------------------------------------------------------
 | UPLOAD + ANALYZE RESEARCH DOCUMENT
 |--------------------------------------------------------------------------
-|
-| Supported:
-| - PDF
-| - DOCX
-| - PNG
-| - JPG/JPEG
-| - WEBP
-| - GIF
-|
-| The document is:
-| 1. validated
-| 2. extracted
-| 3. stored against the research conversation
-| 4. passed to the research AI
-| 5. AI's analysis is saved in the chat
-|
 */
 
 router.post(
@@ -357,7 +334,7 @@ router.post(
 
       /*
       |--------------------------------------------------------------------------
-      | VERIFY CONVERSATION OWNERSHIP
+      | Verify Conversation Ownership
       |--------------------------------------------------------------------------
       */
 
@@ -376,11 +353,14 @@ router.post(
 
       /*
       |--------------------------------------------------------------------------
-      | EXTRA DOCUMENT VALIDATION
+      | Validate File
       |--------------------------------------------------------------------------
       */
 
-      if (!req.file.buffer || !req.file.buffer.length) {
+      if (
+        !req.file.buffer ||
+        !req.file.buffer.length
+      ) {
         return res.status(400).json({
           success: false,
           message: "The uploaded document is empty.",
@@ -397,7 +377,7 @@ router.post(
 
       /*
       |--------------------------------------------------------------------------
-      | EXTRACT DOCUMENT CONTENT
+      | Extract Document
       |--------------------------------------------------------------------------
       */
 
@@ -437,21 +417,22 @@ router.post(
 
       /*
       |--------------------------------------------------------------------------
-      | SAVE DOCUMENT
+      | Save Document
       |--------------------------------------------------------------------------
       */
 
-      const documentId = await addResearchDocument(
-        conversationId,
-        userId,
-        req.file.originalname,
-        req.file.mimetype,
-        extractedText
-      );
+      const documentId =
+        await addResearchDocument(
+          conversationId,
+          userId,
+          req.file.originalname,
+          req.file.mimetype,
+          extractedText
+        );
 
       /*
       |--------------------------------------------------------------------------
-      | UPDATE CHAT TITLE
+      | Update Chat Title
       |--------------------------------------------------------------------------
       */
 
@@ -471,7 +452,7 @@ router.post(
 
       /*
       |--------------------------------------------------------------------------
-      | LOAD CONTEXT FOR AI
+      | Load AI Context
       |--------------------------------------------------------------------------
       */
 
@@ -490,15 +471,8 @@ router.post(
 
       /*
       |--------------------------------------------------------------------------
-      | INITIAL DOCUMENT ANALYSIS
+      | Document Analysis
       |--------------------------------------------------------------------------
-      |
-      | Important:
-      | The AI is instructed not to invent visual information.
-      | If the extracted content cannot verify something such as a
-      | signature, stamp, seal, or page-level visual element, it must
-      | explicitly say that it cannot verify it.
-      |
       */
 
       const analysisPrompt = `
@@ -536,21 +510,58 @@ STRICT ACCURACY RULES:
 - Distinguish clearly between information found in the document and information that cannot be established.
 - Keep the answer useful for an advocate.
 - Stay strictly within legal, case, and document research.
+
+DOCUMENT CONTENT:
+
+${extractedText}
 `;
 
       let documentMessage = "";
+      let documentWebSources = [];
 
       try {
-        documentMessage =
+        const documentResearchResult =
           await researchChatAgent({
             message: analysisPrompt,
+
             history: Array.isArray(history)
               ? history
               : [],
+
             documents: Array.isArray(documents)
               ? documents
               : [],
+
+            researchMode: "standard",
           });
+
+        /*
+        |--------------------------------------------------------------------------
+        | Backward Compatibility
+        |--------------------------------------------------------------------------
+        |
+        | Older researchChatAgent versions may return a string.
+        | Newer Step 8 versions return:
+        |
+        | {
+        |   answer,
+        |   webSources
+        | }
+        |
+        */
+
+        documentMessage =
+          typeof documentResearchResult === "string"
+            ? documentResearchResult
+            : documentResearchResult?.answer || "";
+
+        documentWebSources =
+          typeof documentResearchResult === "object" &&
+          Array.isArray(
+            documentResearchResult?.webSources
+          )
+            ? documentResearchResult.webSources
+            : [];
       } catch (aiError) {
         console.error(
           "RESEARCH DOCUMENT AI ERROR:",
@@ -572,7 +583,7 @@ STRICT ACCURACY RULES:
 
       /*
       |--------------------------------------------------------------------------
-      | SAVE AI ANALYSIS
+      | Save AI Analysis
       |--------------------------------------------------------------------------
       */
 
@@ -584,7 +595,7 @@ STRICT ACCURACY RULES:
 
       /*
       |--------------------------------------------------------------------------
-      | RESPONSE
+      | Response
       |--------------------------------------------------------------------------
       */
 
@@ -598,6 +609,8 @@ STRICT ACCURACY RULES:
         },
 
         message: finalDocumentMessage,
+
+        webSources: documentWebSources,
       });
     } catch (error) {
       console.error(
@@ -620,9 +633,15 @@ STRICT ACCURACY RULES:
 | SEND RESEARCH CHAT MESSAGE
 |--------------------------------------------------------------------------
 |
-| Supports normal legal questions as well as follow-up questions
-| about previously uploaded documents.
+| Supports:
 |
+| standard:
+|   Existing Legal RAG / normal research
+|
+| deep:
+|   Forces TinyFish live web research
+|
+|--------------------------------------------------------------------------
 */
 
 router.post(
@@ -630,29 +649,28 @@ router.post(
   authMiddleware,
   async (req, res) => {
     try {
-      const conversationId = Number(req.params.id);
+      const conversationId = Number(
+        req.params.id
+      );
+
       const userId = req.user.id;
 
       const message = cleanString(
         req.body?.message,
         20000
       );
-/*
-|--------------------------------------------------------------------------
-| RESEARCH MODE
-|--------------------------------------------------------------------------
-|
-| standard = normal legal research
-| deep     = force TinyFish live web research
-|
-| Never trust arbitrary values from the frontend.
-|--------------------------------------------------------------------------
-*/
 
-const researchMode =
-  req.body?.researchMode === "deep"
-    ? "deep"
-    : "standard";
+      /*
+      |--------------------------------------------------------------------------
+      | Research Mode
+      |--------------------------------------------------------------------------
+      */
+
+      const researchMode =
+        req.body?.researchMode === "deep"
+          ? "deep"
+          : "standard";
+
       if (!isValidConversationId(conversationId)) {
         return res.status(400).json({
           success: false,
@@ -669,7 +687,7 @@ const researchMode =
 
       /*
       |--------------------------------------------------------------------------
-      | VERIFY CONVERSATION
+      | Verify Conversation
       |--------------------------------------------------------------------------
       */
 
@@ -688,11 +706,8 @@ const researchMode =
 
       /*
       |--------------------------------------------------------------------------
-      | SAVE USER MESSAGE FIRST
+      | Save User Message
       |--------------------------------------------------------------------------
-      |
-      | This makes the database history authoritative.
-      |
       */
 
       await createResearchMessage(
@@ -703,7 +718,7 @@ const researchMode =
 
       /*
       |--------------------------------------------------------------------------
-      | LOAD UPDATED CONTEXT
+      | Load Updated Context
       |--------------------------------------------------------------------------
       */
 
@@ -722,26 +737,69 @@ const researchMode =
 
       /*
       |--------------------------------------------------------------------------
-      | ASK RESEARCH AI
+      | Ask Research AI
       |--------------------------------------------------------------------------
       */
 
       let answer = "";
+      let webSources = [];
 
       try {
-       answer = await researchChatAgent({
-  message,
+        const researchResult =
+          await researchChatAgent({
+            message,
 
-  history: Array.isArray(history)
-    ? history
-    : [],
+            history: Array.isArray(history)
+              ? history
+              : [],
 
-  documents: Array.isArray(documents)
-    ? documents
-    : [],
+            documents: Array.isArray(documents)
+              ? documents
+              : [],
 
-  researchMode,
-});
+            researchMode,
+          });
+
+        /*
+        |--------------------------------------------------------------------------
+        | Step 8 Result Handling
+        |--------------------------------------------------------------------------
+        |
+        | New agent:
+        |
+        | {
+        |   answer: "...",
+        |   webSources: [...]
+        | }
+        |
+        | Old agent:
+        |
+        | "answer text"
+        |
+        */
+
+        if (
+          typeof researchResult === "string"
+        ) {
+          answer = researchResult;
+          webSources = [];
+        } else if (
+          researchResult &&
+          typeof researchResult === "object"
+        ) {
+          answer =
+            typeof researchResult.answer ===
+            "string"
+              ? researchResult.answer
+              : "";
+
+          webSources =
+            Array.isArray(
+              researchResult.webSources
+            )
+              ? researchResult.webSources
+              : [];
+        }
       } catch (aiError) {
         console.error(
           "RESEARCH CHAT AI ERROR:",
@@ -763,7 +821,61 @@ const researchMode =
 
       /*
       |--------------------------------------------------------------------------
-      | SAVE AI RESPONSE
+      | Normalize Web Sources
+      |--------------------------------------------------------------------------
+      |
+      | Only expose the fields required by the frontend.
+      |
+      */
+
+      const normalizedWebSources =
+        Array.isArray(webSources)
+          ? webSources
+              .filter(
+                (source) =>
+                  source &&
+                  typeof source === "object"
+              )
+              .map((source, index) => ({
+                title:
+                  typeof source.title ===
+                  "string"
+                    ? source.title
+                    : "Untitled source",
+
+                url:
+                  typeof source.url ===
+                  "string"
+                    ? source.url
+                    : "",
+
+                site_name:
+                  typeof source.site_name ===
+                  "string"
+                    ? source.site_name
+                    : "",
+
+                snippet:
+                  typeof source.snippet ===
+                  "string"
+                    ? source.snippet
+                    : "",
+
+                position:
+                  Number.isInteger(
+                    source.position
+                  )
+                    ? source.position
+                    : index + 1,
+              }))
+              .filter(
+                (source) => source.url
+              )
+          : [];
+
+      /*
+      |--------------------------------------------------------------------------
+      | Save AI Response
       |--------------------------------------------------------------------------
       */
 
@@ -775,7 +887,7 @@ const researchMode =
 
       /*
       |--------------------------------------------------------------------------
-      | UPDATE CHAT TITLE
+      | Update Chat Title
       |--------------------------------------------------------------------------
       */
 
@@ -803,13 +915,22 @@ const researchMode =
 
       /*
       |--------------------------------------------------------------------------
-      | RESPONSE
+      | Response
       |--------------------------------------------------------------------------
       */
 
       return res.json({
         success: true,
         message: finalAnswer,
+
+        /*
+        |--------------------------------------------------------------------------
+        | Step 8:
+        | Live TinyFish web sources
+        |--------------------------------------------------------------------------
+        */
+
+        webSources: normalizedWebSources,
       });
     } catch (error) {
       console.error(
@@ -887,7 +1008,7 @@ router.delete(
 
 /*
 |--------------------------------------------------------------------------
-| MULTER / UPLOAD ERROR HANDLER
+| Multer / Upload Error Handler
 |--------------------------------------------------------------------------
 |
 | This must be AFTER the routes using multer.
@@ -897,7 +1018,10 @@ router.delete(
 router.use(
   (error, req, res, next) => {
     if (error instanceof multer.MulterError) {
-      if (error.code === "LIMIT_FILE_SIZE") {
+      if (
+        error.code ===
+        "LIMIT_FILE_SIZE"
+      ) {
         return res.status(413).json({
           success: false,
           message:
@@ -905,7 +1029,10 @@ router.use(
         });
       }
 
-      if (error.code === "LIMIT_FILE_COUNT") {
+      if (
+        error.code ===
+        "LIMIT_FILE_COUNT"
+      ) {
         return res.status(400).json({
           success: false,
           message:
@@ -936,7 +1063,7 @@ router.use(
 
 /*
 |--------------------------------------------------------------------------
-| EXPORT
+| Export
 |--------------------------------------------------------------------------
 */
 
