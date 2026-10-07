@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+
 import {
   BookOpen,
   Upload,
@@ -14,6 +15,7 @@ import {
   MessageSquare,
   ShieldCheck,
 } from 'lucide-react'
+
 import AnimatedMarkdown from '../components/AnimatedMarkdown'
 
 interface ResearchMessage {
@@ -36,6 +38,10 @@ interface ResearchDocument {
   file_type: string
   created_at?: string
 }
+
+type ResearchMode =
+  | 'standard'
+  | 'deep'
 
 const API_BASE_URL =
   import.meta.env.VITE_API_URL || 'http://localhost:5001'
@@ -89,7 +95,13 @@ export default function AIResearch() {
 
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
-  const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null)
+
+  const [researchMode, setResearchMode] =
+    useState<ResearchMode>('standard')
+
+  const [streamingMessageId, setStreamingMessageId] =
+    useState<string | null>(null)
+
   const [uploading, setUploading] = useState(false)
 
   const [chatHistory, setChatHistory] =
@@ -290,18 +302,35 @@ export default function AIResearch() {
   useEffect(() => {
     if (!streamingMessageId) return
 
-    const message = messages.find(message => message.id === streamingMessageId)
+    const message = messages.find(
+      message =>
+        message.id === streamingMessageId,
+    )
+
     if (!message) {
       setStreamingMessageId(null)
       return
     }
 
-    const timeout = window.setTimeout(() => {
-      setStreamingMessageId(null)
-    }, Math.max(450, Math.min(3500, message.content.length * 2.5)))
+    const timeout = window.setTimeout(
+      () => {
+        setStreamingMessageId(null)
+      },
+      Math.max(
+        450,
+        Math.min(
+          3500,
+          message.content.length * 2.5,
+        ),
+      ),
+    )
 
-    return () => window.clearTimeout(timeout)
-  }, [messages, streamingMessageId])
+    return () =>
+      window.clearTimeout(timeout)
+  }, [
+    messages,
+    streamingMessageId,
+  ])
 
   /*
    * Make sure a conversation exists before
@@ -373,6 +402,7 @@ export default function AIResearch() {
           },
           body: JSON.stringify({
             message: question,
+            researchMode,
           }),
         },
       )
@@ -393,7 +423,8 @@ export default function AIResearch() {
       /*
        * Display the actual AI answer.
        */
-      const aiMessageId = `ai-${Date.now()}`
+      const aiMessageId =
+        `ai-${Date.now()}`
 
       setMessages(prev => [
         ...prev,
@@ -404,7 +435,9 @@ export default function AIResearch() {
         },
       ])
 
-      setStreamingMessageId(aiMessageId)
+      setStreamingMessageId(
+        aiMessageId,
+      )
 
       /*
        * Refresh sidebar history so the
@@ -516,7 +549,8 @@ export default function AIResearch() {
        * Backend returns the actual
        * document-analysis response.
        */
-      const analysisMessageId = `analysis-${Date.now()}`
+      const analysisMessageId =
+        `analysis-${Date.now()}`
 
       setMessages(prev => [
         ...prev,
@@ -527,7 +561,9 @@ export default function AIResearch() {
         },
       ])
 
-      setStreamingMessageId(analysisMessageId)
+      setStreamingMessageId(
+        analysisMessageId,
+      )
 
       await loadChats()
     } catch (error) {
@@ -624,6 +660,7 @@ export default function AIResearch() {
       }}
       className="research-layout"
     >
+
       {/* =====================================================
           RESEARCH CHAT HISTORY
           ===================================================== */}
@@ -639,6 +676,7 @@ export default function AIResearch() {
           minHeight: 0,
         }}
       >
+
         <button
           onClick={startNewChat}
           className="btn-primary"
@@ -806,6 +844,7 @@ export default function AIResearch() {
           overflowY: 'auto',
         }}
       >
+
         <div
           style={{
             fontWeight: 800,
@@ -1181,8 +1220,7 @@ export default function AIResearch() {
           </div>
         </div>
       </aside>
-
-      {/* =====================================================
+            {/* =====================================================
           CHAT
           ===================================================== */}
 
@@ -1201,10 +1239,12 @@ export default function AIResearch() {
             'hidden',
         }}
       >
+
         {/* HEADER */}
 
         <header
           style={{
+            position: 'relative',
             padding:
               '14px 20px',
             borderBottom:
@@ -1220,6 +1260,7 @@ export default function AIResearch() {
               'blur(20px)',
           }}
         >
+
           <div
             style={{
               width: 34,
@@ -1270,34 +1311,172 @@ export default function AIResearch() {
             </div>
           </div>
 
-          {uploading && (
-            <div
+          {/* ===================================================
+              RESEARCH MODE
+              =================================================== */}
+
+          <div
+            style={{
+              marginLeft: 'auto',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 7,
+            }}
+          >
+            <span
               style={{
-                marginLeft:
-                  'auto',
-                display:
-                  'flex',
-                alignItems:
-                  'center',
-                gap: 6,
-                fontSize:
-                  '0.72rem',
-                color:
-                  'var(--text-muted)',
+                fontSize: '0.68rem',
+                color: 'var(--text-muted)',
+                fontWeight: 700,
               }}
             >
+              Research mode
+            </span>
+
+            <button
+              type="button"
+              onClick={() =>
+                setResearchMode(
+                  researchMode === 'deep'
+                    ? 'standard'
+                    : 'deep',
+                )
+              }
+              disabled={
+                loading ||
+                uploading
+              }
+              title={
+                researchMode === 'deep'
+                  ? 'Deep Legal Research is enabled'
+                  : 'Enable Deep Legal Research'
+              }
+              style={{
+                border:
+                  researchMode === 'deep'
+                    ? '1px solid var(--blue)'
+                    : '1px solid var(--border)',
+                background:
+                  researchMode === 'deep'
+                    ? 'color-mix(in srgb, var(--blue) 12%, transparent)'
+                    : 'var(--bg-secondary)',
+                color:
+                  researchMode === 'deep'
+                    ? 'var(--blue)'
+                    : 'var(--text-muted)',
+                borderRadius: 8,
+                padding: '7px 10px',
+                cursor:
+                  loading ||
+                  uploading
+                    ? 'not-allowed'
+                    : 'pointer',
+                fontSize: '0.68rem',
+                fontWeight: 800,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                opacity:
+                  loading ||
+                  uploading
+                    ? 0.6
+                    : 1,
+              }}
+            >
+              <span
+                style={{
+                  width: 7,
+                  height: 7,
+                  borderRadius:
+                    '50%',
+                  background:
+                    researchMode === 'deep'
+                      ? 'var(--blue)'
+                      : 'var(--text-muted)',
+                }}
+              />
+
+              {researchMode === 'deep'
+                ? 'Deep Legal Research'
+                : 'Standard Research'}
+            </button>
+
+            {researchMode === 'deep' && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '100%',
+                  right: 20,
+                  marginTop: 6,
+                  padding: '6px 9px',
+                  borderRadius: 7,
+                  background: 'var(--bg-secondary)',
+                  border: '1px solid var(--border)',
+                  color: 'var(--text-muted)',
+                  fontSize: '0.64rem',
+                  zIndex: 20,
+                  boxShadow:
+                    '0 8px 24px rgba(0,0,0,0.12)',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                Uses Legal RAG + TinyFish live web research
+              </div>
+            )}
+          </div>
+
+          {uploading && (
+
+            <div
+
+              style={{
+
+                marginLeft:
+
+                  10,
+
+                display:
+
+                  'flex',
+
+                alignItems:
+
+                  'center',
+
+                gap: 6,
+
+                fontSize:
+
+                  '0.72rem',
+
+                color:
+
+                  'var(--text-muted)',
+
+              }}
+
+            >
+
               <Loader2
+
                 size={13}
+
                 className="spin"
+
               />
 
               Reading document...
+
             </div>
+
           )}
+
         </header>
 
         {/* ===================================================
+
             MESSAGES
+
             =================================================== */}
 
         <div
@@ -1313,6 +1492,7 @@ export default function AIResearch() {
             gap: 18,
           }}
         >
+
           {messages.map(
             msg => (
               <div
@@ -1330,6 +1510,7 @@ export default function AIResearch() {
                       : 'row',
                 }}
               >
+
                 {/* AVATAR */}
 
                 <div
@@ -1391,8 +1572,14 @@ export default function AIResearch() {
                   {msg.role ===
                   'ai' ? (
                     <AnimatedMarkdown
-                      content={String(msg.content ?? '')}
-                      animate={msg.id === streamingMessageId}
+                      content={String(
+                        msg.content ??
+                          '',
+                      )}
+                      animate={
+                        msg.id ===
+                        streamingMessageId
+                      }
                     />
                   ) : (
                     <div
@@ -1407,6 +1594,7 @@ export default function AIResearch() {
                     </div>
                   )}
                 </div>
+
               </div>
             ),
           )}
@@ -1424,6 +1612,7 @@ export default function AIResearch() {
                 gap: 10,
               }}
             >
+
               <div
                 style={{
                   width: 30,
@@ -1459,6 +1648,7 @@ export default function AIResearch() {
                   gap: 8,
                 }}
               >
+
                 <Loader2
                   size={14}
                   className="spin"
@@ -1474,8 +1664,11 @@ export default function AIResearch() {
                 >
                   {uploading
                     ? 'Extracting and understanding the document...'
-                    : 'Researching the case...'}
+                    : researchMode === 'deep'
+                      ? 'Running deep legal research with live web sources...'
+                      : 'Researching the case...'}
                 </span>
+
               </div>
             </div>
           )}
@@ -1485,9 +1678,9 @@ export default function AIResearch() {
               bottomRef
             }
           />
-        </div>
 
-        {/* ===================================================
+        </div>
+                {/* ===================================================
             INPUT
             =================================================== */}
 
@@ -1503,6 +1696,7 @@ export default function AIResearch() {
               'blur(20px)',
           }}
         >
+
           <div
             style={{
               display:
@@ -1519,6 +1713,7 @@ export default function AIResearch() {
                 '8px 8px 8px 14px',
             }}
           >
+
             <textarea
               value={input}
               onChange={e =>
@@ -1606,8 +1801,10 @@ export default function AIResearch() {
                 size={15}
               />
             </button>
+
           </div>
         </div>
+
       </main>
 
       {/* =====================================================
@@ -1729,6 +1926,7 @@ export default function AIResearch() {
           }
         }
       `}</style>
+
     </div>
   )
-}
+} 

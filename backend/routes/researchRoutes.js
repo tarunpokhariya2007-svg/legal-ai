@@ -637,7 +637,22 @@ router.post(
         req.body?.message,
         20000
       );
+/*
+|--------------------------------------------------------------------------
+| RESEARCH MODE
+|--------------------------------------------------------------------------
+|
+| standard = normal legal research
+| deep     = force TinyFish live web research
+|
+| Never trust arbitrary values from the frontend.
+|--------------------------------------------------------------------------
+*/
 
+const researchMode =
+  req.body?.researchMode === "deep"
+    ? "deep"
+    : "standard";
       if (!isValidConversationId(conversationId)) {
         return res.status(400).json({
           success: false,
@@ -714,15 +729,19 @@ router.post(
       let answer = "";
 
       try {
-        answer = await researchChatAgent({
-          message,
-          history: Array.isArray(history)
-            ? history
-            : [],
-          documents: Array.isArray(documents)
-            ? documents
-            : [],
-        });
+       answer = await researchChatAgent({
+  message,
+
+  history: Array.isArray(history)
+    ? history
+    : [],
+
+  documents: Array.isArray(documents)
+    ? documents
+    : [],
+
+  researchMode,
+});
       } catch (aiError) {
         console.error(
           "RESEARCH CHAT AI ERROR:",
