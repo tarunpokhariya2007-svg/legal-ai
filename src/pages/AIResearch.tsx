@@ -3116,216 +3116,190 @@ export default function AIResearch() {
 
 
 
-                {/* MESSAGE */}
-
-
-
+                {/* MESSAGE + LIVE WEB SOURCES */}
                 <div
-
-                  className={
-
-                    msg.role ===
-
-                    'ai'
-
-                      ? 'chat-bubble-ai'
-
-                      : 'chat-bubble-user'
-
-                  }
-
                   style={{
-
-                    maxWidth:
-
-                      '82%',
-
-                    padding:
-
-                      '12px 16px',
-
-                    fontSize:
-
-                      '0.85rem',
-
-                    lineHeight:
-
-                      1.7,
-
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems:
+                      msg.role === 'user'
+                        ? 'flex-end'
+                        : 'flex-start',
+                    width: 'min(82%, 760px)',
+                    minWidth: 0,
                   }}
-
                 >
+                  <div
+                    className={
+                      msg.role === 'ai'
+                        ? 'chat-bubble-ai'
+                        : 'chat-bubble-user'
+                    }
+                    style={{
+                      width: '100%',
+                      maxWidth: '100%',
+                      padding: '12px 16px',
+                      fontSize: '0.85rem',
+                      lineHeight: 1.7,
+                      boxSizing: 'border-box',
+                    }}
+                  >
+                    {msg.role === 'ai' ? (
+                      <AnimatedMarkdown
+                        content={String(
+                          msg.content ??
+                            '',
+                        )}
+                        animate={
+                          msg.id ===
+                          streamingMessageId
+                        }
+                      />
+                    ) : (
+                      <div
+                        style={{
+                          whiteSpace: 'pre-line',
+                        }}
+                      >
+                        {msg.content}
+                      </div>
+                    )}
+                  </div>
 
-                  {msg.role ===
+                  {msg.role === 'ai' &&
+                    Array.isArray(msg.webSources) &&
+                    msg.webSources.length > 0 && (
+                      <div
+                        style={{
+                          marginTop: 10,
+                          width: '100%',
+                          boxSizing: 'border-box',
+                        }}
+                      >
+                        <div
+                          style={{
+                            fontSize: '0.66rem',
+                            fontWeight: 800,
+                            letterSpacing: '0.06em',
+                            color: 'var(--text-muted)',
+                            marginBottom: 7,
+                            textTransform: 'uppercase',
+                          }}
+                        >
+                          Live Web Sources
+                        </div>
 
-                  'ai' ? (
+                        <div
+                          style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: 7,
+                          }}
+                        >
+                          {msg.webSources.map(
+                            (source, index) => (
+                              <a
+                                key={`${source.url}-${index}`}
+                                href={source.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{
+                                  display: 'block',
+                                  textDecoration: 'none',
+                                  color: 'inherit',
+                                  padding: '9px 11px',
+                                  border:
+                                    '1px solid var(--border)',
+                                  borderRadius: 8,
+                                  background:
+                                    'var(--bg-secondary)',
+                                  boxSizing: 'border-box',
+                                  width: '100%',
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    display: 'flex',
+                                    alignItems:
+                                      'center',
+                                    justifyContent:
+                                      'space-between',
+                                    gap: 10,
+                                  }}
+                                >
+                                  <div
+                                    style={{
+                                      fontSize: '0.73rem',
+                                      fontWeight: 750,
+                                      color:
+                                        'var(--text)',
+                                      overflow: 'hidden',
+                                      textOverflow:
+                                        'ellipsis',
+                                      whiteSpace:
+                                        'nowrap',
+                                      minWidth: 0,
+                                    }}
+                                  >
+                                    {source.title ||
+                                      'Untitled source'}
+                                  </div>
 
-                    <AnimatedMarkdown
+                                  <span
+                                    style={{
+                                      flexShrink: 0,
+                                      fontSize: '0.62rem',
+                                      color:
+                                        'var(--blue)',
+                                      fontWeight: 700,
+                                    }}
+                                  >
+                                    Open ↗
+                                  </span>
+                                </div>
 
-                      content={String(
+                                {source.site_name && (
+                                  <div
+                                    style={{
+                                      marginTop: 3,
+                                      fontSize: '0.62rem',
+                                      color:
+                                        'var(--blue)',
+                                    }}
+                                  >
+                                    {source.site_name}
+                                  </div>
+                                )}
 
-                        msg.content ??
-
-                          '',
-
-                      )}
-
-                      animate={
-
-                        msg.id ===
-
-                        streamingMessageId
-
-                      }
-
-                    />
-
-                  ) : (
-
-                    <div
-
-                      style={{
-
-                        whiteSpace:
-
-                          'pre-line',
-
-                      }}
-
-                    >
-
-                      {
-
-                        msg.content
-
-                      }
-
-                    </div>
-
-                  )}
-
+                                {source.snippet && (
+                                  <div
+                                    style={{
+                                      marginTop: 5,
+                                      fontSize: '0.65rem',
+                                      lineHeight: 1.45,
+                                      color:
+                                        'var(--text-muted)',
+                                      display:
+                                        '-webkit-box',
+                                      WebkitLineClamp: 2,
+                                      WebkitBoxOrient:
+                                        'vertical',
+                                      overflow: 'hidden',
+                                    }}
+                                  >
+                                    {source.snippet}
+                                  </div>
+                                )}
+                              </a>
+                            ),
+                          )}
+                        </div>
+                      </div>
+                    )}
                 </div>
-
-                {msg.role === 'ai' &&
-                  Array.isArray(msg.webSources) &&
-                  msg.webSources.length > 0 && (
-                    <div
-                      style={{
-                        marginTop: 10,
-                        width: 'min(82%, 760px)',
-                        marginLeft: 40,
-                      }}
-                    >
-                      <div
-                        style={{
-                          fontSize: '0.66rem',
-                          fontWeight: 800,
-                          letterSpacing: '0.06em',
-                          color: 'var(--text-muted)',
-                          marginBottom: 7,
-                          textTransform: 'uppercase',
-                        }}
-                      >
-                        Live Web Sources
-                      </div>
-
-                      <div
-                        style={{
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: 7,
-                        }}
-                      >
-                        {msg.webSources.map((source, index) => (
-                          <a
-                            key={`${source.url}-${index}`}
-                            href={source.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            style={{
-                              display: 'block',
-                              textDecoration: 'none',
-                              color: 'inherit',
-                              padding: '9px 11px',
-                              border: '1px solid var(--border)',
-                              borderRadius: 8,
-                              background: 'var(--bg-secondary)',
-                            }}
-                          >
-                            <div
-                              style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'space-between',
-                                gap: 10,
-                              }}
-                            >
-                              <div
-                                style={{
-                                  fontSize: '0.73rem',
-                                  fontWeight: 750,
-                                  color: 'var(--text)',
-                                  overflow: 'hidden',
-                                  textOverflow: 'ellipsis',
-                                  whiteSpace: 'nowrap',
-                                }}
-                              >
-                                {source.title || 'Untitled source'}
-                              </div>
-
-                              <span
-                                style={{
-                                  flexShrink: 0,
-                                  fontSize: '0.62rem',
-                                  color: 'var(--blue)',
-                                  fontWeight: 700,
-                                }}
-                              >
-                                Open ↗
-                              </span>
-                            </div>
-
-                            {source.site_name && (
-                              <div
-                                style={{
-                                  marginTop: 3,
-                                  fontSize: '0.62rem',
-                                  color: 'var(--blue)',
-                                }}
-                              >
-                                {source.site_name}
-                              </div>
-                            )}
-
-                            {source.snippet && (
-                              <div
-                                style={{
-                                  marginTop: 5,
-                                  fontSize: '0.65rem',
-                                  lineHeight: 1.45,
-                                  color: 'var(--text-muted)',
-                                  display: '-webkit-box',
-                                  WebkitLineClamp: 2,
-                                  WebkitBoxOrient: 'vertical',
-                                  overflow: 'hidden',
-                                }}
-                              >
-                                {source.snippet}
-                              </div>
-                            )}
-                          </a>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
               </div>
-            ),
-
-
-
+            )
           )}
-
 
 
           {/* =================================================
