@@ -4,7 +4,7 @@ const multer = require("multer");
 const authMiddleware = require("../middleware/authMiddleware");
 const { extractDocument } = require("../services/researchDocumentService");
 const { researchChatAgent } = require("../agents/researchChatAgent");
-
+const { tinyFishSearch } = require("../services/tinyfishService");
 const {
   createResearchConversation,
   getResearchConversations,
@@ -19,6 +19,30 @@ const {
 } = require("../database/researchModel");
 
 const router = express.Router();
+router.get("/tinyfish-test", authMiddleware, async (req, res) => {
+  try {
+    const query =
+      cleanString(req.query.q, 300) ||
+      "Supreme Court of India latest judgments";
+
+    const results = await tinyFishSearch(query);
+
+    return res.json({
+      success: true,
+      provider: "tinyfish",
+      query,
+      results,
+    });
+  } catch (error) {
+    console.error("TinyFish test failed:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "TinyFish test failed",
+      error: error.message,
+    });
+  }
+});
 
 /*
 |--------------------------------------------------------------------------

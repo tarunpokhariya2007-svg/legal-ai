@@ -7,29 +7,29 @@ if (!TINYFISH_API_KEY) {
 }
 
 /**
- * Search the live web using TinyFish.
- *
- * This function is intentionally isolated from the agents so
- * the rest of Nyaya AI does not need to know TinyFish API details.
+ * Search the live web using TinyFish Search API.
  */
 async function tinyFishSearch(query) {
     if (!TINYFISH_API_KEY) {
         throw new Error("TinyFish API key is not configured.");
     }
 
-    const response = await fetch(
-        "https://agent.tinyfish.ai/api/search",
-        {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "X-API-Key": TINYFISH_API_KEY,
-            },
-            body: JSON.stringify({
-                query,
-            }),
-        }
+    if (!query || typeof query !== "string") {
+        throw new Error("A valid search query is required.");
+    }
+
+    const url = new URL(
+        "https://api.search.tinyfish.ai"
     );
+
+    url.searchParams.set("query", query);
+
+    const response = await fetch(url, {
+        method: "GET",
+        headers: {
+            "X-API-Key": TINYFISH_API_KEY,
+        },
+    });
 
     if (!response.ok) {
         const errorText = await response.text();
