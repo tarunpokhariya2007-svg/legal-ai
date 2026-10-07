@@ -6,6 +6,10 @@ const {
   detectAct,
 } = require("../services/legalRetrievalService");
 
+const {
+  webResearchAgent,
+} = require("./webResearchAgent");
+
 
 /*
 |--------------------------------------------------------------------------
@@ -18,16 +22,11 @@ const {
 | 2. Understand uploaded case/document context.
 | 3. Maintain conversational follow-ups.
 | 4. Use the shared Legal RAG for statutory research.
-| 5. Never invent document facts.
-| 6. Clearly distinguish document facts from legal knowledge.
-| 7. Refuse questions unrelated to legal/case research.
-| 8. Preserve the existing Advocate Research interface:
-|
-|    researchChatAgent({
-|        message,
-|        history,
-|        documents
-|    })
+| 5. Use TinyFish for live web research when appropriate.
+| 6. Never invent document facts.
+| 7. Clearly distinguish document facts from legal knowledge.
+| 8. Clearly distinguish live web research from Legal RAG.
+| 9. Refuse questions unrelated to legal/case research.
 |
 |--------------------------------------------------------------------------
 */
@@ -50,7 +49,6 @@ const OUT_OF_SCOPE_RESPONSE =
 */
 
 function cleanText(value, maxLength = 12000) {
-
   if (typeof value !== "string") {
     return "";
   }
@@ -69,10 +67,7 @@ function cleanText(value, maxLength = 12000) {
 */
 
 function normalizeRole(role) {
-
-  const value =
-    String(role || "")
-      .toLowerCase();
+  const value = String(role || "").toLowerCase();
 
   if (
     value === "user" ||
@@ -97,16 +92,9 @@ function normalizeRole(role) {
 |--------------------------------------------------------------------------
 | HISTORY FORMATTER
 |--------------------------------------------------------------------------
-|
-| Reduced from the previous very large context.
-|
-| This prevents conversation history from consuming the
-| entire Groq token budget.
-|
 */
 
 function formatHistory(history) {
-
   if (
     !Array.isArray(history) ||
     history.length === 0
@@ -117,22 +105,19 @@ function formatHistory(history) {
   return history
     .slice(-6)
     .map((item) => {
+      const role = normalizeRole(
+        item?.role ||
+        item?.sender ||
+        item?.message_role
+      );
 
-      const role =
-        normalizeRole(
-          item?.role ||
-          item?.sender ||
-          item?.message_role
-        );
-
-      const content =
-        cleanText(
-          item?.content ||
-          item?.message ||
-          item?.text ||
-          "",
-          1200
-        );
+      const content = cleanText(
+        item?.content ||
+        item?.message ||
+        item?.text ||
+        "",
+        1200
+      );
 
       if (!content) {
         return "";
@@ -142,7 +127,6 @@ function formatHistory(history) {
         `${role === "user" ? "ADVOCATE" : "NYAYA AI"}: ` +
         content
       );
-
     })
     .filter(Boolean)
     .join("\n\n");
@@ -156,20 +140,21 @@ function formatHistory(history) {
 |
 | Uploaded documents remain supported.
 |
-| However, the total document context is deliberately capped
-| so a large PDF/DOCX cannot consume the entire model context.
+| Context is deliberately capped so large documents do not
+| consume the entire Groq context window.
 |
+|--------------------------------------------------------------------------
 */
 
 function formatDocuments(documents) {
-
   if (
     !Array.isArray(documents) ||
     documents.length === 0
   ) {
-    return "No document has been uploaded in this research session.";
+    return (
+      "No document has been uploaded in this research session."
+    );
   }
-
 
   const MAX_DOCUMENTS = 3;
   const MAX_TEXT_PER_DOCUMENT = 6000;
@@ -179,7 +164,6 @@ function formatDocuments(documents) {
 
   const formattedDocuments = [];
 
-
   for (
     let index = 0;
     index < Math.min(
@@ -188,70 +172,62 @@ function formatDocuments(documents) {
     );
     index++
   ) {
+    const document = documents[index];
 
-    const document =
-      documents[index];
+    const name = cleanText(
+      document?.file_name ||
+      document?.filename ||
+      `Document ${index + 1}`,
+      300
+    );
 
-    const name =
-      cleanText(
-        document?.file_name ||
-        document?.filename ||
-        `Document ${index + 1}`,
-        300
-      );
+    const type = cleanText(
+      document?.file_type ||
+      document?.mime_type ||
+      "Unknown",
+      200
+    );
 
-    const type =
-      cleanText(
-        document?.file_type ||
-        document?.mime_type ||
-        "Unknown",
-        200
-      );
-
-    let extractedText =
-      cleanText(
-        document?.extracted_text ||
-        document?.extractedText ||
-        document?.content ||
-        document?.text ||
-        "",
-        MAX_TEXT_PER_DOCUMENT
-      );
-
+    let extractedText = cleanText(
+      document?.extracted_text ||
+      document?.extractedText ||
+      document?.content ||
+      document?.text ||
+      "",
+      MAX_TEXT_PER_DOCUMENT
+    );
 
     if (
       extractedText.length >=
       MAX_TEXT_PER_DOCUMENT
     ) {
-
       extractedText +=
         "\n[Document text truncated for context-size safety.]";
     }
-
 
     const documentBlock = `
 DOCUMENT ${index + 1}
 
 File name:
+
 ${name}
 
 File type:
+
 ${type}
 
 EXTRACTED / ANALYZED CONTENT:
+
 ${extractedText || "[No readable content available]"}
 `;
-
 
     if (
       totalChars +
       documentBlock.length >
       MAX_TOTAL_DOCUMENT_CHARS
     ) {
-
       break;
     }
-
 
     formattedDocuments.push(
       documentBlock
@@ -261,14 +237,13 @@ ${extractedText || "[No readable content available]"}
       documentBlock.length;
   }
 
-
   if (
     formattedDocuments.length === 0
   ) {
-
-    return "No readable document context is available.";
+    return (
+      "No readable document context is available."
+    );
   }
-
 
   return formattedDocuments.join(
     "\n\n----------------------------------------\n\n"
@@ -280,59 +255,56 @@ ${extractedText || "[No readable content available]"}
 |--------------------------------------------------------------------------
 | SIMPLE OUT-OF-SCOPE DETECTION
 |--------------------------------------------------------------------------
-|
-| Lightweight first-level filter.
-|
 */
 
 function looksObviouslyOutOfScope(message) {
-
-  const text =
-    String(message || "")
-      .trim()
-      .toLowerCase();
+  const text = String(message || "")
+    .trim()
+    .toLowerCase();
 
   if (!text) {
     return true;
   }
 
-
   const obviousPatterns = [
-
     /^how are you\b/,
     /^how r u\b/,
     /^what are you doing\b/,
     /^who are you\b/,
+
     /^tell me a joke\b/,
     /^make me laugh\b/,
+
     /^good morning\b/,
     /^good afternoon\b/,
     /^good evening\b/,
     /^good night\b/,
+
     /^what should i eat\b/,
     /^what should we eat\b/,
     /^recipe\b/,
+
     /^write code\b/,
     /^generate code\b/,
+
     /^javascript\b/,
     /^python\b/,
     /^html\b/,
     /^css\b/,
     /^react\b/,
     /^node\.?js\b/,
+
     /^gaming\b/,
     /^movie recommendation\b/,
     /^song recommendation\b/,
+
     /^football\b/,
     /^cricket score\b/,
     /^weather\b/,
-
   ];
 
-
   return obviousPatterns.some(
-    (pattern) =>
-      pattern.test(text)
+    (pattern) => pattern.test(text)
   );
 }
 
@@ -344,7 +316,6 @@ function looksObviouslyOutOfScope(message) {
 */
 
 function hasDocuments(documents) {
-
   return (
     Array.isArray(documents) &&
     documents.length > 0
@@ -360,19 +331,17 @@ function hasDocuments(documents) {
 | Determines whether the current Advocate question should
 | query the shared legal knowledge base.
 |
+|--------------------------------------------------------------------------
 */
 
 function shouldUseLegalRAG(message) {
-
-  const text =
-    String(message || "")
-      .toLowerCase()
-      .trim();
+  const text = String(message || "")
+    .toLowerCase()
+    .trim();
 
   if (!text) {
     return false;
   }
-
 
   /*
    * Explicit Act + section reference.
@@ -390,26 +359,24 @@ function shouldUseLegalRAG(message) {
   const explicitAct =
     detectAct(text);
 
-
   if (
     explicitSection &&
     explicitAct
   ) {
-
     return true;
   }
-
 
   /*
    * General legal research language.
    */
 
   const legalPatterns = [
-
     /\bsection\b/,
     /\bsections\b/,
+
     /\barticle\b/,
     /\barticles\b/,
+
     /\bact\b/,
     /\bacts\b/,
 
@@ -471,17 +438,108 @@ function shouldUseLegalRAG(message) {
     /\bwhat does .* law\b/,
     /\bunder indian law\b/,
     /\bunder .* act\b/,
+
     /\bwhich section\b/,
     /\bwhich act\b/,
+
     /\bapplicable law\b/,
     /\bapplicable section\b/,
-
   ];
 
-
   return legalPatterns.some(
-    (pattern) =>
-      pattern.test(text)
+    (pattern) => pattern.test(text)
+  );
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| TINYFISH / LIVE WEB RESEARCH DETECTION
+|--------------------------------------------------------------------------
+|
+| Standard mode:
+|   TinyFish runs only when the question clearly needs
+|   recent/current/live/external web information.
+|
+| Deep mode:
+|   TinyFish ALWAYS runs.
+|
+|--------------------------------------------------------------------------
+*/
+
+function shouldUseWebResearch(
+  message,
+  researchMode = "standard"
+) {
+  /*
+   * Deep research explicitly enables TinyFish.
+   */
+
+  if (researchMode === "deep") {
+    return true;
+  }
+
+  const text = String(message || "")
+    .toLowerCase()
+    .trim();
+
+  if (!text) {
+    return false;
+  }
+
+  const webResearchPatterns = [
+
+    // Current / recent information
+    /\brecent\b/,
+    /\blatest\b/,
+    /\bcurrent\b/,
+    /\bcurrently\b/,
+    /\bnewest\b/,
+    /\bupdated\b/,
+    /\brecently\b/,
+
+    // Judgments
+    /\brecent judgment\b/,
+    /\brecent judgments\b/,
+    /\blatest judgment\b/,
+    /\blatest judgments\b/,
+    /\brelevant judgment\b/,
+    /\brelevant judgments\b/,
+
+    // Courts
+    /\bsupreme court\b/,
+    /\bhigh court\b/,
+    /\bcourt judgment\b/,
+    /\bcourt judgments\b/,
+
+    // Case law
+    /\bcase law\b/,
+    /\bprecedent\b/,
+    /\bprecedents\b/,
+
+    // Government / legislation
+    /\bgovernment notification\b/,
+    /\bofficial notification\b/,
+    /\bamendment\b/,
+    /\bamendments\b/,
+
+    // Legal updates
+    /\blegal update\b/,
+    /\blegal updates\b/,
+    /\bcurrent law\b/,
+
+    // Explicit web requests
+    /\bsearch online\b/,
+    /\bsearch the web\b/,
+    /\bonline research\b/,
+    /\blive research\b/,
+    /\bweb research\b/,
+    /\bfind online\b/,
+    /\blook online\b/,
+  ];
+
+  return webResearchPatterns.some(
+    (pattern) => pattern.test(text)
   );
 }
 
@@ -490,54 +548,26 @@ function shouldUseLegalRAG(message) {
 |--------------------------------------------------------------------------
 | LEGAL RAG CONTEXT FORMATTER
 |--------------------------------------------------------------------------
-|
-| Shared with the User AI Assistant through:
-|
-|    legalRetrievalService.js
-|
-| This Advocate agent keeps its own formatting and prompt
-| because its architecture is different.
-|
 */
 
 function formatLegalSources(laws) {
-
   if (
     !Array.isArray(laws) ||
     laws.length === 0
   ) {
-
     return (
       "No legal provisions were retrieved from the " +
       "legal knowledge base."
     );
   }
 
-
-  /*
-   * Strict context budget.
-   *
-   * This is intentionally smaller than the model's
-   * 8,000-token request limit because the final prompt
-   * also contains:
-   *
-   * - system instructions
-   * - document context
-   * - conversation history
-   * - current question
-   */
-
   const MAX_SOURCES = 4;
-
   const MAX_CONTENT_CHARS_PER_SOURCE = 3000;
-
   const MAX_TOTAL_LEGAL_CHARS = 8000;
-
 
   let totalChars = 0;
 
   const formattedSources = [];
-
 
   for (
     let index = 0;
@@ -547,22 +577,17 @@ function formatLegalSources(laws) {
     );
     index++
   ) {
-
-    const law =
-      laws[index];
-
+    const law = laws[index];
 
     let content =
       typeof law?.content === "string"
         ? law.content
         : "";
 
-
     if (
       content.length >
       MAX_CONTENT_CHARS_PER_SOURCE
     ) {
-
       content =
         content.slice(
           0,
@@ -571,55 +596,54 @@ function formatLegalSources(laws) {
         "\n[Legal text truncated for context-size safety.]";
     }
 
-
     const source = `
 LEGAL SOURCE ${index + 1}
 
 Act:
+
 ${law?.act_name || "Not available"}
 
 Act Number:
+
 ${law?.act_number || "Not available"}
 
 Section:
+
 ${law?.section_number || "Not available"}
 
 Section Title:
+
 ${law?.section_title || "Not available"}
 
 Legal Text:
+
 ${content}
 
 Source:
+
 ${law?.source_url ||
   law?.source_name ||
   "Not available"}
 
 Effective Date:
+
 ${law?.effective_date ||
   "Not available"}
 
 Retrieval Type:
+
 ${law?.retrieval_type ||
   law?.retrievalType ||
   "legal_corpus"}
 `;
-
-
-    /*
-     * Stop if the total legal context would exceed
-     * the allowed budget.
-     */
 
     if (
       totalChars +
       source.length >
       MAX_TOTAL_LEGAL_CHARS
     ) {
-
       break;
     }
-
 
     formattedSources.push(
       source
@@ -629,21 +653,164 @@ ${law?.retrieval_type ||
       source.length;
   }
 
-
   if (
     formattedSources.length === 0
   ) {
-
     return (
       "No legal provisions could be included within " +
       "the legal context budget."
     );
   }
 
-
   return formattedSources.join(
     "\n----------------------------------------\n"
   );
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| TINYFISH RESULT FORMATTER
+|--------------------------------------------------------------------------
+|
+| TinyFish response structures can vary.
+| This function safely handles:
+|
+| results: [...]
+|
+| results: {
+|   results: [...]
+| }
+|
+| results: {
+|   data: [...]
+| }
+|
+| results: {
+|   items: [...]
+| }
+|
+|--------------------------------------------------------------------------
+*/
+
+function formatWebResearch(webResearch) {
+  if (!webResearch) {
+    return "No live web research was performed.";
+  }
+
+  const rawResults =
+    webResearch?.results;
+
+  let results = [];
+
+  /*
+   * TinyFish may return an array directly.
+   */
+
+  if (
+    Array.isArray(rawResults)
+  ) {
+    results = rawResults;
+  }
+
+  /*
+   * TinyFish may return an object.
+   */
+
+  else if (
+    rawResults &&
+    typeof rawResults === "object"
+  ) {
+    if (
+      Array.isArray(
+        rawResults.results
+      )
+    ) {
+      results =
+        rawResults.results;
+    }
+
+    else if (
+      Array.isArray(
+        rawResults.data
+      )
+    ) {
+      results =
+        rawResults.data;
+    }
+
+    else if (
+      Array.isArray(
+        rawResults.items
+      )
+    ) {
+      results =
+        rawResults.items;
+    }
+  }
+
+  if (
+    results.length === 0
+  ) {
+    return (
+      "No relevant live web sources were retrieved."
+    );
+  }
+
+  return results
+    .slice(0, 6)
+    .map((result, index) => {
+      const title = cleanText(
+        result?.title ||
+        result?.name ||
+        "",
+        500
+      );
+
+      const snippet = cleanText(
+        result?.snippet ||
+        result?.description ||
+        "",
+        1200
+      );
+
+      const url = cleanText(
+        result?.url ||
+        result?.link ||
+        "",
+        1000
+      );
+
+      const source = cleanText(
+        result?.site_name ||
+        result?.source ||
+        "",
+        300
+      );
+
+      return `
+LIVE WEB SOURCE ${index + 1}
+
+Title:
+
+${title || "Not available"}
+
+Source:
+
+${source || "Not available"}
+
+URL:
+
+${url || "Not available"}
+
+Snippet:
+
+${snippet || "No snippet available"}
+`;
+    })
+    .join(
+      "\n----------------------------------------\n"
+    );
 }
 
 
@@ -654,13 +821,10 @@ ${law?.retrieval_type ||
 */
 
 async function researchChatAgent({
-
   message,
-
   history = [],
-
   documents = [],
-
+  researchMode = "standard",
 }) {
 
   /*
@@ -675,9 +839,7 @@ async function researchChatAgent({
       12000
     );
 
-
   if (!userMessage) {
-
     return OUT_OF_SCOPE_RESPONSE;
   }
 
@@ -693,7 +855,6 @@ async function researchChatAgent({
       userMessage
     )
   ) {
-
     return OUT_OF_SCOPE_RESPONSE;
   }
 
@@ -709,12 +870,10 @@ async function researchChatAgent({
       history
     );
 
-
   const documentContext =
     formatDocuments(
       documents
     );
-
 
   const documentAvailable =
     hasDocuments(
@@ -737,7 +896,8 @@ async function researchChatAgent({
 
   let explicitAct = null;
 
-  let explicitReferenceRequested = false;
+  let explicitReferenceRequested =
+    false;
 
   const useLegalRAG =
     shouldUseLegalRAG(
@@ -763,7 +923,6 @@ async function researchChatAgent({
         userMessage
       );
 
-
     explicitReferenceRequested =
       Boolean(
         explicitSection &&
@@ -774,7 +933,6 @@ async function researchChatAgent({
     if (
       explicitReferenceRequested
     ) {
-
       console.log(
         "RESEARCH RAG: Explicit legal reference detected →",
         `${explicitAct.actName} Section ${explicitSection}`
@@ -796,33 +954,29 @@ async function researchChatAgent({
           5
         );
 
-
       console.log(
         `RESEARCH RAG: Retrieved ${legalLaws.length} provision(s)`
       );
 
 
       /*
-       * Log the actual retrieved provisions.
-       *
-       * Useful for Render debugging.
+       * Log retrieved provisions.
        */
 
       legalLaws.forEach(
         (law, index) => {
-
           console.log(
             `RESEARCH RAG SOURCE ${index + 1}:`,
             `${law?.act_name || "Unknown Act"} ` +
             `Section ${law?.section_number || "Unknown"} ` +
-            `(${law?.retrieval_type ||
+            `(${
+              law?.retrieval_type ||
               law?.retrievalType ||
-              "legal_corpus"})`
+              "legal_corpus"
+            })`
           );
-
         }
       );
-
 
     } catch (ragError) {
 
@@ -839,13 +993,6 @@ async function researchChatAgent({
      * -------------------------------------------------------
      * Explicit Act + Section safety
      * -------------------------------------------------------
-     *
-     * If the advocate explicitly asks:
-     *
-     *   Section 103 of BNS
-     *
-     * and exact retrieval fails, we do NOT allow the
-     * underlying LLM to invent the provision from memory.
      */
 
     if (
@@ -858,15 +1005,21 @@ The requested legal provision could not be verified
 from the Nyaya AI legal knowledge base.
 
 Requested Act:
-${explicitAct.actName}
+
+${explicitAct?.actName || "Not available"}
 
 Requested Section:
+
 ${explicitSection}
 
 IMPORTANT:
+
 Do NOT substitute another Act.
+
 Do NOT substitute another section.
+
 Do NOT answer the requested provision from model memory.
+
 State that the provision could not be verified from
 the available legal corpus.
 `;
@@ -878,17 +1031,81 @@ the available legal corpus.
           legalLaws
         );
     }
-
   }
 
 
   /*
    * =========================================================
-   * STEP 5 — MAIN ADVOCATE RESEARCH PROMPT
+   * STEP 5 — TINYFISH LIVE WEB RESEARCH
+   * =========================================================
+   */
+
+  let webResearch = null;
+
+  let webResearchContext =
+    "Live web research was not performed for this question.";
+
+  const useWebResearch =
+    shouldUseWebResearch(
+      userMessage,
+      researchMode
+    );
+
+
+  if (useWebResearch) {
+
+    try {
+
+      console.log(
+        "RESEARCH WEB: Starting TinyFish research →",
+        userMessage
+      );
+
+
+      webResearch =
+        await webResearchAgent({
+          query: userMessage,
+        });
+
+
+      webResearchContext =
+        formatWebResearch(
+          webResearch
+        );
+
+
+      console.log(
+        "RESEARCH WEB: TinyFish research completed."
+      );
+
+    } catch (webError) {
+
+      console.error(
+        "RESEARCH WEB ERROR:",
+        webError
+      );
+
+      webResearch = null;
+
+      /*
+       * TinyFish failure must NOT break
+       * the existing Legal RAG + Groq workflow.
+       */
+
+      webResearchContext =
+        "Live web research could not be completed for this question.";
+    }
+  }
+
+
+  /*
+   * =========================================================
+   * STEP 6 — MAIN ADVOCATE RESEARCH PROMPT
    * =========================================================
    */
 
   const prompt = `
+
 You are NYAYA AI — an advocate-facing Legal Research and Case Document Assistant.
 
 Your job is to behave like a high-quality conversational AI assistant, but your scope is STRICTLY LIMITED to:
@@ -1031,8 +1248,6 @@ If the information appears ambiguous or unreadable, say:
 SIGNATURE / STAMP / SEAL RULE
 ==================================================
 
-This is extremely important.
-
 You may say that a signature, stamp, or seal is present ONLY when the supplied document analysis actually provides reliable visual evidence of it.
 
 Do NOT infer a signature merely because a document normally requires one.
@@ -1081,21 +1296,16 @@ You do NOT have automatic access to:
 - live FIR databases
 - private legal databases
 
-Never claim that you checked any of these.
+Never claim that you checked any of these unless an actual external tool has been used and the result has been supplied to you.
 
-Do not say:
+TinyFish may provide live web research.
 
-"I checked the court database."
+When TinyFish results are supplied:
 
-Do not say:
-
-"I verified this FIR online."
-
-Do not say:
-
-"I checked the Bar Council."
-
-unless an actual external tool has been used and the result has been supplied to you.
+- distinguish them from uploaded document facts
+- distinguish them from internal Legal RAG
+- do not claim TinyFish verified legal correctness
+- do not treat a search snippet as complete legal authority
 
 
 ==================================================
@@ -1190,6 +1400,39 @@ ${legalContext}
 
 
 ==================================================
+LIVE WEB RESEARCH — TINYFISH
+==================================================
+
+Live web research may be provided below when the advocate requests current, recent, live, or external legal research.
+
+When live web sources are available:
+
+1. Treat them as external evidence, not automatically as authoritative legal conclusions.
+
+2. Prefer official court, government, legislative, and other authoritative sources.
+
+3. Clearly distinguish live web information from the internal Nyaya AI legal knowledge base.
+
+4. Never invent information that is not present in the retrieved web sources.
+
+5. Never claim that a source says something unless the supplied source information supports that claim.
+
+6. Do not treat search snippets alone as complete legal authority.
+
+7. If the retrieved web evidence is insufficient, say so.
+
+8. If sources conflict, clearly identify the conflict.
+
+9. Do not manufacture URLs.
+
+10. Never claim that TinyFish verified the legal correctness of a source.
+
+LIVE WEB RESEARCH:
+
+${webResearchContext}
+
+
+==================================================
 FOLLOW-UP QUESTIONS
 ==================================================
 
@@ -1256,12 +1499,23 @@ CURRENT RESEARCH SESSION
 ==================================================
 
 Document available:
+
 ${documentAvailable ? "YES" : "NO"}
 
 Legal RAG used:
+
 ${useLegalRAG ? "YES" : "NO"}
 
+Live web research used:
+
+${useWebResearch ? "YES" : "NO"}
+
+Research mode:
+
+${researchMode}
+
 Explicit Act + Section detected:
+
 ${explicitReferenceRequested ? "YES" : "NO"}
 
 
@@ -1298,6 +1552,15 @@ Use previous conversation when relevant.
 
 For legal/statutory questions, use the retrieved Legal RAG material when available.
 
+For current, recent, live, or external research, use the supplied TinyFish live web research when available.
+
+Clearly distinguish:
+
+1. Uploaded document facts
+2. Retrieved statutory/legal knowledge
+3. Live web research
+4. AI explanation or interpretation
+
 Stay strictly within legal/case/document research.
 
 Do not invent missing information.
@@ -1310,6 +1573,10 @@ If a document fact cannot be verified, say so clearly.
 
 If a legal provision cannot be verified from the retrieved corpus, say so clearly.
 
+If live web evidence is insufficient, say so clearly.
+
+If sources conflict, explain the conflict rather than choosing one without evidence.
+
 If the question is unrelated to the case/legal research, return the exact out-of-scope response and nothing else.
 
 If the question is a legitimate legal question but no document is uploaded, answer using the available retrieved legal material and clearly distinguish verified material from general explanation.
@@ -1318,7 +1585,7 @@ If the question is a legitimate legal question but no document is uploaded, answ
 
   /*
    * =========================================================
-   * STEP 6 — CALL GROQ
+   * STEP 7 — CALL GROQ
    * =========================================================
    */
 
@@ -1328,35 +1595,28 @@ If the question is a legitimate legal question but no document is uploaded, answ
       "RESEARCH CHAT: Sending grounded research request to Groq..."
     );
 
-
     const result =
       await askAI(
         prompt
       );
-
 
     const answer =
       typeof result === "string"
         ? result.trim()
         : "";
 
-
     if (!answer) {
-
       return (
         "I could not generate a research response. " +
         "Please try again."
       );
     }
 
-
     console.log(
       "RESEARCH CHAT: Final response generated."
     );
 
-
     return answer;
-
 
   } catch (error) {
 
@@ -1364,7 +1624,6 @@ If the question is a legitimate legal question but no document is uploaded, answ
       "RESEARCH CHAT AGENT ERROR:",
       error
     );
-
 
     const errorMessage =
       String(
@@ -1384,12 +1643,16 @@ If the question is a legitimate legal question but no document is uploaded, answ
       errorMessage.includes(
         "too large"
       ) ||
-      errorMessage.includes(
-        "requested"
-      ) &&
-      errorMessage.includes(
-        "tokens"
+
+      (
+        errorMessage.includes(
+          "requested"
+        ) &&
+        errorMessage.includes(
+          "tokens"
+        )
       ) ||
+
       errorMessage.includes(
         "context"
       )
