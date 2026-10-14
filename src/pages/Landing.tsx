@@ -634,6 +634,48 @@ export default function Landing() {
         }
 
 
+
+        /* =====================================================
+           DESKTOP TYPOGRAPHY (>=1024px) - font-size / line-height only.
+           !important is required because the page uses inline styles.
+           ===================================================== */
+        @media (min-width: 1024px) {
+          .landing-page section h1 { font-size: 60px !important; line-height: 1.1 !important; }
+          .landing-page section h2 { font-size: 40px !important; line-height: 1.2 !important; }
+          .landing-page section h3 { font-size: 20px !important; line-height: 1.3 !important; }
+
+          /* Hero subtitle */
+          .landing-page section h1 + p { font-size: 18px !important; line-height: 1.65 !important; }
+          /* Section subtitles and card descriptions */
+          .landing-page section h2 + p,
+          .landing-page section h3 + p { font-size: 16px !important; line-height: 1.65 !important; }
+
+          /* Buttons (hero, cards, CTA banner) */
+          .landing-page .btn-primary,
+          .landing-page .btn-ghost,
+          .landing-page section [style*="justify-content: center"][style*="flex-wrap: wrap"] > :is(a, button) { font-size: 15px !important; }
+
+          /* Trust badges */
+          .landing-page section h1 ~ div > div > span { font-size: 13px !important; }
+
+          /* Statistics numbers */
+          .landing-page .stat-number { font-size: 44px !important; }
+
+          /* Team role badge and skill labels */
+          .landing-page .team-card div:has(+ h3) { font-size: 13px !important; }
+          .landing-page .team-card svg + div { font-size: 13px !important; }
+
+          /* Footer headings, copyright and legal links */
+          .landing-page footer h4 { font-size: 14px !important; }
+          .landing-page footer > div > div:last-child > p,
+          .landing-page footer > div > div:last-child a { font-size: 13px !important; }
+
+          /* Navbar links and buttons (only while the landing page is mounted) */
+          body:has(.landing-page) nav .hidden.lg\\:flex > a,
+          body:has(.landing-page) nav .hidden.lg\\:flex > [data-contact-control] > button,
+          body:has(.landing-page) nav a.hidden.sm\\:inline-flex { font-size: 15px !important; }
+        }
+
       `}</style>
 
       {/* ── Hero ── */}
