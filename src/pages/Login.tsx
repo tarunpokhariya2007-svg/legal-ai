@@ -1084,15 +1084,17 @@ if (redirectTo && redirectTo.startsWith('/')) {
 
   return (
     <div
-      className="auth-page"
       style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 1000,
-        overflowY: 'auto',
-        display: 'flex',
-        background: 'var(--bg)',
-      }}
+  position: 'fixed',
+  inset: 0,
+  zIndex: 1000,
+  overflowY: 'auto',
+  display: 'flex',
+  backgroundImage: "url('/dc.jpeg')",
+  backgroundSize: 'cover',
+  backgroundPosition: 'center',
+  backgroundRepeat: 'no-repeat',
+}}
     >
       {/* =================================================
           RIGHT PANEL
