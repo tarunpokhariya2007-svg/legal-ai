@@ -15,6 +15,7 @@ import {
   ChevronDown,
   Check,
   ShieldCheck,
+  ArrowLeft,
 } from 'lucide-react'
 
 // =====================================================
@@ -458,6 +459,12 @@ export default function Login() {
 
   const isAdvocate = location.pathname === '/advocate-login'
   const isSignup = location.pathname === '/signup'
+
+  // Go back if the app has a previous entry; otherwise open the landing page.
+  const handleBack = () => {
+    if (location.key !== 'default') navigate(-1)
+    else navigate('/')
+  }
 
   const [tab, setTab] = useState<'citizen' | 'advocate'>(
     isAdvocate ? 'advocate' : 'citizen'
@@ -1084,18 +1091,43 @@ if (redirectTo && redirectTo.startsWith('/')) {
 
   return (
     <div
+      className="auth-page"
       style={{
-  position: 'fixed',
-  inset: 0,
-  zIndex: 1000,
-  overflowY: 'auto',
-  display: 'flex',
-  backgroundImage: "url('/dc.jpeg')",
-  backgroundSize: 'cover',
-  backgroundPosition: 'center',
-  backgroundRepeat: 'no-repeat',
-}}
+        position: 'fixed',
+        inset: 0,
+        zIndex: 1000,
+        overflowY: 'auto',
+        display: 'flex',
+        background: 'var(--bg)',
+      }}
     >
+      <button
+        type="button"
+        onClick={handleBack}
+        aria-label="Go back"
+        className="auth-back-btn"
+        style={{
+          position: 'absolute',
+          top: 10,
+          left: 16,
+          zIndex: 2,
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 6,
+          padding: '7px 12px',
+          borderRadius: 8,
+          border: '1px solid rgba(212, 175, 55, 0.45)',
+          background: 'rgba(0, 0, 0, 0.6)',
+          color: '#D4AF37',
+          fontSize: '0.82rem',
+          fontWeight: 600,
+          cursor: 'pointer',
+        }}
+      >
+        <ArrowLeft size={16} />
+        Back
+      </button>
+
       {/* =================================================
           RIGHT PANEL
       ================================================= */}
@@ -2434,6 +2466,16 @@ if (redirectTo && redirectTo.startsWith('/')) {
             background-repeat: no-repeat !important;
           }
         }
+        .auth-back-btn:hover {
+          background: rgba(212, 175, 55, 0.12) !important;
+          border-color: #D4AF37 !important;
+        }
+        @media (min-width: 900px) {
+          .auth-back-btn {
+            top: 20px !important;
+            left: 24px !important;
+          }
+        }
         body:has(.auth-page) nav {
           display: none !important;
         }
@@ -2453,15 +2495,16 @@ if (redirectTo && redirectTo.startsWith('/')) {
         <div
           onClick={closeForgotPassword}
           style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.72)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 2100,
-            padding: 20,
-          }}
+  position: 'fixed',
+  inset: 0,
+  zIndex: 1000,
+  overflowY: 'auto',
+  display: 'flex',
+  backgroundImage: "url('/dc.jpeg')",
+  backgroundSize: 'cover',
+  backgroundPosition: 'center',
+  backgroundRepeat: 'no-repeat',
+}}
         >
           <div
             onClick={(e) => e.stopPropagation()}
