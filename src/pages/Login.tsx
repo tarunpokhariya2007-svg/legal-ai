@@ -2426,7 +2426,7 @@ if (redirectTo && redirectTo.startsWith('/')) {
       <style>{`
         @media (min-width: 900px) {
           .auth-page {
-            background-image: linear-gradient(rgba(0,0,0,0.45), rgba(0,0,0,0.45)), url('/zx.jpeg') !important;
+            background-image: linear-gradient(rgba(0,0,0,0.45), rgba(0,0,0,0.45)), url('/dc.jpeg') !important;
             background-size: cover !important;
             background-position: center !important;
             background-repeat: no-repeat !important;
