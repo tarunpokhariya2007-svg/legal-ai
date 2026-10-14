@@ -1084,35 +1084,16 @@ if (redirectTo && redirectTo.startsWith('/')) {
 
   return (
     <div
+      className="auth-page"
       style={{
-        minHeight: 'calc(100vh - 64px)',
+        position: 'fixed',
+        inset: 0,
+        zIndex: 1000,
+        overflowY: 'auto',
         display: 'flex',
         background: 'var(--bg)',
       }}
     >
-      {/* =================================================
-          LEFT PANEL
-      ================================================= */}
-
-      <div
-        style={{
-          flex: 1,
-          display: 'none',
-          flexDirection: 'column',
-          justifyContent: 'center',
-          alignItems: 'center',
-          padding: '60px 40px',
-          backgroundImage:
-            "linear-gradient(rgba(0,0,0,0.45), rgba(0,0,0,0.45)), url('/zx.jpeg')",
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          backgroundRepeat: 'no-repeat',
-          position: 'relative',
-          overflow: 'hidden',
-        }}
-        className="auth-left"
-      />
-
       {/* =================================================
           RIGHT PANEL
       ================================================= */}
@@ -1130,7 +1111,13 @@ if (redirectTo && redirectTo.startsWith('/')) {
         <div
           style={{
             width: '100%',
-            maxWidth: 420,
+            maxWidth: 484,
+            padding: '36px 32px',
+            background: 'rgba(0, 0, 0, 0.5)',
+            backdropFilter: 'blur(16px)',
+            WebkitBackdropFilter: 'blur(16px)',
+            border: '1px solid rgba(255, 255, 255, 0.15)',
+            borderRadius: 20,
           }}
         >
           {/* =================================================
@@ -2438,9 +2425,15 @@ if (redirectTo && redirectTo.startsWith('/')) {
 
       <style>{`
         @media (min-width: 900px) {
-          .auth-left {
-            display: flex !important;
+          .auth-page {
+            background-image: linear-gradient(rgba(0,0,0,0.45), rgba(0,0,0,0.45)), url('/zx.jpeg') !important;
+            background-size: cover !important;
+            background-position: center !important;
+            background-repeat: no-repeat !important;
           }
+        }
+        body:has(.auth-page) nav {
+          display: none !important;
         }
 
         @keyframes spin {
