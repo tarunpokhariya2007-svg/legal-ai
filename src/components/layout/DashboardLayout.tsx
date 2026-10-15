@@ -1,2835 +1,2101 @@
-import { useEffect, useState } from 'react'
-
-import { Link } from 'react-router'
-
-import { isLoggedIn, getStoredUser } from '../lib/auth'
-
+import { useEffect, useRef, useState } from 'react'
+import { Outlet, Link, useLocation, useNavigate } from 'react-router'
+import MandatoryFeedbackGate from "../MandatoryFeedbackGate";
 import {
-
+  LayoutDashboard,
   MessageSquare,
-
-  Upload,
-
+  FolderOpen,
   Users,
-
-  Plus,
-
-  Clock,
-
-  CheckCircle,
-
-  AlertCircle,
-
-  FileText,
-
-  Star,
-
-  MapPin,
-
-  ArrowRight,
-
-  Zap,
-
   Calendar,
-
+  Bell,
+  Settings,
+  LogOut,
+  Menu,
+  X,
+  Search,
+  FileText,
+  BarChart2,
+  DollarSign,
+  BookOpen,
+  ClipboardList,
+  Clock3,
+  Video,
+  ChevronRight,
+  Loader2,
+  FileSearch,
+  MessageCircle,
+  Briefcase,
+  UserRound,
 } from 'lucide-react'
 
+import BackButton from './BackButton'
+import { getStoredUser, logout } from '../../lib/auth'
 
-const API_URL = (
-  import.meta.env.VITE_API_URL ||
-  'https://legal-ai-z7vb.onrender.com'
-).replace(/\/+$/, '')
+/*
+|--------------------------------------------------------------------------
+| API
+|--------------------------------------------------------------------------
+*/
 
-const quickActions = [
+const API_BASE_URL =
+  import.meta.env.VITE_API_URL || 'http://localhost:5001'
 
+/*
+|--------------------------------------------------------------------------
+| HELPERS
+|--------------------------------------------------------------------------
+*/
+
+const isAdvocatePath = (p: string) =>
+  p.startsWith('/advocate')
+
+function escapeRegExp(value: string) {
+  return value.replace(
+    /[.*+?^${}()|[\]\\]/g,
+    '\\$&',
+  )
+}
+
+/*
+|--------------------------------------------------------------------------
+| NAVIGATION
+|--------------------------------------------------------------------------
+*/
+
+const citizenNav = [
   {
-
-    icon: Plus,
-
-    label: 'Start New Case',
-
-    desc: 'Describe your legal issue',
-
-    href: '/dashboard/new-case',
-
-    color: '#E5BC43',
-
-    bg: 'rgba(229,188,67,0.10)',
-
+    icon: LayoutDashboard,
+    label: 'Dashboard',
+    href: '/dashboard',
   },
-
   {
-
-    icon: Upload,
-
-    label: 'Upload Document',
-
-    desc: 'FIR, contract, court order',
-
-    href: '/dashboard/documents',
-
-    color: '#E5BC43',
-
-    bg: 'rgba(229,188,67,0.10)',
-
-  },
-
-  {
-
     icon: MessageSquare,
-
-    label: 'Chat with AI',
-
-    desc: 'Get instant legal guidance',
-
+    label: 'AI Assistant',
     href: '/dashboard/ai-assistant',
-
-    color: '#E5BC43',
-
-    bg: 'rgba(229,188,67,0.10)',
-
   },
-
   {
-
-    icon: Users,
-
-    label: 'Find Advocate',
-
-    desc: 'Find verified advocates',
-
-    href: '/dashboard/advocates',
-
-    color: '#E5BC43',
-
-    bg: 'rgba(229,188,67,0.10)',
-
+    icon: FolderOpen,
+    label: 'My Cases',
+    href: '/dashboard/cases',
   },
-
+  {
+    icon: FileText,
+    label: 'Documents',
+    href: '/dashboard/documents',
+  },
+  {
+    icon: Users,
+    label: 'Find Advocates',
+    href: '/dashboard/advocates',
+  },
+  {
+    icon: Calendar,
+    label: 'Your Bookings',
+    href: '/dashboard/bookings',
+  },
+  {
+    icon: Video,
+    label: 'Meetings',
+    href: '/dashboard/meetings',
+  },
+  {
+    icon: Bell,
+    label: 'Notifications',
+    href: '/dashboard/notifications',
+    badge: 3 as number,
+  },
+  {
+    icon: Settings,
+    label: 'Settings',
+    href: '/dashboard/settings',
+  },
 ]
 
-
-
-interface ActivityItem {
-  id: number
-  action: string
-  description: string
-  entity_type: string | null
-  entity_id: number | null
-  status: string
-  created_at: string
-}
-
-function formatActivityTime(value: string) {
-  if (!value) return 'Time unavailable'
-
-  const timestamp = new Date(value).getTime()
-
-  if (!Number.isFinite(timestamp)) return 'Time unavailable'
-
-  const seconds = Math.max(
-    0,
-    Math.floor((Date.now() - timestamp) / 1000)
-  )
-
-  if (seconds < 60) return 'Just now'
-
-  const minutes = Math.floor(seconds / 60)
-
-  if (minutes < 60) {
-    return `${minutes} min${minutes === 1 ? '' : 's'} ago`
-  }
-
-  const hours = Math.floor(minutes / 60)
-
-  if (hours < 24) {
-    return `${hours} hour${hours === 1 ? '' : 's'} ago`
-  }
-
-  const days = Math.floor(hours / 24)
-
-  if (days < 7) {
-    return `${days} day${days === 1 ? '' : 's'} ago`
-  }
-
-  return new Date(timestamp).toLocaleDateString('en-IN')
-}
-function activityPresentation(action: string) {
-  if (action.startsWith('document_')) return { icon: FileText, color: 'var(--emerald)' }
-  if (action.startsWith('ai_') || action.startsWith('chat_')) return { icon: MessageSquare, color: 'var(--blue)' }
-  if (action.startsWith('booking_') || action.startsWith('meeting_')) return { icon: Calendar, color: '#F59E0B' }
-  if (action.startsWith('case_')) return { icon: CheckCircle, color: 'var(--emerald)' }
-  return { icon: Clock, color: 'var(--blue)' }
-}
-
-const statusConfig = {
-
-  completed: {
-
-    label: 'Done',
-
-    color: 'var(--emerald)',
-
-    bg: 'var(--emerald-subtle)',
-
+const advocateNav = [
+  {
+    icon: LayoutDashboard,
+    label: 'Dashboard',
+    href: '/advocate',
   },
-
-  upcoming: {
-
-    label: 'Upcoming',
-
-    color: 'var(--blue)',
-
-    bg: 'var(--blue-subtle)',
-
+  {
+    icon: Calendar,
+    label: 'Appointments',
+    href: '/advocate/appointments',
   },
-
-  pending: {
-
-    label: 'Pending',
-
-    color: '#F59E0B',
-
-    bg: 'rgba(245,158,11,0.08)',
-
+  {
+    icon: Users,
+    label: 'Clients',
+    href: '/advocate/clients',
   },
+  {
+    icon: ClipboardList,
+    label: 'Consultation Requests',
+    href: '/advocate/consultation-requests',
+  },
+  {
+    icon: Video,
+    label: 'Meetings',
+    href: '/advocate/meetings',
+  },
+  {
+    icon: Clock3,
+    label: 'Availability & Timetable',
+    href: '/advocate/availability',
+  },
+  {
+    icon: BookOpen,
+    label: 'AI Research',
+    href: '/advocate/ai-research',
+  },
+  {
+    icon: FileText,
+    label: 'Documents',
+    href: '/advocate/documents',
+  },
+  {
+    icon: DollarSign,
+    label: 'Earnings',
+    href: '/advocate/earnings',
+  },
+  {
+    icon: BarChart2,
+    label: 'Analytics',
+    href: '/advocate/analytics',
+  },
+  {
+    icon: Settings,
+    label: 'Settings',
+    href: '/advocate/settings',
+  },
+]
 
-}
+/*
+|--------------------------------------------------------------------------
+| SEARCH RESULT TYPE
+|--------------------------------------------------------------------------
+*/
 
-
-
-interface CaseItem {
-
-  id: number
-
-  user_id: number
-
+type SearchResult = {
+  id: string
+  type: string
   title: string
-
-  description: string
-
-  category: string
-
-  severity: string
-
-  status: 'open' | 'in_progress' | 'resolved' | 'closed' | string
-
-  created_at: string
-
-  updated_at: string
-
+  content: string
+  fullContent?: string
+  date?: string | null
+  url?: string
+  field?: string
+  query?: string
 }
 
+/*
+|--------------------------------------------------------------------------
+| COMPONENT
+|--------------------------------------------------------------------------
+*/
 
+export default function DashboardLayout() {
+  const location = useLocation()
+  const navigate = useNavigate()
 
-interface Advocate {
+  /*
+  |--------------------------------------------------------------------------
+  | SIDEBAR
+  |--------------------------------------------------------------------------
+  */
 
-  id: number
+  const [sidebarOpen, setSidebarOpen] =
+    useState(false)
 
-  name: string
+  /*
+  |--------------------------------------------------------------------------
+  | SEARCH STATE
+  |--------------------------------------------------------------------------
+  */
 
-  initials: string
+  const [search, setSearch] = useState('')
 
-  speciality: string
+  // Keep the search field read-only until the user explicitly focuses it.
+  // This prevents Chrome/password-manager autofill from injecting an
+  // email address into the global search field.
+  const [searchFocused, setSearchFocused] = useState(false)
 
-  rating: number
+  const [searchResults, setSearchResults] =
+    useState<SearchResult[]>([])
 
-  cases: number
+  const [searchLoading, setSearchLoading] =
+    useState(false)
 
-  city: string
+  const [searchOpen, setSearchOpen] =
+    useState(false)
 
-  fee: number
+  const [selectedSearchIndex, setSelectedSearchIndex] =
+    useState(-1)
 
-  available: boolean
+  const searchContainerRef =
+    useRef<HTMLDivElement | null>(null)
 
-  color: string
+  const searchInputRef =
+    useRef<HTMLInputElement | null>(null)
 
-}
+  /*
+  |--------------------------------------------------------------------------
+  | USER / ROLE
+  |--------------------------------------------------------------------------
+  */
 
+  const isAdvocate =
+    isAdvocatePath(location.pathname)
 
+  const navItems =
+    isAdvocate
+      ? advocateNav
+      : citizenNav
 
-export default function CitizenDashboard() {
-  // Re-render periodically so relative activity times stay current.
-  const [, setClock] = useState(Date.now())
+  const userLabel =
+    isAdvocate
+      ? 'Advocate'
+      : 'Citizen'
 
-  useEffect(() => {
-    const timer = window.setInterval(() => {
-      setClock(Date.now())
-    }, 60000)
+  const homeHref =
+    isAdvocate
+      ? '/advocate'
+      : '/dashboard'
 
-    return () => window.clearInterval(timer)
-  }, [])
-
-
-  const [recommendedAdvocates, setRecommendedAdvocates] = useState<
-
-    Advocate[]
-
-  >([])
-
-
-
-  const [loadingAdvocates, setLoadingAdvocates] = useState(true)
-
-  const [advocateError, setAdvocateError] = useState('')
-
-
-
-  // =========================================================
-
-  // REAL CASES FROM DATABASE
-
-  // =========================================================
-
-
-
-  const [cases, setCases] = useState<CaseItem[]>([])
-
-  const [loadingCases, setLoadingCases] = useState(true)
-
-  const [caseError, setCaseError] = useState('')
-
-
-
-  // =========================================================
-
-  // REAL AI CONSULTATIONS FROM AI ASSISTANT HISTORY
-
-  // =========================================================
-
-
-
-  const [aiConsultations, setAiConsultations] = useState(0)
-
-  // =========================================================
-  // REAL DOCUMENT COUNT FROM DATABASE
-  // =========================================================
-
-  const [documentsCount, setDocumentsCount] = useState(0)
-
-  const [recentActivity, setRecentActivity] = useState<ActivityItem[]>([])
-  const [loadingActivity, setLoadingActivity] = useState(true)
-  const [activityError, setActivityError] = useState('')
-
-
-
-  // Get logged-in citizen
-
-  const savedUser: any = getStoredUser() || {}
-
-
-
-  const activeCaseCount = cases.filter(
-    (c) => c.status === 'open' || c.status === 'in_progress'
-  ).length
+  const savedUser: any =
+    getStoredUser() || {}
 
   const userName =
-
-    savedUser.fullName ||
-
-    savedUser.full_name ||
-
+    savedUser?.fullName ||
+    savedUser?.full_name ||
+    savedUser?.name ||
     'User'
 
+  const userInitials =
+    userName
+      .split(' ')
+      .map(
+        (word: string) =>
+          word[0],
+      )
+      .join('')
+      .slice(0, 2)
+      .toUpperCase()
 
+  const profileHref =
+    isAdvocate
+      ? '/advocate/profile'
+      : '/dashboard/profile'
 
-  // ==========================================
-
-  // LOAD REAL CASES FROM DATABASE
-
-  // ==========================================
-
-
-
-  useEffect(() => {
-    let cancelled = false
-
-    const loadRecentActivity = async () => {
-      try {
-        if (!isLoggedIn()) {
-          if (!cancelled) {
-            setRecentActivity([])
-            setActivityError('Please log in to view your activity.')
-          }
-          return
-        }
-
-        
-const response = await fetch(`${API_URL}/api/activity/recent`, {
-  method: 'GET',
-  credentials: 'include',
-  cache: 'no-store',
-})
-
-        const result = await response.json()
-        if (!response.ok || !result.success) {
-          throw new Error(result.message || 'Failed to load recent activity.')
-        }
-        if (!cancelled) {
-          setRecentActivity(Array.isArray(result.activities) ? result.activities : [])
-          setActivityError('')
-        }
-      } catch (error) {
-        if (!cancelled) {
-          setActivityError(error instanceof Error ? error.message : 'Failed to load recent activity.')
-        }
-      } finally {
-        if (!cancelled) setLoadingActivity(false)
-      }
-    }
-
-    loadRecentActivity()
-    const intervalId = window.setInterval(loadRecentActivity, 20000)
-    return () => {
-      cancelled = true
-      window.clearInterval(intervalId)
-    }
-  }, [])
-
+  /*
+  |--------------------------------------------------------------------------
+  | GLOBAL SEARCH API
+  |--------------------------------------------------------------------------
+  |
+  | Searches the backend database instead of only the currently
+  | visible page.
+  |
+  |--------------------------------------------------------------------------
+  */
 
   useEffect(() => {
+    const query =
+      search.trim()
 
-    const loadCases = async () => {
+    /*
+    |--------------------------------------------------------------------------
+    | EMPTY / SHORT QUERY
+    |--------------------------------------------------------------------------
+    */
 
-      try {
+    if (
+      !query ||
+      query.length < 2
+    ) {
+      setSearchResults([])
+      setSearchLoading(false)
+      setSearchOpen(false)
+      setSelectedSearchIndex(-1)
 
-        setLoadingCases(true)
-
-        setCaseError('')
-
-
-
-        if (!isLoggedIn()) {
-
-          setCases([])
-
-          setCaseError('Please login again to load your cases.')
-
-          return
-
-        }
-
-
-
-        const response = await fetch(
-
-          `${API_URL}/api/cases`,
-
-          {
-
-            method: 'GET',
-
-            credentials: 'include',
-
-            headers: {
-
-              'Content-Type': 'application/json',
-
-            },
-
-          }
-
-        )
-
-
-
-        const result = await response.json()
-
-
-
-        console.log('CASES API RESPONSE:', result)
-
-
-
-        if (!response.ok || !result.success) {
-
-          throw new Error(
-
-            result.message || 'Failed to load cases'
-
-          )
-
-        }
-
-
-
-        setCases(
-
-          Array.isArray(result.cases)
-
-            ? result.cases
-
-            : []
-
-        )
-
-      } catch (error: any) {
-
-        console.error('LOAD CASES ERROR:', error)
-
-        setCases([])
-
-        setCaseError(
-
-          error.message || 'Unable to load cases'
-
-        )
-
-      } finally {
-
-        setLoadingCases(false)
-
-      }
-
+      return
     }
 
-
-
-    loadCases()
-
-  }, [])
-
-
-
-  // ==========================================
-
-  // LOAD REAL AI CONSULTATIONS
-
-  //
-
-  // Each saved AI Assistant conversation counts
-
-  // as one consultation. This is independent of
-
-  // My Cases.
-
-  // ==========================================
-
-
-
-  useEffect(() => {
-
-    const loadAIConsultations = async () => {
-
-      try {
-
-        if (!isLoggedIn()) {
-
-          setAiConsultations(0)
-
-          return
-
-        }
-
-
-
-        const response = await fetch(
-
-          `${API_URL}/api/chat/conversations`,
-
-          {
-
-            method: 'GET',
-
-            credentials: 'include',
-
-            headers: {
-
-              'Content-Type': 'application/json',
-
-            },
-
-          }
-
-        )
-
-
-
-        const result = await response.json()
-
-
-
-        if (!response.ok || !result.success) {
-
-          throw new Error(
-
-            result.message ||
-
-              'Failed to load AI consultations'
-
-          )
-
-        }
-
-
-
-        setAiConsultations(
-
-          Array.isArray(result.conversations)
-
-            ? result.conversations.length
-
-            : 0
-
-        )
-
-      } catch (error) {
-
-        console.error(
-
-          'LOAD AI CONSULTATIONS ERROR:',
-
-          error
-
-        )
-
-
-
-        // Do not show a fake number when the
-
-        // consultation history cannot be loaded.
-
-        setAiConsultations(0)
-
-      }
-
-    }
-
-
-
-    loadAIConsultations()
-
-  }, [])
-
-
-
-  // ==========================================
-
-  // ==========================================
-  // LOAD REAL DOCUMENT COUNT FROM DATABASE
-  // ==========================================
-
-  useEffect(() => {
-    const loadDocumentCount = async () => {
-      try {
-        if (!isLoggedIn()) {
-          setDocumentsCount(0)
-          return
-        }
-
-        const response = await fetch(
-          `${API_URL}/api/documents/count`,
-          {
-            method: 'GET',
-            credentials: 'include',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-          }
-        )
-
-        const result = await response.json()
-
-        if (!response.ok || !result.success) {
-          throw new Error(
-            result.message || 'Failed to load document count'
-          )
-        }
-const count = Number(result.count)
-
-setDocumentsCount(
-  Number.isFinite(count) && count >= 0
-    ? count
-    : 0
-)
-      } catch (error) {
-        console.error(
-          'LOAD DOCUMENT COUNT ERROR:',
-          error
-        )
-
-        setDocumentsCount(0)
-      }
-    }
-
-    loadDocumentCount()
-  }, [])
-
-  // LOAD ALL REAL ADVOCATES FROM DATABASE
-
-  // ==========================================
-
-
-
-  useEffect(() => {
-
-    const loadAdvocates = async () => {
-
-      try {
-
-        setLoadingAdvocates(true)
-
-        setAdvocateError('')
-
-
-
-        const response = await fetch(
-
-          `${API_URL}/api/lawyers`,
-
-          {
-
-            method: 'GET',
-
-            credentials: 'include',
-
-            headers: {
-
-              'Content-Type': 'application/json',
-
-            },
-
-          }
-
-        )
-
-
-
-        const result = await response.json()
-
-
-
-        console.log(
-
-          'LAWYERS API RESPONSE:',
-
-          result
-
-        )
-
-
-
-        if (!response.ok || !result.success) {
-
-          throw new Error(
-
-            result.message ||
-
-              'Failed to load advocates'
-
-          )
-
-        }
-
-
-
-        const lawyers =
-
-          result.lawyers ||
-
-          result.advocates ||
-
-          []
-
-
-
-        const formattedAdvocates: Advocate[] =
-
-          lawyers.map(
-
-            (lawyer: any, index: number) => {
-
-              const realName =
-
-                lawyer.full_name ||
-
-                lawyer.fullName ||
-
-                lawyer.name ||
-
-                'Advocate'
-
-
-
-              const initials =
-
-                realName
-
-                  .split(' ')
-
-                  .filter(Boolean)
-
-                  .map(
-
-                    (word: string) =>
-
-                      word[0]
-
-                  )
-
-                  .join('')
-
-                  .slice(0, 2)
-
-                  .toUpperCase()
-
-
-
-              return {
-
-                id: lawyer.id,
-
-
-
-                name: realName.startsWith(
-
-                  'Adv.'
-
-                )
-
-                  ? realName
-
-                  : `Adv. ${realName}`,
-
-
-
-                initials,
-
-
-
-                speciality:
-
-                  lawyer.speciality ||
-
-                  lawyer.specialization ||
-
-                  lawyer.specialization_name ||
-
-                  'Legal Services',
-
-
-
-                rating: Number(
-
-                  lawyer.rating || 0
-
-                ),
-
-
-
-                cases: Number(
-
-                  lawyer.cases ||
-
-                    lawyer.total_cases ||
-
-                    0
-
-                ),
-
-
-
-                city:
-
-                  lawyer.city ||
-
-                  lawyer.location ||
-
-                  'India',
-
-
-
-                fee: Number(
-
-                  lawyer.fee ||
-
-                    lawyer.consultation_fee ||
-
-                    0
-
-                ),
-
-
-
-                available:
-
-                  lawyer.available !== false,
-
-
-
-                color:
-
-                  index % 2 === 0
-
-                    ? '#2563EB'
-
-                    : '#7C3AED',
-
-              }
-
+    /*
+    |--------------------------------------------------------------------------
+    | OPEN SEARCH
+    |--------------------------------------------------------------------------
+    */
+
+    setSearchOpen(true)
+    setSearchLoading(true)
+    setSelectedSearchIndex(-1)
+
+    /*
+    |--------------------------------------------------------------------------
+    | ABORT PREVIOUS REQUEST
+    |--------------------------------------------------------------------------
+    */
+
+    const controller =
+      new AbortController()
+
+    /*
+    |--------------------------------------------------------------------------
+    | DEBOUNCE
+    |--------------------------------------------------------------------------
+    */
+
+    const timer =
+      window.setTimeout(
+        async () => {
+          try {
+            /*
+            |--------------------------------------------------------------------------
+            | CLEAN API BASE URL
+            |--------------------------------------------------------------------------
+            */
+
+            const baseUrl =
+              API_BASE_URL.replace(
+                /\/+$/,
+                '',
+              )
+
+            /*
+            |--------------------------------------------------------------------------
+            | SEARCH URL
+            |--------------------------------------------------------------------------
+            */
+
+            const url =
+              `${baseUrl}/api/search?q=${encodeURIComponent(
+                query,
+              )}`
+
+            console.log(
+              '[GLOBAL SEARCH] Request:',
+              url,
+            )
+
+            /*
+            |--------------------------------------------------------------------------
+            | FETCH
+            |--------------------------------------------------------------------------
+            */
+
+            const response =
+              await fetch(
+                url,
+                {
+                  method: 'GET',
+
+                  /*
+                  |--------------------------------------------------------------------------
+                  | IMPORTANT
+                  | Sends authentication cookies.
+                  |--------------------------------------------------------------------------
+                  */
+
+                  credentials:
+                    'include',
+
+                  headers: {
+                    Accept:
+                      'application/json',
+                  },
+
+                  signal:
+                    controller.signal,
+                },
+              )
+
+            /*
+            |--------------------------------------------------------------------------
+            | HTTP ERROR
+            |--------------------------------------------------------------------------
+            */
+
+            if (!response.ok) {
+              const errorText =
+                await response.text()
+
+              console.error(
+                '[GLOBAL SEARCH] HTTP ERROR:',
+                response.status,
+                errorText,
+              )
+
+              throw new Error(
+                `Search request failed: ${response.status}`,
+              )
             }
 
+            /*
+            |--------------------------------------------------------------------------
+            | JSON
+            |--------------------------------------------------------------------------
+            */
+
+            const data =
+              await response.json()
+
+            console.log(
+              '[GLOBAL SEARCH] Response:',
+              data,
+            )
+
+            /*
+            |--------------------------------------------------------------------------
+            | VALID RESPONSE
+            |--------------------------------------------------------------------------
+            */
+
+            if (
+              data?.success === true &&
+              Array.isArray(
+                data.results,
+              )
+            ) {
+              setSearchResults(
+                data.results,
+              )
+            } else {
+              console.warn(
+                '[GLOBAL SEARCH] Invalid response:',
+                data,
+              )
+
+              setSearchResults([])
+            }
+          } catch (
+            error: any
+          ) {
+            /*
+            |--------------------------------------------------------------------------
+            | ABORTED REQUEST
+            |--------------------------------------------------------------------------
+            */
+
+            if (
+              error?.name ===
+              'AbortError'
+            ) {
+              return
+            }
+
+            console.error(
+              '[GLOBAL SEARCH] ERROR:',
+              error,
+            )
+
+            setSearchResults([])
+          } finally {
+            if (
+              !controller.signal
+                .aborted
+            ) {
+              setSearchLoading(
+                false,
+              )
+            }
+          }
+        },
+        300,
+      )
+
+    /*
+    |--------------------------------------------------------------------------
+    | CLEANUP
+    |--------------------------------------------------------------------------
+    */
+
+    return () => {
+      window.clearTimeout(
+        timer,
+      )
+
+      controller.abort()
+    }
+  }, [search])
+
+  /*
+  |--------------------------------------------------------------------------
+  | CLOSE SEARCH WHEN CLICKING OUTSIDE
+  |--------------------------------------------------------------------------
+  */
+
+  useEffect(() => {
+    const handleOutsideClick =
+      (event: MouseEvent) => {
+        if (
+          searchContainerRef.current &&
+          !searchContainerRef.current.contains(
+            event.target as Node,
           )
-
-
-
-        // IMPORTANT:
-
-        // Show ALL registered advocates.
-
-        setRecommendedAdvocates(
-
-          formattedAdvocates
-
-        )
-
-      } catch (error: any) {
-
-        console.error(
-
-          'LOAD ADVOCATES ERROR:',
-
-          error
-
-        )
-
-
-
-        setAdvocateError(
-
-          error.message ||
-
-            'Unable to load advocates'
-
-        )
-
-
-
-        setRecommendedAdvocates([])
-
-      } finally {
-
-        setLoadingAdvocates(false)
-
+        ) {
+          setSearchOpen(false)
+          setSelectedSearchIndex(-1)
+        }
       }
 
+    document.addEventListener(
+      'mousedown',
+      handleOutsideClick,
+    )
+
+    return () => {
+      document.removeEventListener(
+        'mousedown',
+        handleOutsideClick,
+      )
     }
-
-
-
-    loadAdvocates()
-
   }, [])
 
+  /*
+  |--------------------------------------------------------------------------
+  | CTRL/CMD + K
+  |--------------------------------------------------------------------------
+  */
 
+  useEffect(() => {
+    const handleKeyDown =
+      (event: KeyboardEvent) => {
+        if (
+          (event.ctrlKey ||
+            event.metaKey) &&
+          event.key.toLowerCase() ===
+            'k'
+        ) {
+          event.preventDefault()
+
+          searchInputRef.current?.focus()
+
+          setSearchOpen(true)
+
+          return
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | ESCAPE
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+          event.key ===
+          'Escape'
+        ) {
+          setSearchOpen(false)
+
+          setSelectedSearchIndex(
+            -1,
+          )
+
+          searchInputRef.current?.blur()
+        }
+      }
+
+    document.addEventListener(
+      'keydown',
+      handleKeyDown,
+    )
+
+    return () => {
+      document.removeEventListener(
+        'keydown',
+        handleKeyDown,
+      )
+    }
+  }, [])
+
+  /*
+  |--------------------------------------------------------------------------
+  | OPEN SEARCH RESULT
+  |--------------------------------------------------------------------------
+  */
+
+  const openSearchResult =
+    (
+      result: SearchResult,
+    ) => {
+      if (!result?.url) {
+        return
+      }
+
+      setSearchOpen(false)
+
+      setSelectedSearchIndex(
+        -1,
+      )
+
+      /*
+      |--------------------------------------------------------------------------
+      | Keep search text visible until navigation occurs.
+      |--------------------------------------------------------------------------
+      */
+
+      navigate(result.url)
+    }
+
+  /*
+  |--------------------------------------------------------------------------
+  | KEYBOARD NAVIGATION
+  |--------------------------------------------------------------------------
+  */
+
+  const handleSearchKeyDown =
+    (
+      event: React.KeyboardEvent<HTMLInputElement>,
+    ) => {
+      /*
+      |--------------------------------------------------------------------------
+      | ESC
+      |--------------------------------------------------------------------------
+      */
+
+      if (
+        event.key ===
+        'Escape'
+      ) {
+        event.preventDefault()
+
+        setSearchOpen(false)
+
+        setSelectedSearchIndex(
+          -1,
+        )
+
+        return
+      }
+
+      /*
+      |--------------------------------------------------------------------------
+      | OPEN DROPDOWN
+      |--------------------------------------------------------------------------
+      */
+
+      if (!searchOpen) {
+        if (
+          event.key ===
+            'ArrowDown' ||
+          event.key ===
+            'ArrowUp'
+        ) {
+          setSearchOpen(true)
+        }
+
+        return
+      }
+
+      /*
+      |--------------------------------------------------------------------------
+      | ARROW DOWN
+      |--------------------------------------------------------------------------
+      */
+
+      if (
+        event.key ===
+        'ArrowDown'
+      ) {
+        event.preventDefault()
+
+        if (
+          searchResults.length ===
+          0
+        ) {
+          return
+        }
+
+        setSelectedSearchIndex(
+          (
+            previous,
+          ) =>
+            previous >=
+            searchResults.length -
+              1
+              ? 0
+              : previous + 1,
+        )
+
+        return
+      }
+
+      /*
+      |--------------------------------------------------------------------------
+      | ARROW UP
+      |--------------------------------------------------------------------------
+      */
+
+      if (
+        event.key ===
+        'ArrowUp'
+      ) {
+        event.preventDefault()
+
+        if (
+          searchResults.length ===
+          0
+        ) {
+          return
+        }
+
+        setSelectedSearchIndex(
+          (
+            previous,
+          ) =>
+            previous <= 0
+              ? searchResults.length -
+                1
+              : previous - 1,
+        )
+
+        return
+      }
+
+      /*
+      |--------------------------------------------------------------------------
+      | ENTER
+      |--------------------------------------------------------------------------
+      */
+
+      if (
+        event.key ===
+        'Enter'
+      ) {
+        event.preventDefault()
+
+        /*
+        |--------------------------------------------------------------------------
+        | Selected result
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+          selectedSearchIndex >=
+            0 &&
+          searchResults[
+            selectedSearchIndex
+          ]
+        ) {
+          openSearchResult(
+            searchResults[
+              selectedSearchIndex
+            ],
+          )
+
+          return
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | First result
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+          searchResults.length >
+          0
+        ) {
+          openSearchResult(
+            searchResults[0],
+          )
+        }
+
+        return
+      }
+    }
+
+  /*
+  |--------------------------------------------------------------------------
+  | RESULT ICON
+  |--------------------------------------------------------------------------
+  */
+
+  const getResultIcon =
+    (
+      type: string,
+    ) => {
+      const normalized =
+        type.toLowerCase()
+
+      if (
+        normalized.includes(
+          'assistant',
+        )
+      ) {
+        return MessageCircle
+      }
+
+      if (
+        normalized.includes(
+          'research',
+        )
+      ) {
+        return BookOpen
+      }
+
+      if (
+        normalized.includes(
+          'document',
+        )
+      ) {
+        return FileSearch
+      }
+
+      if (
+        normalized.includes(
+          'case',
+        )
+      ) {
+        return Briefcase
+      }
+
+      if (
+        normalized.includes(
+          'client',
+        )
+      ) {
+        return UserRound
+      }
+
+      return FileText
+    }
+
+  /*
+  |--------------------------------------------------------------------------
+  | HIGHLIGHT SEARCH TERM
+  |--------------------------------------------------------------------------
+  */
+
+  const renderHighlightedText =
+    (
+      text: string,
+    ) => {
+      if (!text) {
+        return null
+      }
+
+      const query =
+        search.trim()
+
+      if (!query) {
+        return text
+      }
+
+      const parts =
+        text.split(
+          new RegExp(
+            `(${escapeRegExp(
+              query,
+            )})`,
+            'gi',
+          ),
+        )
+
+      return parts.map(
+        (
+          part,
+          index,
+        ) => {
+          const isMatch =
+            part.toLowerCase() ===
+            query.toLowerCase()
+
+          if (isMatch) {
+            return (
+              <mark
+                key={index}
+                style={{
+                  background:
+                    'rgba(234, 179, 8, 0.28)',
+                  color:
+                    'inherit',
+                  borderRadius: 3,
+                  padding:
+                    '1px 2px',
+                  fontWeight: 700,
+                }}
+              >
+                {part}
+              </mark>
+            )
+          }
+
+          return (
+            <span key={index}>
+              {part}
+            </span>
+          )
+        },
+      )
+    }
+
+  /*
+  |--------------------------------------------------------------------------
+  | SIDEBAR
+  |--------------------------------------------------------------------------
+  */
+
+  const Sidebar =
+    () => (
+      <aside
+        className="sidebar"
+        style={{
+          zIndex: 40,
+        }}
+      >
+        {/* LOGO */}
+
+        <div
+          style={{
+            padding:
+              '20px 16px 16px',
+            borderBottom:
+              '1px solid var(--border)',
+          }}
+        >
+          <Link
+            to={homeHref}
+            style={{
+              textDecoration:
+                'none',
+              display: 'flex',
+              alignItems:
+                'center',
+              gap: 10,
+            }}
+          >
+            <img
+              src="/nyaya-logo.jpeg"
+              alt="Nyaya AI"
+              style={{
+                width: 42,
+                height: 42,
+                borderRadius:
+                  '50%',
+                objectFit:
+                  'cover',
+                display: 'block',
+                flexShrink: 0,
+              }}
+            />
+
+            <span
+              style={{
+                fontWeight: 800,
+                fontSize:
+                  '1rem',
+                color:
+                  'var(--text)',
+                letterSpacing:
+                  '-0.02em',
+              }}
+            >
+              Nyaya
+              <span
+                style={{
+                  color:
+                    'var(--blue)',
+                }}
+              >
+                AI
+              </span>
+            </span>
+          </Link>
+
+          {isAdvocate && (
+            <div
+              style={{
+                marginTop: 8,
+                display: 'flex',
+                alignItems:
+                  'center',
+                gap: 6,
+              }}
+            >
+              <div
+                style={{
+                  padding:
+                    '2px 8px',
+                  borderRadius: 6,
+                  fontSize:
+                    '0.65rem',
+                  fontWeight: 700,
+                  background:
+                    'var(--emerald-subtle)',
+                  color:
+                    'var(--emerald)',
+                  border:
+                    '1px solid var(--emerald-light)',
+                  letterSpacing:
+                    '0.05em',
+                  textTransform:
+                    'uppercase',
+                }}
+              >
+                Verified Advocate
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* NAVIGATION */}
+
+        <nav
+          style={{
+            padding:
+              '12px 10px',
+            flex: 1,
+          }}
+        >
+          <div
+            style={{
+              marginBottom: 6,
+              padding:
+                '0 6px',
+            }}
+          >
+            <span
+              style={{
+                fontSize:
+                  '0.65rem',
+                fontWeight: 700,
+                color:
+                  'var(--text-subtle)',
+                letterSpacing:
+                  '0.08em',
+                textTransform:
+                  'uppercase',
+              }}
+            >
+              Navigation
+            </span>
+          </div>
+
+          {navItems.map(
+            (item) => {
+              const active =
+                location.pathname ===
+                item.href
+
+              return (
+                <Link
+                  key={item.href}
+                  to={item.href}
+                  onClick={() =>
+                    setSidebarOpen(
+                      false,
+                    )
+                  }
+                  className={`nav-item ${
+                    active
+                      ? 'active'
+                      : ''
+                  }`}
+                >
+                  <item.icon
+                    size={17}
+                    strokeWidth={
+                      active
+                        ? 2.5
+                        : 2
+                    }
+                  />
+
+                  <span
+                    style={{
+                      flex: 1,
+                    }}
+                  >
+                    {item.label}
+                  </span>
+
+                  {'badge' in
+                    item &&
+                  typeof item.badge ===
+                    'number' ? (
+                    <span
+                      style={{
+                        minWidth: 18,
+                        height: 18,
+                        borderRadius:
+                          9,
+                        background:
+                          'var(--blue)',
+                        color:
+                          'white',
+                        fontSize:
+                          '0.65rem',
+                        fontWeight: 700,
+                        display: 'flex',
+                        alignItems:
+                          'center',
+                        justifyContent:
+                          'center',
+                        padding:
+                          '0 5px',
+                      }}
+                    >
+                      {String(
+                        item.badge,
+                      )}
+                    </span>
+                  ) : null}
+                </Link>
+              )
+            },
+          )}
+        </nav>
+
+        {/* USER */}
+
+        <div
+          style={{
+            padding:
+              '12px 10px',
+            borderTop:
+              '1px solid var(--border)',
+          }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              alignItems:
+                'center',
+              gap: 10,
+              padding:
+                '8px 10px',
+            }}
+          >
+            <div
+              className="avatar"
+              style={{
+                width: 36,
+                height: 36,
+                fontSize:
+                  '0.8rem',
+              }}
+            >
+              {userInitials}
+            </div>
+
+            <div
+              style={{
+                flex: 1,
+                minWidth: 0,
+              }}
+            >
+              <div
+                style={{
+                  fontSize:
+                    '0.8rem',
+                  fontWeight: 600,
+                  color:
+                    'var(--text)',
+                  whiteSpace:
+                    'nowrap',
+                  overflow:
+                    'hidden',
+                  textOverflow:
+                    'ellipsis',
+                }}
+              >
+                {userName}
+              </div>
+
+              <div
+                style={{
+                  fontSize:
+                    '0.68rem',
+                  color:
+                    'var(--text-muted)',
+                }}
+              >
+                {userLabel}
+              </div>
+            </div>
+          </div>
+
+          <div
+            style={{
+              display: 'flex',
+              gap: 6,
+              padding:
+                '6px 4px 0',
+            }}
+          >
+            <button
+              onClick={() => {
+                logout(
+                  API_BASE_URL,
+                ).finally(() => {
+                  navigate('/')
+                })
+              }}
+              style={{
+                flex: 1,
+                padding: '7px',
+                borderRadius: 8,
+                border:
+                  '1px solid var(--border)',
+                background:
+                  'var(--bg-secondary)',
+                cursor:
+                  'pointer',
+                color:
+                  'var(--text-muted)',
+                display: 'flex',
+                alignItems:
+                  'center',
+                justifyContent:
+                  'center',
+              }}
+              title="Logout"
+            >
+              <LogOut
+                size={14}
+              />
+            </button>
+
+            <Link
+              to={profileHref}
+              style={{
+                flex: 2,
+                padding: '7px',
+                borderRadius: 8,
+                border:
+                  '1px solid var(--border)',
+                background:
+                  'var(--bg-secondary)',
+                cursor:
+                  'pointer',
+                color:
+                  'var(--text-muted)',
+                display: 'flex',
+                alignItems:
+                  'center',
+                justifyContent:
+                  'center',
+                gap: 4,
+                textDecoration:
+                  'none',
+                fontSize:
+                  '0.75rem',
+                fontWeight: 500,
+              }}
+            >
+              Profile
+              <ChevronRight
+                size={12}
+              />
+            </Link>
+          </div>
+        </div>
+      </aside>
+    )
+
+  /*
+  |--------------------------------------------------------------------------
+  | RENDER
+  |--------------------------------------------------------------------------
+  */
 
   return (
-
     <div
-
       style={{
-
         display: 'flex',
-
-        flexDirection: 'column',
-
-        gap: 28,
-
+        minHeight: '100vh',
+        background:
+          'var(--bg)',
       }}
-
-      className="page-enter"
-
     >
+      {/* DESKTOP SIDEBAR */}
 
+      <div className="hidden lg:block">
+        <Sidebar />
+      </div>
 
+      {/* MOBILE SIDEBAR */}
 
-      {/* ==========================================
-      {/* ==========================================
-          WELCOME
-      ========================================== */}
-      <div
-        className="nyaya-banner"
-        style={{
-          borderRadius: 'var(--radius)',
-          padding: '28px 32px',
-          background:
-            'linear-gradient(135deg, #3A2A08 0%, #6B5014 55%, #17130A 100%)',
-          border: '1px solid #262626',
-          position: 'relative',
-          overflow: 'hidden',
-        }}
-      >
+      {sidebarOpen && (
         <div
           style={{
-            position: 'relative',
+            position: 'fixed',
+            inset: 0,
+            zIndex: 50,
             display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'flex-start',
-            flexWrap: 'wrap',
-            gap: 16,
           }}
         >
-          <div style={{ minWidth: 0 }}>
-            <div
-              style={{
-                fontSize: '0.8rem',
-                color: '#E5BC43',
-                marginBottom: 6,
-                fontWeight: 500,
-                fontFamily: 'Inter, system-ui, sans-serif',
-              }}
-            >
-              Your legal matters, at a glance.
-            </div>
-            <h1
-              style={{
-                fontSize: '1.7rem',
-                fontWeight: 700,
-                color: '#F5F5F5',
-                letterSpacing: '-0.02em',
-                marginBottom: 8,
-                fontFamily: "'Playfair Display', Georgia, serif",
-                overflowWrap: 'anywhere',
-              }}
-            >
-              {userName}
-            </h1>
-            <p
-              style={{
-                color: '#D4D4D4',
-                fontSize: '0.9rem',
-              }}
-            >
-              You have{' '}
-              <strong style={{ color: '#F5F5F5' }}>
-                {activeCaseCount} active case
-                {activeCaseCount === 1 ? '' : 's'}
-              </strong>
-              .
-            </p>
-          </div>
-          <Link
-            to="/dashboard/ai-assistant"
+          <div
             style={{
-              padding: '12px 20px',
-              borderRadius: 10,
-              background: '#E5BC43',
-              border: '1px solid #E5BC43',
-              color: '#1A1405',
-              textDecoration: 'none',
-              fontSize: '0.875rem',
-              fontWeight: 600,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
+              position:
+                'absolute',
+              inset: 0,
+              background:
+                'rgba(0,0,0,0.5)',
+              backdropFilter:
+                'blur(4px)',
             }}
-          >
-            <Zap size={15} />
-            Ask AI Assistant
-          </Link>
-        </div>
-        {/* MINI STATS */}
-        <div
-          style={{
-            position: 'relative',
-            display: 'flex',
-            gap: 12,
-            marginTop: 24,
-            flexWrap: 'wrap',
-          }}
-        >
-          {[
-            { val: String(cases.length), lbl: 'Total Cases' },
-            { val: String(activeCaseCount), lbl: 'Active' },
-            { val: String(aiConsultations), lbl: 'AI Consultations' },
-            { val: String(documentsCount), lbl: 'Documents' },
-          ].map((s) => (
-            <div
-              key={s.lbl}
-              style={{
-                padding: '10px 16px',
-                borderRadius: 10,
-                background: 'rgba(0,0,0,0.28)',
-                border: '1px solid rgba(229,188,67,0.18)',
-              }}
-            >
-              <div
-                style={{
-                  fontSize: '1.3rem',
-                  fontWeight: 700,
-                  color: '#F5F5F5',
-                }}
-              >
-                {s.val}
-              </div>
-              <div
-                style={{
-                  fontSize: '0.7rem',
-                  color: '#A3A3A3',
-                  marginTop: 1,
-                }}
-              >
-                {s.lbl}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* ==========================================
-          QUICK ACTIONS
-
-      ========================================== */}
-
-
-
-      <div>
-
-        <h2
-
-          style={{
-
-            fontSize: '1rem',
-
-            fontWeight: 700,
-
-            color: 'var(--text)',
-
-            marginBottom: 14,
-
-          }}
-
-        >
-
-          Quick Actions
-
-        </h2>
-
-
-
-        <div
-
-          style={{
-
-            display: 'grid',
-
-            gridTemplateColumns:
-
-              'repeat(4, 1fr)',
-
-            gap: 14,
-
-          }}
-
-          className="qa-grid"
-
-        >
-
-          {quickActions.map((a) => (
-
-            <Link
-
-              key={a.label}
-
-              to={a.href}
-
-              className="card card-interactive"
-
-              style={{
-
-                padding: '20px 18px',
-                borderColor:
-                  a.href === '/dashboard/ai-assistant'
-                    ? 'rgba(229,188,67,0.45)'
-                    : undefined,
-
-                textDecoration: 'none',
-
-                display: 'flex',
-
-                flexDirection: 'column',
-
-                gap: 10,
-
-              }}
-
-            >
-
-              <div
-
-                style={{
-
-                  width: 42,
-
-                  height: 42,
-
-                  borderRadius: 12,
-
-                  background: a.bg,
-
-                  display: 'flex',
-
-                  alignItems: 'center',
-
-                  justifyContent: 'center',
-
-                }}
-
-              >
-
-                <a.icon
-
-                  size={20}
-
-                  style={{
-
-                    color: a.color,
-
-                  }}
-
-                  strokeWidth={2}
-
-                />
-
-              </div>
-
-
-
-              <div>
-
-                <div
-
-                  style={{
-
-                    fontWeight: 700,
-
-                    color: 'var(--text)',
-
-                    fontSize: '0.875rem',
-
-                  }}
-
-                >
-
-                  {a.label}
-
-                </div>
-
-
-
-                <div
-
-                  style={{
-
-                    fontSize: '0.75rem',
-
-                    color: 'var(--text-muted)',
-
-                    marginTop: 2,
-
-                  }}
-
-                >
-
-                  {a.desc}
-
-                </div>
-
-              </div>
-
-            </Link>
-
-          ))}
-
-        </div>
-
-      </div>
-
-
-
-      {/* ==========================================
-
-          CASES + ACTIVITY
-
-      ========================================== */}
-
-
-
-      <div
-
-        style={{
-
-          display: 'grid',
-
-          gridTemplateColumns:
-
-            'minmax(0, 1fr) minmax(0, 1fr)',
-
-          gap: 20, alignItems: 'stretch', gridAutoRows: 'minmax(320px, auto)',
-
-        }}
-
-        className="two-col-grid"
-
-      >
-
-
-
-        {/* MY CASES */}
-
-
-
-        <div
-
-          className="card"
-
-          style={{ padding: 24 }}
-
-        >
+            onClick={() =>
+              setSidebarOpen(
+                false,
+              )
+            }
+          />
 
           <div
-
             style={{
+              position:
+                'relative',
+              zIndex: 1,
+            }}
+          >
+            <Sidebar />
+          </div>
 
+          <button
+            onClick={() =>
+              setSidebarOpen(
+                false,
+              )
+            }
+            style={{
+              position:
+                'absolute',
+              top: 16,
+              right: 16,
+              width: 36,
+              height: 36,
+              borderRadius: 8,
+              border:
+                '1px solid var(--border)',
+              background:
+                'var(--bg-card)',
               display: 'flex',
-
+              alignItems:
+                'center',
               justifyContent:
-
-                'space-between',
-
-              alignItems: 'center',
-
-              marginBottom: 20,
-
+                'center',
+              cursor:
+                'pointer',
+              color:
+                'var(--text)',
             }}
-
           >
-
-            <h2
-
-              style={{
-
-                fontWeight: 700,
-
-                color: 'var(--text)',
-
-                fontSize: '0.95rem',
-
-              }}
-
-            >
-
-              My Cases
-
-            </h2>
-
-
-
-            <Link
-
-              to="/dashboard/cases"
-
-              style={{
-
-                fontSize: '0.8rem',
-
-                color: 'var(--blue)',
-
-                textDecoration: 'none',
-
-                fontWeight: 500,
-
-                display: 'flex',
-
-                alignItems: 'center',
-
-                gap: 3,
-
-              }}
-
-            >
-
-              View all
-
-              <ArrowRight size={13} />
-
-            </Link>
-
-          </div>
-
-
-
-          <div
-
-            style={{
-
-              display: 'flex',
-
-              flexDirection: 'column',
-
-              gap: 14,
-
-            }}
-
-          >
-
-            {loadingCases && (
-
-              <div
-
-                style={{
-
-                  padding: 24,
-
-                  textAlign: 'center',
-
-                  color: 'var(--text-muted)',
-
-                  fontSize: '0.8rem',
-
-                }}
-
-              >
-
-                Loading your cases...
-
-              </div>
-
-            )}
-
-
-
-            {!loadingCases && caseError && (
-
-              <div
-
-                style={{
-
-                  padding: 24,
-
-                  textAlign: 'center',
-
-                  color: '#DC2626',
-
-                  fontSize: '0.8rem',
-
-                }}
-
-              >
-
-                {caseError}
-
-              </div>
-
-            )}
-
-
-
-            {!loadingCases &&
-
-              !caseError &&
-
-              cases.length === 0 && (
-
-                <div
-
-                  style={{
-
-                    padding: 24,
-
-                    textAlign: 'center',
-
-                    color: 'var(--text-muted)',
-
-                    fontSize: '0.8rem',
-
-                  }}
-
-                >
-
-                  No cases yet.
-                  <div style={{ marginTop: 12 }}>
-                    <Link
-                      to="/dashboard/new-case"
-                      className="btn-primary"
-                      style={{
-                        padding: '8px 16px',
-                        borderRadius: 8,
-                        fontSize: '0.8rem',
-                        fontWeight: 600,
-                        textDecoration: 'none',
-                        display: 'inline-block',
-                      }}
-                    >
-                      Start New Case
-                    </Link>
-                  </div>
-
-                </div>
-
-              )}
-
-
-
-            {!loadingCases &&
-
-              !caseError &&
-
-              cases.slice(0, 3).map((c) => {
-
-                const isResolved =
-
-                  c.status === 'resolved' ||
-
-                  c.status === 'closed'
-
-
-
-                const statusLabel = isResolved
-
-                  ? 'Closed'
-
-                  : 'Processing'
-
-
-
-                return (
-
-                  <div
-
-                    key={c.id}
-
-                    style={{
-
-                      padding: 14,
-
-                      borderRadius: 10,
-
-                      background: 'var(--bg-secondary)',
-
-                      cursor: 'pointer',
-
-                    }}
-
-                  >
-
-                    <div
-
-                      style={{
-
-                        display: 'flex',
-
-                        justifyContent: 'space-between',
-
-                        alignItems: 'flex-start',
-
-                        marginBottom: 8,
-
-                        gap: 10,
-
-                      }}
-
-                    >
-
-                      <div
-
-                        style={{
-
-                          minWidth: 0,
-
-                          flex: 1,
-
-                        }}
-
-                      >
-
-                        <div
-
-                          style={{
-
-                            fontWeight: 600,
-
-                            color: 'var(--text)',
-
-                            fontSize: '0.85rem',
-
-                          }}
-
-                        >
-
-                          {c.title}
-
-                        </div>
-
-
-
-                        <div
-
-                          style={{
-
-                            fontSize: '0.72rem',
-
-                            color: 'var(--text-muted)',
-
-                            marginTop: 2,
-
-                          }}
-
-                        >
-
-                          Case #{c.id} · {c.category}
-
-                        </div>
-
-                      </div>
-
-
-
-                      <span
-
-                        className="badge"
-
-                        style={{
-
-                          background: isResolved
-
-                            ? 'rgba(120,120,120,0.1)'
-
-                            : 'rgba(245,158,11,0.1)',
-
-                          color: isResolved
-
-                            ? 'var(--text-muted)'
-
-                            : '#F59E0B',
-
-                          flexShrink: 0,
-
-                        }}
-
-                      >
-
-                        {statusLabel}
-
-                      </span>
-
-                    </div>
-
-                  </div>
-
-                )
-
-              })}
-
-          </div>
-
+            <X size={18} />
+          </button>
         </div>
+      )}
 
+      {/* MAIN */}
 
+      <div
+        style={{
+          flex: 1,
+          display: 'flex',
+          flexDirection:
+            'column',
+          minWidth: 0,
+          overflow:
+            'hidden',
+        }}
+      >
+        {/* TOP BAR */}
 
-        {/* RECENT ACTIVITY */}
-
-
-
-        <div
-
-          className="card activity-panel"
-
-          style={{ padding: 24 }}
-
+        <header
+          style={{
+            height: 60,
+            display: 'flex',
+            alignItems:
+              'center',
+            gap: 12,
+            padding:
+              '0 24px',
+            borderBottom:
+              '1px solid var(--border)',
+            background:
+              'var(--bg-glass)',
+            backdropFilter:
+              'blur(20px)',
+            WebkitBackdropFilter:
+              'blur(20px)',
+            position:
+              'sticky',
+            top: 0,
+            zIndex: 30,
+          }}
         >
+          {/* MOBILE MENU */}
+
+          <button
+            onClick={() =>
+              setSidebarOpen(
+                true,
+              )
+            }
+            className="lg:hidden"
+            style={{
+              width: 34,
+              height: 34,
+              borderRadius: 8,
+              border:
+                '1px solid var(--border)',
+              background:
+                'var(--bg-card)',
+              display: 'flex',
+              alignItems:
+                'center',
+              justifyContent:
+                'center',
+              cursor:
+                'pointer',
+              color:
+                'var(--text)',
+            }}
+          >
+            <Menu size={17} />
+          </button>
+
+          {/* =====================================================
+              GLOBAL SEARCH
+          ===================================================== */}
 
           <div
-
+            ref={
+              searchContainerRef
+            }
             style={{
-
-              display: 'flex',
-
-              justifyContent: 'space-between',
-
-              alignItems: 'center',
-
-              marginBottom: 20,
-
+              flex: 1,
+              maxWidth: 520,
+              position:
+                'relative',
             }}
-
           >
+            {/* SEARCH ICON */}
 
-            <h2
-
+            <Search
+              size={15}
               style={{
-
-                fontWeight: 700,
-
-                color: 'var(--text)',
-
-                fontSize: '0.95rem',
-
-              }}
-
-            >
-
-              Recent Activity
-
-            </h2>
-
-
-
-            <Clock
-
-              size={16}
-
-              style={{
-
+                position:
+                  'absolute',
+                left: 10,
+                top: '50%',
+                transform:
+                  'translateY(-50%)',
                 color:
-
                   'var(--text-muted)',
-
+                pointerEvents:
+                  'none',
+                zIndex: 2,
               }}
-
             />
 
-          </div>
+            {/* INPUT */}
 
+            <input
+              ref={
+                searchInputRef
+              }
+              className="input"
+              type="search"
+              autoComplete="off"
+              readOnly={!searchFocused}
+              value={search}
+              onChange={(
+                event,
+              ) => {
+                setSearch(
+                  event.target.value,
+                )
 
+                setSearchOpen(
+                  true,
+                )
+              }}
+              onFocus={(event) => {
+                // Clear any value that the browser may have injected
+                // before React received focus.
+                if (
+                  !search &&
+                  event.currentTarget.value
+                ) {
+                  event.currentTarget.value = ''
+                  setSearch('')
+                }
 
-          <div className="activity-scroll"
+                setSearchFocused(true)
 
-            style={{
+                if (
+                  search.trim()
+                    .length >= 2
+                ) {
+                  setSearchOpen(
+                    true,
+                  )
+                }
+              }}
+              onBlur={() => {
+                // Return to read-only mode when the user leaves the field.
+                setSearchFocused(false)
+              }}
+              onKeyDown={
+                handleSearchKeyDown
+              }
+              placeholder={
+                isAdvocate
+                  ? 'Search clients, cases, research...'
+                  : 'Search cases, AI Assistant, documents...'
+              }
+              autoCorrect="off"
+              autoCapitalize="off"
+              spellCheck={false}
+              data-form-type="other"
+              data-lpignore="true"
+              data-1p-ignore="true"
+              aria-label="Global search"
+              style={{
+                paddingLeft: 32,
+                paddingRight: 34,
+                fontSize:
+                  '0.875rem',
+                height: 36,
+                borderRadius: 8,
+              }}
+            />
 
-              display: 'flex',
+            {/* LOADING */}
 
-              flexDirection: 'column',
+            {searchLoading && (
+              <Loader2
+                size={15}
+                style={{
+                  position:
+                    'absolute',
+                  right: 10,
+                  top: '50%',
+                  transform:
+                    'translateY(-50%)',
+                  animation:
+                    'spin 1s linear infinite',
+                  color:
+                    'var(--text-muted)',
+                }}
+              />
+            )}
 
-              gap: 0,
+            {/* =====================================================
+                SEARCH RESULTS
+            ===================================================== */}
 
-            }}
-
-          >
-
-            {loadingActivity ? (
-              <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', padding: '8px 0' }}>Loading activity…</div>
-            ) : activityError ? (
-              <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', padding: '8px 0' }}>
-                {activityError} <button type="button" onClick={() => window.location.reload()} style={{ marginLeft: 8, color: 'var(--gold)', background: 'transparent', border: 0, cursor: 'pointer' }}>Retry</button>
-              </div>
-            ) : recentActivity.length === 0 ? (
-              <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', padding: '8px 0' }}>No activity yet. Your recent actions will appear here.</div>
-            ) : recentActivity.map(
-
-              (a, i) => {
-                const presentation = activityPresentation(a.action)
-                const ActivityIcon = presentation.icon
-                const activityStatus = a.status === 'pending' ? 'pending' : 'completed'
-                const sc = statusConfig[activityStatus]
-
-
-
-                return (
+            {searchOpen &&
+              search.trim()
+                .length >= 2 && (
+                <div
+                  style={{
+                    position:
+                      'absolute',
+                    top: 44,
+                    left: 0,
+                    right: 0,
+                    maxHeight: 520,
+                    overflowY:
+                      'auto',
+                    background:
+                      'var(--bg-card)',
+                    border:
+                      '1px solid var(--border)',
+                    borderRadius: 12,
+                    boxShadow:
+                      '0 18px 45px rgba(0,0,0,0.28)',
+                    zIndex: 100,
+                  }}
+                >
+                  {/* SEARCH HEADER */}
 
                   <div
-
-                    key={i}
-
                     style={{
-
+                      padding:
+                        '10px 14px',
+                      borderBottom:
+                        '1px solid var(--border)',
                       display: 'flex',
-
-                      gap: 12,
-
-                      paddingBottom: 16,
-
-                      position:
-
-                        'relative',
-
+                      alignItems:
+                        'center',
+                      justifyContent:
+                        'space-between',
+                      gap: 10,
                     }}
-
                   >
+                    <div
+                      style={{
+                        fontSize:
+                          '0.72rem',
+                        fontWeight: 700,
+                        color:
+                          'var(--text-muted)',
+                      }}
+                    >
+                      {searchLoading
+                        ? 'Searching...'
+                        : searchResults.length >
+                            0
+                          ? `${searchResults.length} result${
+                              searchResults.length ===
+                              1
+                                ? ''
+                                : 's'
+                            }`
+                          : 'No results'}
+                    </div>
 
-                    {i <
+                    <div
+                      style={{
+                        fontSize:
+                          '0.65rem',
+                        color:
+                          'var(--text-subtle)',
+                      }}
+                    >
+                      ↑ ↓ navigate · Enter
+                      open · Esc close
+                    </div>
+                  </div>
 
-                      recentActivity.length -
+                  {/* LOADING */}
 
-                        1 && (
-
+                  {searchLoading &&
+                    searchResults.length ===
+                      0 && (
                       <div
-
                         style={{
-
-                          position:
-
-                            'absolute',
-
-                          left: 12,
-
-                          top: 28,
-
-                          bottom: 0,
-
-                          width: 1,
-
-                          background:
-
-                            'var(--border)',
-
+                          padding:
+                            '28px 16px',
+                          textAlign:
+                            'center',
+                          color:
+                            'var(--text-muted)',
                         }}
+                      >
+                        <Loader2
+                          size={22}
+                          style={{
+                            animation:
+                              'spin 1s linear infinite',
+                            marginBottom:
+                              8,
+                          }}
+                        />
 
-                      />
-
+                        <div
+                          style={{
+                            fontSize:
+                              '0.8rem',
+                          }}
+                        >
+                          Searching your
+                          content...
+                        </div>
+                      </div>
                     )}
 
+                  {/* NO RESULTS */}
 
-
-                    <div
-
-                      style={{
-
-                        width: 26,
-
-                        height: 26,
-
-                        borderRadius:
-
-                          '50%',
-
-                        flexShrink: 0,
-
-                        background:
-
-                          `color-mix(in srgb, ${presentation.color} 12%, transparent)`,
-
-                        display: 'flex',
-
-                        alignItems:
-
-                          'center',
-
-                        justifyContent:
-
-                          'center',
-
-                        position:
-
-                          'relative',
-
-                        zIndex: 1,
-
-                      }}
-
-                    >
-
-                      <ActivityIcon
-                        size={12}
-                        style={{ color: presentation.color }}
-                      />
-
-                    </div>
-
-
-
-                    <div
-
-                      style={{
-
-                        flex: 1,
-
-                        minWidth: 0,
-
-                      }}
-
-                    >
-
+                  {!searchLoading &&
+                    searchResults.length ===
+                      0 && (
                       <div
-
                         style={{
-
-                          fontSize:
-
-                            '0.8rem',
-
-                          fontWeight: 500,
-
-                          color:
-
-                            'var(--text)',
-
-                          lineHeight: 1.4,
-
-                        }}
-
-                      >
-
-                        {a.description}
-
-                      </div>
-
-
-
-                      <div
-
-                        style={{
-
-                          display: 'flex',
-
-                          alignItems:
-
-                            'center',
-
-                          gap: 8,
-
-                          marginTop: 3,
-
-                        }}
-
-                      >
-
-                        <span
-
-                          style={{
-
-                            fontSize:
-
-                              '0.7rem',
-
-                            color:
-
-                              'var(--text-muted)',
-
-                          }}
-
-                        >
-
-                          {formatActivityTime(a.created_at)}
-
-                        </span>
-
-
-
-                        <span
-
-                          className="badge"
-
-                          style={{
-
-                            background:
-
-                              sc.bg,
-
-                            color:
-
-                              sc.color,
-
-                            fontSize:
-
-                              '0.6rem',
-
-                          }}
-
-                        >
-
-                          {sc.label}
-
-                        </span>
-
-                      </div>
-
-                    </div>
-
-                  </div>
-
-                )
-
-              }
-
-            )}
-
-          </div>
-
-        </div>
-
-      </div>
-
-
-
-      {/* ==========================================
-
-          ALL REGISTERED ADVOCATES
-
-      ========================================== */}
-
-
-
-      <div>
-
-        <div
-
-          style={{
-
-            display: 'flex',
-
-            justifyContent: 'space-between',
-
-            alignItems: 'center',
-
-            marginBottom: 14,
-
-          }}
-
-        >
-
-          <h2
-
-            style={{
-
-              fontSize: '1rem',
-
-              fontWeight: 700,
-
-              color: 'var(--text)',
-
-            }}
-
-          >
-
-            Recommended Advocates
-
-          </h2>
-
-
-
-          <Link
-
-            to="/dashboard/advocates"
-
-            style={{
-
-              fontSize: '0.8rem',
-
-              color: 'var(--blue)',
-
-              textDecoration: 'none',
-
-              fontWeight: 500,
-
-              display: 'flex',
-
-              alignItems: 'center',
-
-              gap: 3,
-
-            }}
-
-          >
-
-            Browse all
-
-            <ArrowRight size={13} />
-
-          </Link>
-
-        </div>
-
-
-
-        {/* LOADING */}
-
-
-
-        {loadingAdvocates && (
-
-          <div
-
-            className="card"
-
-            style={{
-
-              padding: 30,
-
-              textAlign: 'center',
-
-              color:
-
-                'var(--text-muted)',
-
-            }}
-
-          >
-
-            Loading advocates...
-
-          </div>
-
-        )}
-
-
-
-        {/* ERROR */}
-
-
-
-        {!loadingAdvocates &&
-
-          advocateError && (
-
-            <div
-
-              className="card"
-
-              style={{
-
-                padding: 30,
-
-                textAlign: 'center',
-
-                color: '#DC2626',
-
-              }}
-
-            >
-
-              {advocateError}
-
-            </div>
-
-          )}
-
-
-
-        {/* NO ADVOCATES */}
-
-
-
-        {!loadingAdvocates &&
-
-          !advocateError &&
-
-          recommendedAdvocates.length ===
-
-            0 && (
-
-            <div
-
-              className="card"
-
-              style={{
-
-                padding: 30,
-
-                textAlign: 'center',
-
-                color:
-
-                  'var(--text-muted)',
-
-              }}
-
-            >
-
-              No advocates have
-
-              registered yet.
-
-            </div>
-
-          )}
-
-
-
-        {/* ALL REAL ADVOCATES */}
-
-
-
-        {!loadingAdvocates &&
-
-          recommendedAdvocates.length >
-
-            0 && (
-
-            <div
-
-              style={{
-
-                display: 'grid',
-
-                gridTemplateColumns:
-
-                  'repeat(3, minmax(0, 1fr))',
-
-                gap: 16,
-
-              }}
-
-              className="advocates-mini-grid"
-
-            >
-
-              {recommendedAdvocates.slice(0, 3).map(
-
-                (a) => (
-
-                  <div
-
-                    key={a.id}
-
-                    className="card card-interactive"
-
-                    style={{
-
-                      padding: 20, display: 'flex', flexDirection: 'column',
-
-                    }}
-
-                  >
-
-                    <div
-
-                      style={{
-
-                        display: 'flex',
-
-                        gap: 12,
-
-                        marginBottom: 12,
-
-                      }}
-
-                    >
-
-                      <div
-
-                        className="avatar"
-
-                        style={{
-
-                          width: 44,
-
-                          height: 44,
-
-                          background:
-
-                            `linear-gradient(135deg, ${a.color}, ${a.color}88)`,
-
-                        }}
-
-                      >
-
-                        {a.initials}
-
-                      </div>
-
-
-
-                      <div
-
-                        style={{
-
-                          flex: 1,
-
-                          minWidth: 0,
-
-                        }}
-
-                      >
-
-                        <div
-
-                          style={{
-
-                            fontWeight: 700,
-
-                            color:
-
-                              'var(--text)',
-
-                            fontSize:
-
-                              '0.875rem',
-
-                          }}
-
-                        >
-
-                          {a.name}
-
-                        </div>
-
-
-
-                        <div
-
-                          style={{
-
-                            fontSize:
-
-                              '0.72rem',
-
-                            color:
-
-                              'var(--text-muted)',
-
-                            marginTop: 1,
-
-                          }}
-
-                        >
-
-                          {a.speciality}
-
-                        </div>
-
-                      </div>
-
-                    </div>
-
-
-
-                    <div
-
-                      style={{
-
-                        display: 'flex',
-
-                        columnGap: 14,
-                        rowGap: 6,
-
-                        marginBottom: 14,
-
-                        flexWrap:
-
-                          'wrap',
-
-                      }}
-
-                    >
-
-                      <div
-
-                        style={{
-
-                          display: 'flex',
-
-                          alignItems:
-
-                            'center',
-
-                          gap: 3,
-
-                        }}
-
-                      >
-
-                        <Star
-
-                          size={12}
-
-                          style={{
-
-                            color:
-
-                              '#F59E0B', display: a.rating ? undefined : 'none',
-
-                          }}
-
-                          fill="#F59E0B"
-
-                        />
-
-
-
-                        <span
-
-                          style={{
-
-                            fontSize: a.rating ? '0.78rem' : '0.7rem',
-
-                            fontWeight: a.rating ? 600 : 400,
-
-                            color: a.rating ? 'var(--text)' : 'var(--text-muted)',
-
-                          }}
-
-                        >
-
-                          {a.rating ||
-
-                            'New on NyayaAI'}
-
-                        </span>
-
-                      </div>
-
-
-
-                      <div
-
-                        style={{
-
-                          display: 'flex',
-
-                          alignItems:
-
-                            'center',
-
-                          gap: 3,
-
-                        }}
-
-                      >
-
-                        <MapPin
-
-                          size={12}
-
-                          style={{
-
-                            color:
-
-                              'var(--text-muted)',
-
-                          }}
-
-                        />
-
-
-
-                        <span
-
-                          style={{
-
-                            fontSize:
-
-                              '0.72rem',
-
-                            color:
-
-                              'var(--text-muted)',
-
-                          }}
-
-                        >
-
-                          {a.city}
-
-                        </span>
-
-                      </div>
-
-
-
-                      {a.fee > 0 && (
-
-                        <div
-
-                          style={{
-
-                            fontSize:
-
-                              '0.72rem',
-
-                            color:
-
-                              'var(--text-muted)',
-
-                          }}
-
-                        >
-
-                          ₹{a.fee}/hr
-
-                        </div>
-
-                      )}
-
-                    </div>
-
-
-
-                    <div
-
-                      style={{
-
-                        display: 'flex',
-
-                        justifyContent:
-
-                          'space-between',
-
-                        alignItems:
-
-                          'center', marginTop: 'auto', gap: 8,
-
-                      }}
-
-                    >
-
-                      <span
-
-                        style={{
-
-                          fontSize:
-
-                            '0.7rem',
-
-                          fontWeight: 600,
-
-                          color:
-
-                            a.available
-
-                              ? 'var(--emerald)'
-
-                              : 'var(--text-muted)',
-
-                        }}
-
-                      >
-
-                        {a.available
-
-                          ? '● Available'
-
-                          : '○ Busy'}
-
-                      </span>
-
-
-
-                      <Link
-
-                        to={`/dashboard/booking?advocateId=${a.id}`}
-
-                        className="btn-primary"
-
-                        style={{
-
                           padding:
-
-                            '6px 12px',
-
-                          borderRadius: 8,
-
-                          fontSize:
-
-                            '0.75rem',
-
-                          fontWeight: 600,
-
-                          textDecoration:
-
-                            'none',
-
-                          opacity:
-
-                            a.available
-
-                              ? 1
-
-                              : 0.4,
-
-                          pointerEvents:
-
-                            a.available
-
-                              ? 'auto'
-
-                              : 'none',
-
+                            '28px 16px',
+                          textAlign:
+                            'center',
                         }}
-
                       >
+                        <Search
+                          size={22}
+                          style={{
+                            color:
+                              'var(--text-subtle)',
+                            marginBottom:
+                              8,
+                          }}
+                        />
 
-                        Book
+                        <div
+                          style={{
+                            fontSize:
+                              '0.85rem',
+                            fontWeight: 600,
+                            color:
+                              'var(--text)',
+                          }}
+                        >
+                          No matching content
+                        </div>
 
-                      </Link>
+                        <div
+                          style={{
+                            marginTop: 4,
+                            fontSize:
+                              '0.72rem',
+                            color:
+                              'var(--text-muted)',
+                          }}
+                        >
+                          Try another word
+                          or phrase.
+                        </div>
+                      </div>
+                    )}
 
-                    </div>
+                  {/* RESULTS */}
 
-                  </div>
+                  {searchResults.map(
+                    (
+                      result,
+                      index,
+                    ) => {
+                      const Icon =
+                        getResultIcon(
+                          result.type,
+                        )
 
-                )
+                      const selected =
+                        index ===
+                        selectedSearchIndex
 
+                      return (
+                        <button
+                          key={
+                            result.id
+                          }
+                          type="button"
+                          onClick={() =>
+                            openSearchResult(
+                              result,
+                            )
+                          }
+                          onMouseEnter={() =>
+                            setSelectedSearchIndex(
+                              index,
+                            )
+                          }
+                          style={{
+                            width:
+                              '100%',
+                            textAlign:
+                              'left',
+                            border: 'none',
+                            borderBottom:
+                              index <
+                              searchResults.length -
+                                1
+                                ? '1px solid var(--border)'
+                                : 'none',
+                            background:
+                              selected
+                                ? 'var(--bg-secondary)'
+                                : 'transparent',
+                            cursor:
+                              'pointer',
+                            padding:
+                              '12px 14px',
+                            display:
+                              'flex',
+                            alignItems:
+                              'flex-start',
+                            gap: 11,
+                            color:
+                              'var(--text)',
+                          }}
+                        >
+                          {/* ICON */}
+
+                          <div
+                            style={{
+                              width: 32,
+                              height: 32,
+                              borderRadius:
+                                8,
+                              background:
+                                'var(--bg-secondary)',
+                              display:
+                                'flex',
+                              alignItems:
+                                'center',
+                              justifyContent:
+                                'center',
+                              flexShrink: 0,
+                            }}
+                          >
+                            <Icon
+                              size={16}
+                              color="var(--blue)"
+                            />
+                          </div>
+
+                          {/* CONTENT */}
+
+                          <div
+                            style={{
+                              flex: 1,
+                              minWidth: 0,
+                            }}
+                          >
+                            {/* SOURCE */}
+
+                            <div
+                              style={{
+                                display:
+                                  'flex',
+                                alignItems:
+                                  'center',
+                                gap: 7,
+                                marginBottom:
+                                  3,
+                              }}
+                            >
+                              <span
+                                style={{
+                                  fontSize:
+                                    '0.65rem',
+                                  fontWeight: 700,
+                                  color:
+                                    'var(--blue)',
+                                  textTransform:
+                                    'uppercase',
+                                  letterSpacing:
+                                    '0.04em',
+                                }}
+                              >
+                                {
+                                  result.type
+                                }
+                              </span>
+
+                              {result.field && (
+                                <span
+                                  style={{
+                                    fontSize:
+                                      '0.6rem',
+                                    color:
+                                      'var(--text-subtle)',
+                                    textTransform:
+                                      'uppercase',
+                                  }}
+                                >
+                                  {result.field}
+                                </span>
+                              )}
+                            </div>
+
+                            {/* TITLE */}
+
+                            <div
+                              style={{
+                                fontSize:
+                                  '0.82rem',
+                                fontWeight:
+                                  650,
+                                color:
+                                  'var(--text)',
+                                marginBottom:
+                                  4,
+                                overflow:
+                                  'hidden',
+                                textOverflow:
+                                  'ellipsis',
+                                whiteSpace:
+                                  'nowrap',
+                              }}
+                            >
+                              {
+                                result.title
+                              }
+                            </div>
+
+                            {/* MATCHING SENTENCE */}
+
+                            <div
+                              style={{
+                                fontSize:
+                                  '0.73rem',
+                                lineHeight:
+                                  1.5,
+                                color:
+                                  'var(--text-muted)',
+                                display:
+                                  '-webkit-box',
+                                WebkitLineClamp:
+                                  3,
+                                WebkitBoxOrient:
+                                  'vertical',
+                                overflow:
+                                  'hidden',
+                              }}
+                            >
+                              {renderHighlightedText(
+                                result.content,
+                              )}
+                            </div>
+                          </div>
+
+                          {/* ARROW */}
+
+                          <ChevronRight
+                            size={15}
+                            style={{
+                              marginTop: 8,
+                              flexShrink: 0,
+                              color:
+                                'var(--text-subtle)',
+                            }}
+                          />
+                        </button>
+                      )
+                    },
+                  )}
+
+                  {/* FOOTER */}
+
+                  {!searchLoading &&
+                    searchResults.length >
+                      0 && (
+                      <div
+                        style={{
+                          padding:
+                            '8px 14px',
+                          borderTop:
+                            '1px solid var(--border)',
+                          fontSize:
+                            '0.65rem',
+                          color:
+                            'var(--text-subtle)',
+                          display: 'flex',
+                          justifyContent:
+                            'space-between',
+                        }}
+                      >
+                        <span>
+                          Searching your
+                          accessible content
+                        </span>
+
+                        <span>
+                          {
+                            searchResults.length
+                          }{' '}
+                          matches
+                        </span>
+                      </div>
+                    )}
+                </div>
               )}
-
-            </div>
-
-          )}
-
-      </div>
-
-
-
-      {/* ==========================================
-
-          UPCOMING APPOINTMENT
-
-      ========================================== */}
-
-
-
-      <div
-
-        className="card"
-
-        style={{ padding: 24 }}
-
-      >
-
-        <div
-
-          style={{
-
-            display: 'flex',
-
-            alignItems: 'center',
-
-            gap: 12,
-
-          }}
-
-        >
-
-          <div
-
-            style={{
-
-              width: 44,
-
-              height: 44,
-
-              borderRadius: 12,
-
-              background:
-
-                'var(--blue-subtle)',
-
-              display: 'flex',
-
-              alignItems: 'center',
-
-              justifyContent: 'center',
-
-            }}
-
-          >
-
-            <Calendar
-
-              size={20}
-
-              style={{
-
-                color: 'var(--blue)',
-
-              }}
-
-            />
-
           </div>
 
-
+          {/* SPACER */}
 
           <div
-
             style={{
-
               flex: 1,
-
             }}
+          />
 
-          >
-
-            <div
-
-              style={{
-
-                fontWeight: 700,
-
-                color: 'var(--text)',
-
-                fontSize: '0.95rem',
-
-              }}
-
-            >
-
-              Upcoming Appointment
-
-            </div>
-
-
-
-            <div
-
-              style={{
-
-                fontSize: '0.8rem',
-
-                color:
-
-                  'var(--text-muted)',
-
-                marginTop: 3,
-
-              }}
-
-            >
-
-              Your upcoming advocate
-
-              consultation will appear
-
-              here.
-
-            </div>
-
-          </div>
-
-
+          {/* NOTIFICATIONS */}
 
           <Link
-
-            to="/dashboard/booking"
-
-            className="btn-primary"
-
+            to={
+              isAdvocate
+                ? '/advocate/notifications'
+                : '/dashboard/notifications'
+            }
             style={{
-
-              padding: '8px 16px',
-
+              position:
+                'relative',
+              width: 36,
+              height: 36,
               borderRadius: 8,
-
-              fontSize: '0.8rem',
-
-              fontWeight: 600,
-
-              textDecoration: 'none',
-
+              border:
+                '1px solid var(--border)',
+              background:
+                'var(--bg-card)',
+              display: 'flex',
+              alignItems:
+                'center',
+              justifyContent:
+                'center',
+              cursor:
+                'pointer',
+              color:
+                'var(--text-muted)',
+              textDecoration:
+                'none',
               flexShrink: 0,
-
             }}
-
           >
+            <Bell size={17} />
 
-            Book Consultation
-
+            <span
+              style={{
+                position:
+                  'absolute',
+                top: 6,
+                right: 6,
+                width: 8,
+                height: 8,
+                borderRadius:
+                  '50%',
+                background:
+                  'var(--blue)',
+                border:
+                  '2px solid var(--bg-card)',
+              }}
+            />
           </Link>
+        </header>
 
-        </div>
+        {/* CONTENT */}
 
+        <main
+          style={{
+            flex: 1,
+            overflowY:
+              'auto',
+            padding:
+              '28px 24px',
+          }}
+          className="page-enter"
+        >
+          {location.pathname !== '/dashboard' && location.pathname !== '/dashboard/' && (
+<div
+            style={{
+              marginBottom: 18,
+            }}
+          >
+            <BackButton />
+          </div>
+)}
+
+          <MandatoryFeedbackGate>
+            <Outlet />
+          </MandatoryFeedbackGate>
+        </main>
       </div>
 
+      {/* SPIN ANIMATION */}
 
+      <style>
+        {`
+          @keyframes spin {
+            from {
+              transform: rotate(0deg);
+            }
 
-      <p
-        style={{
-          fontSize: '0.72rem',
-          color: '#A3A3A3',
-          textAlign: 'center',
-          padding: '4px 8px 0',
-          lineHeight: 1.5,
-        }}
-      >
-        AI-generated guidance is informational and does not replace advice from
-        a qualified advocate.
-      </p>
-
-      {/* ==========================================
-
-          RESPONSIVE
-
-      ========================================== */}
-
-
-
-      <style>{`
-
-        /* Recent Activity: panel height follows My Cases; only list scrolls */
-        .activity-panel {
-          height: 0;
-          min-height: 100%;
-          display: flex;
-          flex-direction: column;
-        }
-        .activity-scroll {
-          flex: 1 1 auto;
-          min-height: 0;
-          overflow-y: auto;
-          padding-right: 6px;
-          scrollbar-width: thin;
-          scrollbar-color: rgba(212, 175, 55, 0.35) transparent;
-        }
-        .activity-scroll::-webkit-scrollbar { width: 4px; }
-        .activity-scroll::-webkit-scrollbar-thumb {
-          background: rgba(212, 175, 55, 0.35);
-          border-radius: 99px;
-        }
-        .activity-scroll::-webkit-scrollbar-track { background: transparent; }
-        @media (max-width: 900px) {
-
-          .qa-grid {
-
-            grid-template-columns:
-
-              repeat(2, 1fr) !important;
-
+            to {
+              transform: rotate(360deg);
+            }
           }
-
-
-
-          .activity-panel {
-            height: auto !important;
-            min-height: 0 !important;
-            max-height: 420px;
-          }
-          .two-col-grid {
-
-            grid-template-columns:
-
-              1fr !important;
-
-          }
-
-
-
-          .advocates-mini-grid {
-
-            grid-template-columns:
-
-              1fr !important;
-
-          }
-
-        }
-
-
-
-        @media (max-width: 600px) {
-
-          .qa-grid {
-
-            grid-template-columns:
-
-              1fr 1fr !important;
-
-          }
-
-
-
-          .advocates-mini-grid {
-
-            grid-template-columns:
-
-              1fr !important;
-
-          }
-
-        }
-
-      `}</style>
-
+        `}
+      </style>
     </div>
-
   )
-
 }
