@@ -2290,7 +2290,8 @@ setDocumentsCount(
 
                         display: 'flex',
 
-                        gap: 10,
+                        columnGap: 14,
+                        rowGap: 6,
 
                         marginBottom: 14,
 
@@ -2340,15 +2341,11 @@ setDocumentsCount(
 
                           style={{
 
-                            fontSize:
+                            fontSize: a.rating ? '0.78rem' : '0.7rem',
 
-                              '0.78rem',
+                            fontWeight: a.rating ? 600 : 400,
 
-                            fontWeight: 600,
-
-                            color:
-
-                              'var(--text)',
+                            color: a.rating ? 'var(--text)' : 'var(--text-muted)',
 
                           }}
 
