@@ -350,15 +350,13 @@ export default function CitizenDashboard() {
           return
         }
 
-        const response = await fetch(`${API_URL}/api/activity/recent`, {
-          method: 'GET',
-          credentials: 'include',
-          cache: 'no-store',
-          headers: {
-            'Content-Type': 'application/json',
-            'Cache-Control': 'no-cache',
-          },
-        })
+        
+const response = await fetch(`${API_URL}/api/activity/recent`, {
+  method: 'GET',
+  credentials: 'include',
+  cache: 'no-store',
+})
+
         const result = await response.json()
         if (!response.ok || !result.success) {
           throw new Error(result.message || 'Failed to load recent activity.')
