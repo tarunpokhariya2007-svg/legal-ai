@@ -2065,13 +2065,15 @@ export default function DashboardLayout() {
           }}
           className="page-enter"
         >
-          <div
+          {location.pathname !== '/dashboard' && location.pathname !== '/dashboard/' && (
+<div
             style={{
               marginBottom: 18,
             }}
           >
             <BackButton />
           </div>
+)}
 
           <MandatoryFeedbackGate>
             <Outlet />

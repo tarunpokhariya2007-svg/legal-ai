@@ -52,9 +52,9 @@ const quickActions = [
 
     href: '/dashboard/new-case',
 
-    color: 'var(--blue)',
+    color: '#E5BC43',
 
-    bg: 'var(--blue-subtle)',
+    bg: 'rgba(229,188,67,0.10)',
 
   },
 
@@ -68,9 +68,9 @@ const quickActions = [
 
     href: '/dashboard/documents',
 
-    color: '#7C3AED',
+    color: '#E5BC43',
 
-    bg: 'rgba(124,58,237,0.08)',
+    bg: 'rgba(229,188,67,0.10)',
 
   },
 
@@ -84,9 +84,9 @@ const quickActions = [
 
     href: '/dashboard/ai-assistant',
 
-    color: 'var(--emerald)',
+    color: '#E5BC43',
 
-    bg: 'var(--emerald-subtle)',
+    bg: 'rgba(229,188,67,0.10)',
 
   },
 
@@ -100,9 +100,9 @@ const quickActions = [
 
     href: '/dashboard/advocates',
 
-    color: '#F59E0B',
+    color: '#E5BC43',
 
-    bg: 'rgba(245,158,11,0.08)',
+    bg: 'rgba(229,188,67,0.10)',
 
   },
 
@@ -318,6 +318,10 @@ export default function CitizenDashboard() {
   const savedUser: any = getStoredUser() || {}
 
 
+
+  const activeCaseCount = cases.filter(
+    (c) => c.status === 'open' || c.status === 'in_progress'
+  ).length
 
   const userName =
 
@@ -940,377 +944,139 @@ setDocumentsCount(
 
 
       {/* ==========================================
-
+      {/* ==========================================
           WELCOME
-
       ========================================== */}
-
-
-
       <div
-
+        className="nyaya-banner"
         style={{
-
           borderRadius: 'var(--radius)',
-
           padding: '28px 32px',
-
           background:
-
-            'linear-gradient(135deg, #8A6508 0%, #C9A227 45%, #F0D264 100%)',
-
+            'linear-gradient(135deg, #3A2A08 0%, #6B5014 55%, #17130A 100%)',
+          border: '1px solid #262626',
           position: 'relative',
-
           overflow: 'hidden',
-
         }}
-
       >
-
         <div
-
           style={{
-
-            position: 'absolute',
-
-            top: -40,
-
-            right: -40,
-
-            width: 200,
-
-            height: 200,
-
-            borderRadius: '50%',
-
-            background:
-
-              'radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%)',
-
-          }}
-
-        />
-
-
-
-        <div
-
-          style={{
-
             position: 'relative',
-
             display: 'flex',
-
             justifyContent: 'space-between',
-
             alignItems: 'flex-start',
-
             flexWrap: 'wrap',
-
             gap: 16,
-
           }}
-
         >
-
-          <div>
-
+          <div style={{ minWidth: 0 }}>
             <div
-
               style={{
-
                 fontSize: '0.8rem',
-
-                color: 'rgba(255,255,255,0.6)',
-
+                color: '#E5BC43',
                 marginBottom: 6,
-
                 fontWeight: 500,
-
+                fontFamily: 'Inter, system-ui, sans-serif',
               }}
-
             >
-
-              Welcome back 👋
-
+              Your legal matters, at a glance.
             </div>
-
-
-
             <h1
-
               style={{
-
-                fontSize: '1.6rem',
-
-                fontWeight: 800,
-
-                color: 'white',
-
-                letterSpacing: '-0.03em',
-
+                fontSize: '1.7rem',
+                fontWeight: 700,
+                color: '#F5F5F5',
+                letterSpacing: '-0.02em',
                 marginBottom: 8,
-
+                fontFamily: "'Playfair Display', Georgia, serif",
+                overflowWrap: 'anywhere',
               }}
-
             >
-
               {userName}
-
             </h1>
-
-
-
             <p
-
               style={{
-
-                color: 'rgba(255,255,255,0.7)',
-
+                color: '#D4D4D4',
                 fontSize: '0.9rem',
-
               }}
-
             >
-
               You have{' '}
-
-              <strong style={{ color: 'white' }}>
-
-                {cases.filter(
-
-                  (c) =>
-
-                    c.status === 'open' ||
-
-                    c.status === 'in_progress'
-
-                ).length}{' '}
-
-                active case
-
-                {cases.filter(
-
-                  (c) =>
-
-                    c.status === 'open' ||
-
-                    c.status === 'in_progress'
-
-                ).length === 1
-
-                  ? ''
-
-                  : 's'}
-
-              </strong>{' '}
-
-              and{' '}
-
-              <strong style={{ color: 'white' }}>
-
-                1 upcoming appointment
-
-              </strong>{' '}
-
-              this week.
-
+              <strong style={{ color: '#F5F5F5' }}>
+                {activeCaseCount} active case
+                {activeCaseCount === 1 ? '' : 's'}
+              </strong>
+              .
             </p>
-
           </div>
-
-
-
           <Link
-
             to="/dashboard/ai-assistant"
-
             style={{
-
               padding: '12px 20px',
-
               borderRadius: 10,
-
-              background:
-
-                'rgba(255,255,255,0.15)',
-
-              border:
-
-                '1px solid rgba(255,255,255,0.25)',
-
-              color: 'white',
-
+              background: '#E5BC43',
+              border: '1px solid #E5BC43',
+              color: '#1A1405',
               textDecoration: 'none',
-
               fontSize: '0.875rem',
-
               fontWeight: 600,
-
               display: 'flex',
-
               alignItems: 'center',
-
               gap: 6,
-
-              backdropFilter: 'blur(10px)',
-
             }}
-
           >
-
             <Zap size={15} />
-
             Ask AI Assistant
-
           </Link>
-
         </div>
-
-
-
         {/* MINI STATS */}
-
-
-
         <div
-
           style={{
-
+            position: 'relative',
             display: 'flex',
-
-            gap: 20,
-
+            gap: 12,
             marginTop: 24,
-
             flexWrap: 'wrap',
-
           }}
-
         >
-
           {[
-
-            {
-
-              val: String(cases.length),
-
-              lbl: 'Total Cases',
-
-            },
-
-            {
-
-              val: String(
-
-                cases.filter(
-
-                  (c) =>
-
-                    c.status === 'open' ||
-
-                    c.status === 'in_progress'
-
-                ).length
-
-              ),
-
-              lbl: 'Active',
-
-            },
-
-            {
-
-              val: String(aiConsultations),
-
-              lbl: 'AI Consultations',
-
-            },
-
-            {
-
-              val: String(documentsCount),
-
-              lbl: 'Documents',
-
-            },
-
+            { val: String(cases.length), lbl: 'Total Cases' },
+            { val: String(activeCaseCount), lbl: 'Active' },
+            { val: String(aiConsultations), lbl: 'AI Consultations' },
+            { val: String(documentsCount), lbl: 'Documents' },
           ].map((s) => (
-
             <div
-
               key={s.lbl}
-
               style={{
-
                 padding: '10px 16px',
-
                 borderRadius: 10,
-
-                background:
-
-                  'rgba(255,255,255,0.1)',
-
-                border:
-
-                  '1px solid rgba(255,255,255,0.15)',
-
+                background: 'rgba(0,0,0,0.28)',
+                border: '1px solid rgba(229,188,67,0.18)',
               }}
-
             >
-
               <div
-
                 style={{
-
                   fontSize: '1.3rem',
-
-                  fontWeight: 800,
-
-                  color: 'white',
-
+                  fontWeight: 700,
+                  color: '#F5F5F5',
                 }}
-
               >
-
                 {s.val}
-
               </div>
-
-
-
               <div
-
                 style={{
-
                   fontSize: '0.7rem',
-
-                  color:
-
-                    'rgba(255,255,255,0.6)',
-
+                  color: '#A3A3A3',
                   marginTop: 1,
-
                 }}
-
               >
-
                 {s.lbl}
-
               </div>
-
             </div>
-
           ))}
-
         </div>
-
       </div>
 
-
-
       {/* ==========================================
-
           QUICK ACTIONS
 
       ========================================== */}
@@ -1372,6 +1138,10 @@ setDocumentsCount(
               style={{
 
                 padding: '20px 18px',
+                borderColor:
+                  a.href === '/dashboard/ai-assistant'
+                    ? 'rgba(229,188,67,0.45)'
+                    : undefined,
 
                 textDecoration: 'none',
 
@@ -1493,9 +1263,9 @@ setDocumentsCount(
 
           gridTemplateColumns:
 
-            '1fr 1fr',
+            'minmax(0, 1fr) minmax(0, 1fr)',
 
-          gap: 20,
+          gap: 20, alignItems: 'start',
 
         }}
 
@@ -1677,7 +1447,23 @@ setDocumentsCount(
 
                 >
 
-                  No cases yet. Start a new case from My Cases.
+                  No cases yet.
+                  <div style={{ marginTop: 12 }}>
+                    <Link
+                      to="/dashboard/new-case"
+                      className="btn-primary"
+                      style={{
+                        padding: '8px 16px',
+                        borderRadius: 8,
+                        fontSize: '0.8rem',
+                        fontWeight: 600,
+                        textDecoration: 'none',
+                        display: 'inline-block',
+                      }}
+                    >
+                      Start New Case
+                    </Link>
+                  </div>
 
                 </div>
 
@@ -2368,7 +2154,7 @@ setDocumentsCount(
 
                 gridTemplateColumns:
 
-                  'repeat(3, 1fr)',
+                  'repeat(3, minmax(0, 1fr))',
 
                 gap: 16,
 
@@ -2378,7 +2164,7 @@ setDocumentsCount(
 
             >
 
-              {recommendedAdvocates.map(
+              {recommendedAdvocates.slice(0, 3).map(
 
                 (a) => (
 
@@ -2390,7 +2176,7 @@ setDocumentsCount(
 
                     style={{
 
-                      padding: 20,
+                      padding: 20, display: 'flex', flexDirection: 'column',
 
                     }}
 
@@ -2540,7 +2326,7 @@ setDocumentsCount(
 
                             color:
 
-                              '#F59E0B',
+                              '#F59E0B', display: a.rating ? undefined : 'none',
 
                           }}
 
@@ -2570,7 +2356,7 @@ setDocumentsCount(
 
                           {a.rating ||
 
-                            'New'}
+                            'New on NyayaAI'}
 
                         </span>
 
@@ -2674,7 +2460,7 @@ setDocumentsCount(
 
                         alignItems:
 
-                          'center',
+                          'center', marginTop: 'auto', gap: 8,
 
                       }}
 
@@ -2938,6 +2724,19 @@ setDocumentsCount(
 
 
 
+      <p
+        style={{
+          fontSize: '0.72rem',
+          color: '#A3A3A3',
+          textAlign: 'center',
+          padding: '4px 8px 0',
+          lineHeight: 1.5,
+        }}
+      >
+        AI-generated guidance is informational and does not replace advice from
+        a qualified advocate.
+      </p>
+
       {/* ==========================================
 
           RESPONSIVE
@@ -2974,7 +2773,7 @@ setDocumentsCount(
 
             grid-template-columns:
 
-              1fr 1fr !important;
+              1fr !important;
 
           }
 
