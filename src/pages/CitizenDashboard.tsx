@@ -38,7 +38,15 @@ import {
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001'
 
+const [, setClock] = useState(Date.now())
 
+useEffect(() => {
+  const timer = window.setInterval(() => {
+    setClock(Date.now())
+  }, 60000)
+
+  return () => window.clearInterval(timer)
+}, [])
 
 const quickActions = [
 
@@ -123,13 +131,7 @@ interface ActivityItem {
 function formatActivityTime(value: string) {
   if (!value) return 'Time unavailable'
 
-  // Treat timezone-less MySQL timestamps as UTC.
-  const normalizedValue =
-    /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(\.\d+)?$/.test(value)
-      ? value.replace(' ', 'T') + 'Z'
-      : value
-
-  const timestamp = new Date(normalizedValue).getTime()
+  const timestamp = new Date(value).getTime()
 
   if (!Number.isFinite(timestamp)) return 'Time unavailable'
 
@@ -141,23 +143,25 @@ function formatActivityTime(value: string) {
   if (seconds < 60) return 'Just now'
 
   const minutes = Math.floor(seconds / 60)
+
   if (minutes < 60) {
     return `${minutes} min${minutes === 1 ? '' : 's'} ago`
   }
 
   const hours = Math.floor(minutes / 60)
+
   if (hours < 24) {
     return `${hours} hour${hours === 1 ? '' : 's'} ago`
   }
 
   const days = Math.floor(hours / 24)
+
   if (days < 7) {
     return `${days} day${days === 1 ? '' : 's'} ago`
   }
 
   return new Date(timestamp).toLocaleDateString('en-IN')
 }
-
 function activityPresentation(action: string) {
   if (action.startsWith('document_')) return { icon: FileText, color: 'var(--emerald)' }
   if (action.startsWith('ai_') || action.startsWith('chat_')) return { icon: MessageSquare, color: 'var(--blue)' }
