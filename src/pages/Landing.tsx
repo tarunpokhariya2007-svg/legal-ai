@@ -19,15 +19,10 @@ import {
 } from 'lucide-react'
 
 const stats = [
-
-  { value: '', label: 'Multi-Agent Legal AI ', icon: Bot },
-
+  { value: 'Multi-Agent', label: 'Legal AI Engine', icon: Bot },
   { value: '24/7', label: 'AI Assistance', icon: Clock },
-
-  { value: '8+', label: 'Languages Supported', icon: Languages },
-
-  { value: 'Secure', label: 'User Data Protection', icon: ShieldCheck },
-
+  { value: 'Multiple', label: 'Indian Languages', icon: Languages },
+  { value: 'Private', label: 'Your Data, Your Control', icon: ShieldCheck },
 ];
 
 const steps = [
@@ -120,7 +115,7 @@ const features = [
 
     icon: Lock, title: 'Secure Chat',
 
-    desc: 'End-to-end encrypted communication with advocates. Your legal matters stay strictly confidential.',
+    desc: 'Your conversations stay private and are only shared with advocates you choose.',
 
     color: '#8B4A42', bg: 'rgba(139,74,66,0.07)',
 
@@ -130,7 +125,7 @@ const features = [
 
     icon: Globe, title: 'Multilingual Support',
 
-    desc: 'Available in Hindi, English, Tamil, Bengali, Marathi, Telugu, Kannada, and 14 more Indian languages.',
+    desc: 'Get legal information in multiple Indian languages.',
 
     color: '#527B83', bg: 'rgba(82,123,131,0.08)',
 
@@ -221,17 +216,6 @@ export default function Landing() {
 
   }
 
-  // These landing-page feature buttons ALWAYS open the Login page first.
-
-  // This is intentional: even an already-authenticated user must go through
-
-  // the Login page when clicking one of the newly added Legal Help options.
-
-  const requireLogin = (_path: string) => {
-
-    navigate('/login')
-
-  }
 
   useEffect(() => {
 
@@ -493,6 +477,10 @@ export default function Landing() {
         .landing-page .stat-number {
 
           color: var(--landing-gold) !important;
+          background: none !important;
+          -webkit-text-fill-color: var(--landing-gold) !important;
+          font-size: clamp(1.4rem, 5vw, 2.5rem);
+          white-space: nowrap;
 
         }
 
@@ -659,7 +647,7 @@ export default function Landing() {
           .landing-page section h1 ~ div > div > span { font-size: 13px !important; }
 
           /* Statistics numbers */
-          .landing-page .stat-number { font-size: 44px !important; }
+          .landing-page .stat-number { font-size: clamp(32px, 3.2vw, 44px) !important; }
 
           /* Team role badge and skill labels */
           .landing-page .team-card div:has(+ h3) { font-size: 13px !important; }
@@ -742,7 +730,7 @@ export default function Landing() {
 
               </p>
 
-              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 40 }}>
+              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
 
                 <button
 
@@ -780,11 +768,15 @@ export default function Landing() {
 
               </div>
 
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: 1.6, maxWidth: 480, marginBottom: 28 }}>
+                Nyaya AI gives general legal information, not legal advice. For your specific case, consult a qualified advocate.
+              </p>
+
               {/* Trust indicators */}
 
               <div style={{ display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap' }}>
 
-                {['Bar Council Verified', 'ISO 27001 Certified', 'MeitY Recognized'].map(t => (
+                {['Built on Indian legal sources', 'Private by design', 'Available in your language'].map(t => (
 
                   <div key={t} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
 
@@ -1274,335 +1266,10 @@ export default function Landing() {
 
       </motion.section>
 
-      {/* ── What You Can Do ── */}
-
-      <motion.section
-        id="pricing"
-        className="hero-gradient"
-        style={{ padding: '100px 24px', borderTop: '1px solid var(--border)' }}
-        initial={{ opacity: 0, y: 28 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: false, amount: 0.1 }}
-        transition={{ duration: 0.7, ease: 'easeOut' }}
-      >
-
-        <div style={{ maxWidth: 1100, margin: '0 auto' }}>
-
-          <motion.div
-            style={{ textAlign: 'center', marginBottom: 56 }}
-            initial={{ opacity: 0, y: 22 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: false, amount: 0.2 }}
-            transition={{ duration: 0.6, ease: 'easeOut' }}
-          >
-
-            <span className="section-tag" style={{ marginBottom: 16, display: 'inline-flex', alignItems: 'center', gap: 7 }}>
-
-              <Scale size={12} /> Legal Help Starts Here
-
-            </span>
-
-            <h2 style={{
-
-              fontSize: 'clamp(1.8rem, 3vw, 2.6rem)',
-
-              fontWeight: 800,
-
-              color: 'var(--text)',
-
-              letterSpacing: '-0.03em',
-
-              marginTop: 12,
-
-              marginBottom: 14,
-
-            }}>
-
-              Legal help that starts with you.
-
-            </h2>
-
-            <p style={{
-
-              color: 'var(--text-muted)',
-
-              fontSize: '1rem',
-
-              lineHeight: 1.7,
-
-              maxWidth: 650,
-
-              margin: '0 auto',
-
-            }}>
-
-              Get AI-powered legal guidance, understand your rights, analyze documents,
-
-              and connect with advocates — all from one platform.
-
-            </p>
-
-          </motion.div>
-
-          <div
-
-            style={{
-
-              display: 'grid',
-
-              gridTemplateColumns: 'repeat(3, 1fr)',
-
-              gap: 24,
-
-            }}
-
-            className="pricing-grid"
-
-          >
-
-            {[
-
-              {
-
-                icon: MessageSquare,
-
-                title: 'AI Legal Guidance',
-
-                desc: 'Describe your legal issue in simple language and get structured guidance based on your situation.',
-
-                button: 'Get Legal Help',
-
-                action: () => requireLogin('/dashboard/ai-assistant'),
-
-              },
-
-              {
-
-                icon: FileSearch,
-
-                title: 'Document Analysis',
-
-                desc: 'Upload legal documents and use AI to identify important information, clauses, risks, and key points.',
-
-                button: 'Analyze a Document',
-
-                action: () => requireLogin('/dashboard/documents'),
-
-              },
-
-              {
-
-                icon: Users,
-
-                title: 'Find an Advocate',
-
-                desc: 'Discover advocates based on your legal needs and connect with the right professional for your matter.',
-
-                button: 'Find an Advocate',
-
-                action: () => requireLogin('/dashboard/advocates'),
-
-              },
-
-            ].map((item, i) => {
-
-              const Icon = item.icon
-
-              return (
-
-                <motion.div
-                  key={item.title}
-                  className="card"
-                  initial={{ opacity: 0, y: 35 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: false, amount: 0.18 }}
-                  transition={{ duration: 0.55, delay: i * 0.12, ease: 'easeOut' }}
-
-                  style={{
-
-                    padding: 30,
-
-                    position: 'relative',
-
-                    display: 'flex',
-
-                    flexDirection: 'column',
-
-                    minHeight: 320,
-
-                  }}
-
-                >
-
-                  <div
-
-                    style={{
-
-                      width: 52,
-
-                      height: 52,
-
-                      borderRadius: 15,
-
-                      background: 'rgba(212,175,55,0.09)',
-
-                      border: '1px solid rgba(212,175,55,0.20)',
-
-                      display: 'flex',
-
-                      alignItems: 'center',
-
-                      justifyContent: 'center',
-
-                      marginBottom: 20,
-
-                    }}
-
-                  >
-
-                    <Icon size={23} />
-
-                  </div>
-
-                  <h3
-
-                    style={{
-
-                      fontSize: '1.15rem',
-
-                      fontWeight: 750,
-
-                      color: 'var(--text)',
-
-                      marginBottom: 10,
-
-                    }}
-
-                  >
-
-                    {item.title}
-
-                  </h3>
-
-                  <p
-
-                    style={{
-
-                      fontSize: '0.9rem',
-
-                      color: 'var(--text-muted)',
-
-                      lineHeight: 1.7,
-
-                      margin: '0 0 24px',
-
-                      flex: 1,
-
-                    }}
-
-                  >
-
-                    {item.desc}
-
-                  </p>
-
-                  <button
-
-                    type="button"
-
-                    onClick={item.action}
-
-                    className="btn-ghost"
-
-                    style={{
-
-                      width: '100%',
-
-                      padding: '12px 14px',
-
-                      borderRadius: 10,
-
-                      fontWeight: 700,
-
-                      fontSize: '0.88rem',
-
-                      display: 'inline-flex',
-
-                      alignItems: 'center',
-
-                      justifyContent: 'center',
-
-                      gap: 8,
-
-                      cursor: 'pointer',
-
-                    }}
-
-                  >
-
-                    {item.button}
-
-                    <ArrowRight size={16} />
-
-                  </button>
-
-                </motion.div>
-
-              )
-
-            })}
-
-          </div>
-
-          <div
-
-            style={{
-
-              marginTop: 28,
-
-              padding: '18px 22px',
-
-              borderRadius: 14,
-
-              border: '1px solid rgba(212,175,55,0.18)',
-
-              background: 'rgba(212,175,55,0.035)',
-
-              textAlign: 'center',
-
-            }}
-
-          >
-
-            <p
-
-              style={{
-
-                margin: 0,
-
-                color: 'rgba(255,255,255,0.72)',
-
-                fontSize: '0.86rem',
-
-                lineHeight: 1.6,
-
-              }}
-
-            >
-
-              Start exploring Nyaya AI today — no subscription purchase is required.
-
-            </p>
-
-          </div>
-
-        </div>
-
-      </motion.section>
-
       {/* ── CTA Banner ── */}
 
       <motion.section
+        id="pricing"
         style={{ padding: '80px 24px', background: '#000000' }}
         initial={{ opacity: 0, y: 28 }}
         whileInView={{ opacity: 1, y: 0 }}
@@ -1628,18 +1295,11 @@ export default function Landing() {
 
           <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
 
-            <Link to="/signup" style={{
-
+            <Link to="/signup" className="btn-primary" style={{
               padding: '14px 32px', borderRadius: 12, fontWeight: 700, fontSize: '1rem',
-
-              background: '#F5F1E8', color: '#243447', textDecoration: 'none',
-
-              boxShadow: '0 8px 32px rgba(0,0,0,0.2)', display: 'inline-flex', alignItems: 'center', gap: 8,
-
+              textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 8,
             }}>
-
               Get Started Free <ArrowRight size={18} />
-
             </Link>
 
             <button
@@ -1664,7 +1324,10 @@ export default function Landing() {
 
           </div>
 
-        </div>
+        <p style={{ color: 'rgba(255,255,255,0.75)', fontSize: '0.9rem', marginTop: 20 }}>
+            Free to start.
+          </p>
+          </div>
 
       </motion.section>
 
@@ -1985,57 +1648,58 @@ export default function Landing() {
             </div>
 
             {[
-
-              { heading: 'Platform', links: ['AI Assistant', 'Find Advocates', 'Document Analyzer', 'Jurisdiction Finder', 'Legal Help'] },
-
-              { heading: 'For Advocates', links: ['Join as Advocate', 'AI Research Tool', 'Client Management', 'Earnings Dashboard', 'Verification'] },
-
-              { heading: 'Company', links: ['About Us', 'Careers', 'Blog', 'Press', 'Contact', 'Privacy Policy'] },
-
+              { heading: 'Platform', links: [
+                { label: 'AI Assistant', to: '/dashboard/ai-assistant', protect: true },
+                { label: 'Find Advocates', to: '/dashboard/advocates', protect: true },
+                { label: 'Document Analyzer', to: '/dashboard/documents', protect: true },
+              ] },
+              { heading: 'For Advocates', links: [
+                { label: 'Join as Advocate', to: '/signup' },
+              ] },
+              { heading: 'Company', links: [
+                { label: 'About Us', to: '#about', anchor: true },
+              ] },
             ].map(col => (
-
               <div key={col.heading}>
-
                 <h4 style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text)', marginBottom: 16, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
-
                   {col.heading}
-
                 </h4>
-
                 <ul style={{ listStyle: 'none', padding: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
-
                   {col.links.map(l => (
-
-                    <li key={l}>
-
-                      <a href="#" style={{ fontSize: '0.875rem', color: 'var(--text-muted)', textDecoration: 'none' }}>{l}</a>
-
+                    <li key={l.label}>
+                      {'anchor' in l && l.anchor ? (
+                        <a href={l.to} style={{ fontSize: '0.875rem', color: 'var(--text-muted)', textDecoration: 'none' }}>{l.label}</a>
+                      ) : 'protect' in l && l.protect ? (
+                        <Link
+                          to={l.to}
+                          onClick={(e) => { e.preventDefault(); handleProtectedNavigation(l.to) }}
+                          style={{ fontSize: '0.875rem', color: 'var(--text-muted)', textDecoration: 'none' }}
+                        >{l.label}</Link>
+                      ) : (
+                        <Link to={l.to} style={{ fontSize: '0.875rem', color: 'var(--text-muted)', textDecoration: 'none' }}>{l.label}</Link>
+                      )}
                     </li>
-
                   ))}
-
                 </ul>
-
               </div>
-
             ))}
-
           </div>
 
           <div style={{ borderTop: '1px solid var(--border)', paddingTop: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
 
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-subtle)' }}>
-
-              © 2026 NyayaAI Technologies Pvt. Ltd. · Not a substitute for professional legal advice. · CIN: U74140DL2024PTC000001
-
+            <p style={{ fontSize: '0.8rem', color: '#C4C4C4' }}>
+              © 2026 NyayaAI · Not a substitute for professional legal advice.
             </p>
 
             <div style={{ display: 'flex', gap: 16 }}>
 
-              {['Terms', 'Privacy', 'Disclaimer', 'Grievance'].map(l => (
-
-                <a key={l} href="#" style={{ fontSize: '0.8rem', color: 'var(--text-subtle)', textDecoration: 'none' }}>{l}</a>
-
+              {[
+                { label: 'Terms', to: '/terms' },
+                { label: 'Privacy', to: '/privacy' },
+                { label: 'Disclaimer', to: '/disclaimer' },
+                { label: 'Grievance', to: '/grievance' },
+              ].map(l => (
+                <Link key={l.label} to={l.to} style={{ fontSize: '0.8rem', color: 'var(--text-subtle)', textDecoration: 'none' }}>{l.label}</Link>
               ))}
 
             </div>
