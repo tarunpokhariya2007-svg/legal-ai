@@ -226,12 +226,42 @@ async function initializeMeetingEndRequestsTable() {
 // =====================================================
 // INITIALIZE DATABASE TABLES
 // =====================================================
+async function initializeUserActivityTable() {
+    try {
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS user_activity (
+                id BIGINT NOT NULL AUTO_INCREMENT,
+                user_id INT NOT NULL,
+                action VARCHAR(80) NOT NULL,
+                description VARCHAR(500) NOT NULL,
+                entity_type VARCHAR(50) DEFAULT NULL,
+                entity_id BIGINT DEFAULT NULL,
+                status VARCHAR(20) NOT NULL DEFAULT 'completed',
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (id),
+                INDEX idx_user_activity_user_created (user_id, created_at),
+                CONSTRAINT fk_user_activity_user
+                    FOREIGN KEY (user_id)
+                    REFERENCES users(id)
+                    ON DELETE CASCADE
+            )
+        `);
+
+        console.log("USER ACTIVITY TABLE READY");
+    } catch (error) {
+        console.error(
+            "FAILED TO CREATE USER ACTIVITY TABLE:",
+            error.message
+        );
+    }
+}
 
 async function initializeDatabaseTables() {
     await initializeNotificationsTable();
     await initializeAppointmentsTable();
     await initializeConsultationMeetingsTable();
     await initializeMeetingEndRequestsTable();
+    await initializeUserActivityTable();
     await ensureLegalKnowledgeTable(pool);
 }
 
