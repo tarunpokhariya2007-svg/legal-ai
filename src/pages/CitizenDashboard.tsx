@@ -1265,7 +1265,7 @@ setDocumentsCount(
 
             'minmax(0, 1fr) minmax(0, 1fr)',
 
-          gap: 20, alignItems: 'start',
+          gap: 20, alignItems: 'stretch', gridAutoRows: 'minmax(320px, auto)',
 
         }}
 
@@ -1633,7 +1633,7 @@ setDocumentsCount(
 
         <div
 
-          className="card"
+          className="card activity-panel"
 
           style={{ padding: 24 }}
 
@@ -1693,7 +1693,7 @@ setDocumentsCount(
 
 
 
-          <div
+          <div className="activity-scroll"
 
             style={{
 
@@ -2744,6 +2744,27 @@ setDocumentsCount(
 
       <style>{`
 
+        /* Recent Activity: panel height follows My Cases; only list scrolls */
+        .activity-panel {
+          height: 0;
+          min-height: 100%;
+          display: flex;
+          flex-direction: column;
+        }
+        .activity-scroll {
+          flex: 1 1 auto;
+          min-height: 0;
+          overflow-y: auto;
+          padding-right: 6px;
+          scrollbar-width: thin;
+          scrollbar-color: rgba(212, 175, 55, 0.35) transparent;
+        }
+        .activity-scroll::-webkit-scrollbar { width: 4px; }
+        .activity-scroll::-webkit-scrollbar-thumb {
+          background: rgba(212, 175, 55, 0.35);
+          border-radius: 99px;
+        }
+        .activity-scroll::-webkit-scrollbar-track { background: transparent; }
         @media (max-width: 900px) {
 
           .qa-grid {
@@ -2756,6 +2777,11 @@ setDocumentsCount(
 
 
 
+          .activity-panel {
+            height: auto !important;
+            min-height: 0 !important;
+            max-height: 420px;
+          }
           .two-col-grid {
 
             grid-template-columns:
