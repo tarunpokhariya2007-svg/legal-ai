@@ -110,67 +110,37 @@ const quickActions = [
 
 
 
-const recentActivity = [
+interface ActivityItem {
+  id: number
+  action: string
+  description: string
+  entity_type: string | null
+  entity_id: number | null
+  status: string
+  created_at: string
+}
 
-  {
+function formatActivityTime(value: string) {
+  const timestamp = new Date(value).getTime()
+  if (!Number.isFinite(timestamp)) return 'Recently'
+  const seconds = Math.max(0, Math.floor((Date.now() - timestamp) / 1000))
+  if (seconds < 60) return 'Just now'
+  const minutes = Math.floor(seconds / 60)
+  if (minutes < 60) return `${minutes} min${minutes === 1 ? '' : 's'} ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'} ago`
+  const days = Math.floor(hours / 24)
+  if (days < 7) return `${days} day${days === 1 ? '' : 's'} ago`
+  return new Date(value).toLocaleDateString()
+}
 
-    icon: MessageSquare,
-
-    title: 'AI consultation on property dispute',
-
-    time: '2 hours ago',
-
-    status: 'completed',
-
-    color: 'var(--blue)',
-
-  },
-
-  {
-
-    icon: FileText,
-
-    title: 'Rental agreement analyzed',
-
-    time: '1 day ago',
-
-    status: 'completed',
-
-    color: 'var(--emerald)',
-
-  },
-
-  {
-
-    icon: AlertCircle,
-
-    title: 'Security deposit case — awaiting document upload',
-
-    time: '3 days ago',
-
-    status: 'pending',
-
-    color: '#F59E0B',
-
-  },
-
-  {
-
-    icon: CheckCircle,
-
-    title: 'Consumer complaint filed successfully',
-
-    time: '1 week ago',
-
-    status: 'completed',
-
-    color: 'var(--emerald)',
-
-  },
-
-]
-
-
+function activityPresentation(action: string) {
+  if (action.startsWith('document_')) return { icon: FileText, color: 'var(--emerald)' }
+  if (action.startsWith('ai_') || action.startsWith('chat_')) return { icon: MessageSquare, color: 'var(--blue)' }
+  if (action.startsWith('booking_') || action.startsWith('meeting_')) return { icon: Calendar, color: '#F59E0B' }
+  if (action.startsWith('case_')) return { icon: CheckCircle, color: 'var(--emerald)' }
+  return { icon: Clock, color: 'var(--blue)' }
+}
 
 const statusConfig = {
 
@@ -306,6 +276,10 @@ export default function CitizenDashboard() {
 
   const [documentsCount, setDocumentsCount] = useState(0)
 
+  const [recentActivity, setRecentActivity] = useState<ActivityItem[]>([])
+  const [loadingActivity, setLoadingActivity] = useState(true)
+  const [activityError, setActivityError] = useState('')
+
 
 
   // Get logged-in citizen
@@ -330,6 +304,50 @@ export default function CitizenDashboard() {
 
   // ==========================================
 
+
+
+  useEffect(() => {
+    let cancelled = false
+
+    const loadRecentActivity = async () => {
+      try {
+        if (!isLoggedIn()) {
+          if (!cancelled) {
+            setRecentActivity([])
+            setActivityError('Please log in to view your activity.')
+          }
+          return
+        }
+
+        const response = await fetch(`${API_URL}/api/activity/recent`, {
+          method: 'GET',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+        })
+        const result = await response.json()
+        if (!response.ok || !result.success) {
+          throw new Error(result.message || 'Failed to load recent activity.')
+        }
+        if (!cancelled) {
+          setRecentActivity(Array.isArray(result.activities) ? result.activities : [])
+          setActivityError('')
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setActivityError(error instanceof Error ? error.message : 'Failed to load recent activity.')
+        }
+      } finally {
+        if (!cancelled) setLoadingActivity(false)
+      }
+    }
+
+    loadRecentActivity()
+    const intervalId = window.setInterval(loadRecentActivity, 20000)
+    return () => {
+      cancelled = true
+      window.clearInterval(intervalId)
+    }
+  }, [])
 
 
   useEffect(() => {
@@ -1870,17 +1888,21 @@ setDocumentsCount(
 
           >
 
-            {recentActivity.map(
+            {loadingActivity ? (
+              <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', padding: '8px 0' }}>Loading activity…</div>
+            ) : activityError ? (
+              <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', padding: '8px 0' }}>
+                {activityError} <button type="button" onClick={() => window.location.reload()} style={{ marginLeft: 8, color: 'var(--gold)', background: 'transparent', border: 0, cursor: 'pointer' }}>Retry</button>
+              </div>
+            ) : recentActivity.length === 0 ? (
+              <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', padding: '8px 0' }}>No activity yet. Your recent actions will appear here.</div>
+            ) : recentActivity.map(
 
               (a, i) => {
-
-                const sc =
-
-                  statusConfig[
-
-                    a.status as keyof typeof statusConfig
-
-                  ]
+                const presentation = activityPresentation(a.action)
+                const ActivityIcon = presentation.icon
+                const activityStatus = a.status === 'pending' ? 'pending' : 'completed'
+                const sc = statusConfig[activityStatus]
 
 
 
@@ -1956,7 +1978,7 @@ setDocumentsCount(
 
                         background:
 
-                          `color-mix(in srgb, ${a.color} 12%, transparent)`,
+                          `color-mix(in srgb, ${presentation.color} 12%, transparent)`,
 
                         display: 'flex',
 
@@ -1978,16 +2000,9 @@ setDocumentsCount(
 
                     >
 
-                      <a.icon
-
+                      <ActivityIcon
                         size={12}
-
-                        style={{
-
-                          color: a.color,
-
-                        }}
-
+                        style={{ color: presentation.color }}
                       />
 
                     </div>
@@ -2026,7 +2041,7 @@ setDocumentsCount(
 
                       >
 
-                        {a.title}
+                        {a.description}
 
                       </div>
 
@@ -2066,7 +2081,7 @@ setDocumentsCount(
 
                         >
 
-                          {a.time}
+                          {formatActivityTime(a.created_at)}
 
                         </span>
 

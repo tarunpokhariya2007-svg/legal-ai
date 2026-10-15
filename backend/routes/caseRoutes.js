@@ -1,6 +1,7 @@
 const express = require("express");
 const authMiddleware = require("../middleware/authMiddleware");
 const db = require("../db");
+const { recordActivity } = require("../database/activityModel");
 
 const router = express.Router();
 
@@ -226,6 +227,15 @@ router.post("/", authMiddleware, async (req, res) => {
 
     const caseId =
       result.insertId;
+
+    await recordActivity({
+      userId,
+      action: "case_created",
+      description: `Case created: ${title.trim()}`,
+      entityType: "case",
+      entityId: caseId,
+      status: "completed",
+    });
 
     console.log(
       "CASE CREATED SUCCESSFULLY"

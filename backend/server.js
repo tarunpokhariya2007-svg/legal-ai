@@ -48,6 +48,7 @@ const { ensureOtpTable } = require("./database/otpModel");
 const { ensureGoogleAuthSupport } = require("./database/userModel");
 const { ensureRefreshTokenTable } = require("./database/refreshTokenModel");
 const { ensurePasswordResetTokenTable } = require("./database/passwordResetTokenModel");
+const { ensureActivityTable } = require("./database/activityModel");
 
 const {
     ensureDocumentHashColumn,
@@ -111,6 +112,10 @@ ensureAuditLogsTable().catch((err) => {
     );
 });
 
+ensureActivityTable().catch((err) => {
+    console.error("Failed to ensure user_activity table:", err.message);
+});
+
 // =====================================================
 // ROUTES
 // =====================================================
@@ -128,6 +133,7 @@ const caseRoutes = require("./routes/caseRoutes");
 const profileRoutes = require("./routes/profileRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
 const appointmentRoutes = require("./routes/appointmentRoutes");
+const activityRoutes = require("./routes/activityRoutes");
 const availabilityRoutes = require("./routes/availabilityRoutes");
 const meetingRoutes = require("./routes/meetingRoutes");
 const signalingRoutes = require("./routes/signalingRoutes");
@@ -320,6 +326,8 @@ app.use(
 // =====================================================
 // API ROUTES
 // =====================================================
+
+app.use("/api/activity", activityRoutes);
 
 // -----------------------------------------------------
 // Upload
