@@ -121,17 +121,41 @@ interface ActivityItem {
 }
 
 function formatActivityTime(value: string) {
-  const timestamp = new Date(value).getTime()
-  if (!Number.isFinite(timestamp)) return 'Recently'
-  const seconds = Math.max(0, Math.floor((Date.now() - timestamp) / 1000))
+  if (!value) return 'Time unavailable'
+
+  // Treat timezone-less MySQL timestamps as UTC.
+  const normalizedValue =
+    /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(\.\d+)?$/.test(value)
+      ? value.replace(' ', 'T') + 'Z'
+      : value
+
+  const timestamp = new Date(normalizedValue).getTime()
+
+  if (!Number.isFinite(timestamp)) return 'Time unavailable'
+
+  const seconds = Math.max(
+    0,
+    Math.floor((Date.now() - timestamp) / 1000)
+  )
+
   if (seconds < 60) return 'Just now'
+
   const minutes = Math.floor(seconds / 60)
-  if (minutes < 60) return `${minutes} min${minutes === 1 ? '' : 's'} ago`
+  if (minutes < 60) {
+    return `${minutes} min${minutes === 1 ? '' : 's'} ago`
+  }
+
   const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'} ago`
+  if (hours < 24) {
+    return `${hours} hour${hours === 1 ? '' : 's'} ago`
+  }
+
   const days = Math.floor(hours / 24)
-  if (days < 7) return `${days} day${days === 1 ? '' : 's'} ago`
-  return new Date(value).toLocaleDateString()
+  if (days < 7) {
+    return `${days} day${days === 1 ? '' : 's'} ago`
+  }
+
+  return new Date(timestamp).toLocaleDateString('en-IN')
 }
 
 function activityPresentation(action: string) {
