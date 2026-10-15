@@ -38,16 +38,6 @@ import {
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001'
 
-const [, setClock] = useState(Date.now())
-
-useEffect(() => {
-  const timer = window.setInterval(() => {
-    setClock(Date.now())
-  }, 60000)
-
-  return () => window.clearInterval(timer)
-}, [])
-
 const quickActions = [
 
   {
@@ -257,6 +247,17 @@ interface Advocate {
 
 
 export default function CitizenDashboard() {
+  // Re-render periodically so relative activity times stay current.
+  const [, setClock] = useState(Date.now())
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setClock(Date.now())
+    }, 60000)
+
+    return () => window.clearInterval(timer)
+  }, [])
+
 
   const [recommendedAdvocates, setRecommendedAdvocates] = useState<
 
@@ -350,7 +351,11 @@ export default function CitizenDashboard() {
         const response = await fetch(`${API_URL}/api/activity/recent`, {
           method: 'GET',
           credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
+          cache: 'no-store',
+          headers: {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-cache',
+          },
         })
         const result = await response.json()
         if (!response.ok || !result.success) {
