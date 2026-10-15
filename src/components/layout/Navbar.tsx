@@ -333,7 +333,7 @@ export default function Navbar() {
 
                 fontSize: '0.9rem',
 
-                fontWeight: 650,
+                fontWeight: 600,
 
                 alignItems: 'center',
 
@@ -395,7 +395,7 @@ export default function Navbar() {
 
                 fontSize: '0.9rem',
 
-                fontWeight: 750,
+                fontWeight: 600,
 
                 alignItems: 'center',
 

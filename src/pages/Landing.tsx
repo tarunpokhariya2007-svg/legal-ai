@@ -8,7 +8,7 @@ import { isLoggedIn } from '../lib/auth'
 
 import {
 
-  Scale, ArrowRight, CheckCircle, Shield, Zap, Globe, Lock,
+  Scale, ArrowRight, CheckCircle, Shield, Globe, Lock,
 
   MessageSquare, Users, FileSearch, MapPin, Mic, ChevronRight,
 
@@ -430,6 +430,20 @@ export default function Landing() {
 
         }
 
+        /* Landing eyebrow labels: plain gold text (scoped; Team tag untouched) */
+
+        .landing-page .section-tag.eyebrow-plain {
+
+          background: none !important;
+
+          border: 0 !important;
+
+          border-radius: 0 !important;
+
+          padding: 0 !important;
+
+        }
+
         /* Gold primary action */
 
         .landing-page .btn-primary {
@@ -647,7 +661,7 @@ export default function Landing() {
           .landing-page section h1 ~ div > div > span { font-size: 13px !important; }
 
           /* Statistics numbers */
-          .landing-page .stat-number { font-size: clamp(32px, 3.2vw, 44px) !important; }
+          .landing-page .stat-number { font-size: clamp(26px, 2.4vw, 32px) !important; }
 
           /* Team role badge and skill labels */
           .landing-page .team-card div:has(+ h3) { font-size: 13px !important; }
@@ -704,9 +718,9 @@ export default function Landing() {
 
               <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginBottom: 24 }}>
 
-                <span className="section-tag">
+                <span className="section-tag eyebrow-plain">
 
-                  <Zap size={12} /> Agentic AI Platform
+                  Agentic AI Platform
 
                 </span>
 
@@ -714,13 +728,13 @@ export default function Landing() {
 
               <h1 style={{
 
-                fontSize: 'clamp(2.4rem, 4.5vw, 3.6rem)', fontWeight: 900,
+                fontSize: 'clamp(2.4rem, 4.5vw, 3.6rem)', fontWeight: 600, fontFamily: 'var(--font-display)',
 
-                lineHeight: 1.1, letterSpacing: '-0.04em', marginBottom: 20, color: 'var(--text)',
+                lineHeight: 1.1, letterSpacing: '-0.01em', marginBottom: 20, color: 'var(--text)',
 
               }}>
 
-                AI Legal Guidance<br /><span className="gradient-text">for India</span><br />with Nyaya AI.
+                AI Legal Guidance for <span className="gradient-text">India</span><br />with Nyaya AI.
 
               </h1>
 
@@ -824,7 +838,7 @@ export default function Landing() {
 
                 <div className="stat-number">{s.value}</div>
 
-                <div style={{ fontSize: '0.875rem', color: 'var(--text-muted)', fontWeight: 500, marginTop: 4 }}>
+                <div style={{ fontSize: '0.9rem', color: 'var(--text-muted)', fontWeight: 500, marginTop: 4 }}>
 
                   {s.label}
 
@@ -863,13 +877,13 @@ export default function Landing() {
             transition={{ duration: 0.6, ease: 'easeOut' }}
           >
 
-            <span className="section-tag" style={{ marginBottom: 16, display: 'inline-flex' }}>
+            <span className="section-tag eyebrow-plain" style={{ marginBottom: 16, display: 'inline-flex' }}>
 
-              <Clock size={12} /> How It Works
+              How It Works
 
             </span>
 
-            <h2 style={{ fontSize: 'clamp(1.8rem, 3vw, 2.6rem)', fontWeight: 800, color: 'var(--text)', letterSpacing: '-0.03em', marginTop: 12 }}>
+            <h2 style={{ fontSize: 'clamp(1.8rem, 3vw, 2.6rem)', fontWeight: 600, fontFamily: 'var(--font-display)', color: 'var(--text)', letterSpacing: '-0.01em', marginTop: 12 }}>
 
               Justice in four steps
 
@@ -915,13 +929,13 @@ export default function Landing() {
 
                 </div>
 
-                <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text)', marginBottom: 8 }}>
+                <h3 style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text)', marginBottom: 8 }}>
 
                   {s.title}
 
                 </h3>
 
-                <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                <p style={{ fontSize: '0.9375rem', color: 'var(--text-muted)', lineHeight: 1.6 }}>
 
                   {s.desc}
 
@@ -971,13 +985,13 @@ export default function Landing() {
             transition={{ duration: 0.6, ease: 'easeOut' }}
           >
 
-            <span className="section-tag" style={{ marginBottom: 16, display: 'inline-flex' }}>
+            <span className="section-tag eyebrow-plain" style={{ marginBottom: 16, display: 'inline-flex' }}>
 
-              <Zap size={12} /> Platform Features
+              Platform Features
 
             </span>
 
-            <h2 style={{ fontSize: 'clamp(1.8rem, 3vw, 2.6rem)', fontWeight: 800, color: 'var(--text)', letterSpacing: '-0.03em', marginTop: 12 }}>
+            <h2 style={{ fontSize: 'clamp(1.8rem, 3vw, 2.6rem)', fontWeight: 600, fontFamily: 'var(--font-display)', color: 'var(--text)', letterSpacing: '-0.01em', marginTop: 12 }}>
 
               Everything you need for legal clarity
 
@@ -1011,13 +1025,13 @@ export default function Landing() {
 
                 </div>
 
-                <h3 style={{ fontWeight: 700, color: 'var(--text)', marginBottom: 8, fontSize: '1rem' }}>
+                <h3 style={{ fontWeight: 600, color: 'var(--text)', marginBottom: 8, fontSize: '1rem' }}>
 
                   {f.title}
 
                 </h3>
 
-                <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                <p style={{ fontSize: '0.9375rem', color: 'var(--text-muted)', lineHeight: 1.6 }}>
 
                   {f.desc}
 
@@ -1281,7 +1295,7 @@ export default function Landing() {
 
           <Shield size={40} style={{ color: 'rgba(255,255,255,0.6)', margin: '0 auto 20px' }} />
 
-          <h2 style={{ fontSize: 'clamp(1.8rem, 3vw, 2.6rem)', fontWeight: 800, color: 'white', letterSpacing: '-0.03em', marginBottom: 16 }}>
+          <h2 style={{ fontSize: 'clamp(1.8rem, 3vw, 2.6rem)', fontWeight: 600, fontFamily: 'var(--font-display)', color: 'white', letterSpacing: '-0.01em', marginBottom: 16 }}>
 
             Your rights. Our mission.
 
@@ -1661,7 +1675,7 @@ export default function Landing() {
               ] },
             ].map(col => (
               <div key={col.heading}>
-                <h4 style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text)', marginBottom: 16, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+                <h4 style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text)', marginBottom: 16, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
                   {col.heading}
                 </h4>
                 <ul style={{ listStyle: 'none', padding: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
