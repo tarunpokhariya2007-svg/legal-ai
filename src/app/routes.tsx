@@ -19,6 +19,10 @@ import DashboardLayout from '../components/layout/DashboardLayout'
 
 import Landing from '../pages/Landing'
 import Login from '../pages/Login'
+import Terms from '../pages/legal/Terms'
+import Privacy from '../pages/legal/Privacy'
+import Disclaimer from '../pages/legal/Disclaimer'
+import Grievance from '../pages/legal/Grievance.tsx'
 
 import CitizenDashboard from '../pages/CitizenDashboard'
 import AIAssistant from '../pages/AIAssistant'
@@ -77,6 +81,26 @@ export const router = createBrowserRouter([
       {
         path: 'signup',
         Component: Login,
+      },
+
+      {
+        path: 'terms',
+        Component: Terms,
+      },
+
+      {
+        path: 'privacy',
+        Component: Privacy,
+      },
+
+      {
+        path: 'disclaimer',
+        Component: Disclaimer,
+      },
+
+      {
+        path: 'grievance',
+        Component: Grievance,
       },
     ],
   },
