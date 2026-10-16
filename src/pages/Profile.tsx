@@ -4,6 +4,7 @@ import { getStoredUser, isLoggedIn, setStoredUser } from '../lib/auth'
 import LivePhotoCapture from '../components/LivePhotoCapture'
 import {
   uploadProfilePhoto,
+  deleteProfilePhoto,
   useAuthedPhotoSrc,
 } from '../lib/profilePhoto'
 import {
@@ -1012,6 +1013,64 @@ export default function Profile() {
 
   }
 
+  // ===================================================
+  // REMOVE LIVE PROFILE PHOTO
+  // ===================================================
+
+  const [removingPhoto, setRemovingPhoto] = useState(false)
+
+  const handlePhotoRemove = async () => {
+
+    if (
+      !window.confirm(
+        'Remove your profile photo? This cannot be undone.'
+      )
+    ) {
+      return
+    }
+
+    setRemovingPhoto(true)
+
+    try {
+
+      await deleteProfilePhoto()
+
+      setUserDataState((previous: any) => ({
+        ...previous,
+        photoUrl: '',
+      }))
+
+      const storedUser = getStoredUser()
+
+      if (storedUser) {
+        setStoredUser({
+          ...storedUser,
+          photoUrl: '',
+        })
+      }
+
+      // Update the sidebar avatar immediately.
+      window.dispatchEvent(
+        new CustomEvent('profile-photo-updated', { detail: '' })
+      )
+
+      alert('Profile photo removed successfully.')
+
+    } catch (error: any) {
+
+      alert(
+        error?.message ||
+        'Failed to remove profile photo. Your current photo was kept.'
+      )
+
+    } finally {
+
+      setRemovingPhoto(false)
+
+    }
+
+  }
+
 
   // ===================================================
   // SAVE PROFILE
@@ -1454,6 +1513,7 @@ export default function Profile() {
               AVATAR
               ============================================= */}
 
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
           <div
             style={{
               position:
@@ -1476,10 +1536,8 @@ export default function Profile() {
                 overflow:
                   'hidden',
 
-                background:
-                  isAdvocate
-                    ? 'linear-gradient(135deg, var(--emerald), #065F46)'
-                    : 'linear-gradient(135deg, var(--blue), #7C3AED)',
+                background: '#000',
+                color: '#fff',
               }}
             >
 
@@ -1558,6 +1616,27 @@ export default function Profile() {
               onSave={handlePhotoSave}
             />
 
+          </div>
+          {userData?.photoUrl && (
+            <button
+              type="button"
+              onClick={handlePhotoRemove}
+              disabled={removingPhoto}
+              style={{
+                background: 'transparent',
+                border: '1px solid var(--border)',
+                borderRadius: 8,
+                padding: '4px 10px',
+                fontSize: '0.72rem',
+                fontWeight: 600,
+                color: '#DC2626',
+                cursor: removingPhoto ? 'not-allowed' : 'pointer',
+                opacity: removingPhoto ? 0.6 : 1,
+              }}
+            >
+              {removingPhoto ? 'Removing...' : 'Remove Photo'}
+            </button>
+          )}
           </div>
 
 

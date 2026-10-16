@@ -59,6 +59,27 @@ export async function uploadProfilePhoto(
 }
 
 // -----------------------------------------------------
+// Remove the logged-in user's saved photo. The backend
+// deletes the stored object and clears the database
+// reference; the user is identified from the cookie.
+// -----------------------------------------------------
+
+export async function deleteProfilePhoto(): Promise<void> {
+  const response = await fetch(`${API_URL}/api/profile/photo`, {
+    method: 'DELETE',
+    credentials: 'include',
+  })
+
+  const data = await response.json().catch(() => ({}))
+
+  if (!response.ok || !data.success) {
+    throw new Error(
+      data.message || 'Failed to remove profile photo.'
+    )
+  }
+}
+
+// -----------------------------------------------------
 // Load a photo with the login cookie and expose it as an
 // object URL. Needed for the user's own photo because
 // citizen photos are private (an <img> tag alone would not

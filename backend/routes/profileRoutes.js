@@ -762,6 +762,72 @@ router.put(
 );
 
 // =====================================================
+// REMOVE PROFILE PHOTO
+// DELETE /api/profile/photo
+//
+// Only the authenticated user's own photo can be removed (the
+// id comes from the auth cookie, never from the request).
+// The storage object is deleted first, so a storage failure
+// leaves the current photo untouched; then the database
+// reference is cleared.
+// =====================================================
+
+router.delete(
+    "/photo",
+    authMiddleware,
+    photoUploadLimiter,
+    async (req, res) => {
+        try {
+            const [rows] = await db.query(
+                `
+                SELECT id, profile_photo_path
+                FROM users
+                WHERE id = ?
+                LIMIT 1
+                `,
+                [req.user.id]
+            );
+
+            if (!rows.length) {
+                return res.status(404).json({
+                    success: false,
+                    message: "User not found",
+                });
+            }
+
+            const reference = rows[0].profile_photo_path || null;
+
+            if (reference) {
+                await deleteDocumentFromStorage(reference);
+
+                await db.query(
+                    `
+                    UPDATE users
+                    SET profile_photo_path = NULL
+                    WHERE id = ?
+                    `,
+                    [req.user.id]
+                );
+            }
+
+            res.json({
+                success: true,
+                message: "Profile photo removed successfully.",
+                photoUrl: "",
+            });
+        } catch (err) {
+            console.error("REMOVE PROFILE PHOTO ERROR:", err);
+
+            res.status(500).json({
+                success: false,
+                message:
+                    "Failed to remove profile photo. Your current photo was kept. Please try again.",
+            });
+        }
+    }
+);
+
+// =====================================================
 // SERVE A PROFILE PHOTO
 // GET /api/profile/photo/:userId
 //
