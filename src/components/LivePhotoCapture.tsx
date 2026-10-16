@@ -45,9 +45,9 @@ const DETECT_INTERVAL_MS = 80 // position / ready stages
 // Consecutive good frames needed before "Start liveness check"
 // is enabled (also used to average the neutral-face baseline).
 const MIN_ALIGN_FRAMES = 3
-// A passed challenge stays valid for this long; after that the
-// user repeats a (new) challenge before capturing.
-const READY_TIMEOUT_MS = 30000
+// A face detected within this window is used to centre the crop;
+// otherwise the centre of the frame is used.
+const FACE_CROP_MAX_AGE_MS = 1500
 
 const MIN_VIDEO_HEIGHT = 480
 
@@ -459,7 +459,7 @@ export default function LivePhotoCapture({
   const [holdProgress, setHoldProgress] = useState(0)
   const [message, setMessage] = useState('Starting camera…')
   const [poseOk, setPoseOk] = useState(false)
-  const [captureReady, setCaptureReady] = useState(false)
+  const [cameraReady, setCameraReady] = useState(false)
   const [startReady, setStartReady] = useState(false)
   const [errorText, setErrorText] = useState('')
   const [saveError, setSaveError] = useState('')
@@ -478,13 +478,10 @@ export default function LivePhotoCapture({
   const challengeRef = useRef<Challenge>(CHALLENGES[0])
   const challengeStateRef = useRef<ChallengeState | null>(null)
   const holdRef = useRef(0)
-  const readySinceRef = useRef(0)
-  const captureReadyRef = useRef(false)
   const startReadyRef = useRef(false)
-  const lastGoodRef = useRef<{
-    metrics: FaceMetrics
-    quality: QualityMetrics
-  } | null>(null)
+  const lastFaceRef = useRef<{ metrics: FaceMetrics; at: number } | null>(
+    null
+  )
   const lastDetectRef = useRef(0)
   const lastTimestampRef = useRef(0)
   const alignSumRef = useRef({ ear: 0, mouth: 0, height: 0, n: 0 })
@@ -548,8 +545,7 @@ export default function LivePhotoCapture({
     bestFrameRef.current = null
     photoBlobRef.current = null
     challengeStateRef.current = null
-    lastGoodRef.current = null
-    captureReadyRef.current = false
+    lastFaceRef.current = null
     startReadyRef.current = false
 
     releasePreview()
@@ -747,12 +743,9 @@ export default function LivePhotoCapture({
     alignSumRef.current = { ear: 0, mouth: 0, height: 0, n: 0 }
     bestFrameRef.current = null
     photoBlobRef.current = null
-    lastGoodRef.current = null
-    captureReadyRef.current = false
     startReadyRef.current = false
 
     stageRef.current = 'align'
-    setCaptureReady(false)
     setStartReady(false)
 
     setChallenge(next)
@@ -767,9 +760,7 @@ export default function LivePhotoCapture({
     (reason: string) => {
       holdRef.current = 0
       challengeStateRef.current = null
-      captureReadyRef.current = false
 
-      setCaptureReady(false)
       setHoldProgress(0)
       setPoseOk(false)
       setMessage(reason)
@@ -966,13 +957,10 @@ export default function LivePhotoCapture({
     challengeStateRef.current = null
     holdRef.current = 0
     bestFrameRef.current = null
-    readySinceRef.current = now
-    captureReadyRef.current = false
 
     setHoldProgress(0)
     setPoseOk(false)
-    setCaptureReady(false)
-    setMessage('Challenge passed. Look straight at the camera.')
+    setMessage('Liveness check passed. Tap Capture Photo when ready.')
 
     changeStage('ready')
   }
@@ -990,6 +978,9 @@ export default function LivePhotoCapture({
     ) {
       return
     }
+
+    // A valid video frame is available: manual capture is allowed.
+    setCameraReady(true)
 
     const current = stageRef.current
 
@@ -1018,48 +1009,42 @@ export default function LivePhotoCapture({
     const result = landmarker.detectForVideo(video, now)
     const faces = (result.faceLandmarks || []) as Pt[][]
 
+    // Remember the latest single face so a manual capture can be
+    // centred on it, whatever the validation outcome.
+    if (faces.length === 1) {
+      const m = computeMetrics(faces[0], video.videoWidth, video.videoHeight)
+
+      if (m) {
+        lastFaceRef.current = { metrics: m, at: now }
+      }
+    }
+
     if (current === 'challenge') {
       runChallengeFrame(video, faces, now)
       return
     }
 
-    // ----- "ready" stage: keep checking, enable Capture Photo -----
+    // ----- "ready" stage: warnings only; capture is always allowed -----
     if (current === 'ready') {
-      const notReady = (text: string) => {
-        captureReadyRef.current = false
-        setCaptureReady(false)
+      const warn = (text: string) => {
         setPoseOk(false)
-        setMessage(text)
-      }
-
-      if (now - readySinceRef.current > READY_TIMEOUT_MS) {
-        resetFlow()
-        setMessage(
-          'The liveness check expired. Please complete a new quick challenge.'
-        )
-        return
+        setMessage(`${text} You can still capture.`)
       }
 
       if (faces.length === 0) {
-        return notReady('No face detected. Move into the frame.')
+        return warn('No face detected.')
       }
 
       if (faces.length > 1) {
-        return notReady(
-          'More than one face detected. Only you should be visible.'
-        )
+        return warn('More than one face detected.')
       }
 
       const readyCheck = checkPosition(video, faces[0])
 
       if ('problem' in readyCheck) {
-        return notReady(readyCheck.problem)
+        return warn(readyCheck.problem)
       }
 
-      lastGoodRef.current = readyCheck
-      captureReadyRef.current = true
-
-      setCaptureReady(true)
       setPoseOk(true)
       setMessage('All checks passed. Tap Capture Photo.')
       return
@@ -1161,6 +1146,7 @@ export default function LivePhotoCapture({
     let cancelled = false
 
     resetFlow()
+    setCameraReady(false)
     setErrorText('')
     setPhase('loading')
     setMessage('Starting camera…')
@@ -1261,23 +1247,52 @@ export default function LivePhotoCapture({
     changeStage('challenge')
   }
 
-  // Manual capture: only possible once the liveness challenge has
-  // passed and the face is still forward-facing and clear.
+  // Manual capture: always available once a video frame exists.
+  // Validation results are warnings only and never block it.
   const handleCapture = () => {
     const video = videoRef.current
-    const good = lastGoodRef.current
 
     if (
-      stageRef.current !== 'ready' ||
-      !captureReadyRef.current ||
       !video ||
-      !good
+      video.readyState < 2 ||
+      !video.videoWidth ||
+      !video.videoHeight
     ) {
+      setMessage('The camera is still loading. Please wait a moment.')
       return
     }
 
+    const last = lastFaceRef.current
+    const side = Math.min(video.videoWidth, video.videoHeight)
+
+    // Centre the crop on a recently detected face; otherwise use
+    // the centre of the frame.
+    const metrics: FaceMetrics =
+      last && performance.now() - last.at < FACE_CROP_MAX_AGE_MS
+        ? last.metrics
+        : {
+            yaw: 0,
+            pitch: 0.6,
+            roll: 0,
+            offsetX: 0,
+            offsetY: 0,
+            heightFrac: 0.55,
+            inside: true,
+            faceBox: {
+              x: (video.videoWidth - side / 1.8) / 2,
+              y: (video.videoHeight - side / 1.8) / 2,
+              w: side / 1.8,
+              h: side / 1.8,
+            },
+          }
+
     bestFrameRef.current = null
-    captureCandidate(video, good.metrics, good.quality)
+    captureCandidate(video, metrics, {
+      brightness: 0,
+      contrast: 0,
+      sharpness: 0,
+      frameBrightness: 0,
+    })
 
     void finishCapture()
   }
@@ -1285,6 +1300,7 @@ export default function LivePhotoCapture({
   const handleRetake = async () => {
     releasePreview()
     resetFlow()
+    setCameraReady(false)
     setErrorText('')
     setPhase('loading')
     setMessage('Starting camera…')
@@ -1586,7 +1602,7 @@ export default function LivePhotoCapture({
           <button
             type="button"
             className="btn-primary"
-            disabled={!captureReady || phase !== 'capturing'}
+            disabled={!cameraReady || phase !== 'capturing'}
             onClick={handleCapture}
             style={{
               width: '100%',
@@ -1594,9 +1610,9 @@ export default function LivePhotoCapture({
               padding: '12px 16px',
               fontWeight: 600,
               ...centered,
-              opacity: captureReady && phase === 'capturing' ? 1 : 0.45,
+              opacity: cameraReady && phase === 'capturing' ? 1 : 0.45,
               cursor:
-                captureReady && phase === 'capturing'
+                cameraReady && phase === 'capturing'
                   ? 'pointer'
                   : 'not-allowed',
             }}
@@ -1605,21 +1621,17 @@ export default function LivePhotoCapture({
             Capture Photo
           </button>
 
-          {!captureReady && !failed && (
-            <div
-              style={{
-                marginTop: 8,
-                fontSize: '0.8rem',
-                color: 'var(--text-muted)',
-              }}
-            >
-              {stage === 'ready'
-                ? 'Capture Photo unlocks when your face is clear and facing forward.'
-                : stage === 'challenge'
-                  ? `Capture Photo unlocks after you complete the challenge: ${challenge.label.toLowerCase()}.`
-                  : 'Capture Photo unlocks after you start and pass a quick liveness check. Position your face first.'}
-            </div>
-          )}
+          <div
+            style={{
+              marginTop: 8,
+              fontSize: '0.8rem',
+              color: 'var(--text-muted)',
+            }}
+          >
+            {cameraReady && phase === 'capturing'
+              ? 'You can capture at any time. For a clearer photo, face the light and look straight at the camera. The liveness check is optional.'
+              : 'The camera is still loading. Capture Photo will be available in a moment.'}
+          </div>
 
           {failed && (
             <div style={{ display: 'flex', gap: 10, marginTop: 10 }}>
