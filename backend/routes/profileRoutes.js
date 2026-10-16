@@ -490,6 +490,95 @@ function handlePhotoUpload(req, res, next) {
 // verification and all other profile fields are untouched.
 // =====================================================
 
+// Maps a failure in the photo-save pipeline to a safe, useful
+// response. Only the failing stage and an upstream HTTP status
+// are used; storage bodies, keys and URLs are never sent to the
+// client (the full error is logged server-side only).
+function describePhotoFailure(stage, err) {
+    const message = String((err && err.message) || "");
+
+    if (stage === "storage") {
+        if (/not configured/i.test(message)) {
+            return {
+                status: 503,
+                code: "PHOTO_STORAGE_NOT_CONFIGURED",
+                message:
+                    "Photo storage is not configured on the server. Please contact support.",
+            };
+        }
+
+        const match = message.match(/upload failed \((\d{3})\)/i);
+        const upstream = match ? Number(match[1]) : null;
+
+        if (upstream === 401 || upstream === 403) {
+            return {
+                status: 502,
+                code: "PHOTO_STORAGE_AUTH_FAILED",
+                message:
+                    "The server's photo storage credentials were rejected. Please contact support.",
+            };
+        }
+
+        if (upstream === 415) {
+            return {
+                status: 502,
+                code: "PHOTO_STORAGE_TYPE_REJECTED",
+                message:
+                    "Photo storage does not accept JPEG images. Please contact support.",
+            };
+        }
+
+        if (upstream === 413) {
+            return {
+                status: 502,
+                code: "PHOTO_STORAGE_TOO_LARGE",
+                message:
+                    "Photo storage rejected the file size. Please contact support.",
+            };
+        }
+
+        if (upstream === 400 || upstream === 404) {
+            return {
+                status: 502,
+                code: "PHOTO_STORAGE_BUCKET_ERROR",
+                message:
+                    "Photo storage is not set up correctly. Please contact support.",
+            };
+        }
+
+        return {
+            status: 502,
+            code: "PHOTO_STORAGE_UNAVAILABLE",
+            message:
+                "Photo storage is temporarily unavailable. Please try again.",
+        };
+    }
+
+    if (stage === "database") {
+        if (err && err.code === "ER_BAD_FIELD_ERROR") {
+            return {
+                status: 500,
+                code: "PHOTO_DB_COLUMN_MISSING",
+                message:
+                    "Profile photos are not set up in the database yet. Please contact support.",
+            };
+        }
+
+        return {
+            status: 500,
+            code: "PHOTO_DB_UPDATE_FAILED",
+            message:
+                "Your photo was uploaded but could not be linked to your profile. Please try again.",
+        };
+    }
+
+    return {
+        status: 500,
+        code: "PHOTO_SAVE_FAILED",
+        message: "Failed to save profile photo. Please try again.",
+    };
+}
+
 router.put(
     "/photo",
     authMiddleware,
@@ -497,6 +586,7 @@ router.put(
     handlePhotoUpload,
     async (req, res) => {
         let uploadedReference = null;
+        let stage = "validate";
 
         try {
             const validation = validateProfilePhotoBuffer(
@@ -509,6 +599,8 @@ router.put(
                     message: validation.message,
                 });
             }
+
+            stage = "lookup";
 
             const [existingRows] = await db.query(
                 `
@@ -534,6 +626,8 @@ router.put(
                 req.user.id
             );
 
+            stage = "storage";
+
             await uploadDocumentBuffer(
                 req.file.buffer,
                 objectPath,
@@ -541,6 +635,8 @@ router.put(
             );
 
             uploadedReference = toStorageReference(objectPath);
+
+            stage = "database";
 
             await db.query(
                 `
@@ -553,6 +649,8 @@ router.put(
 
             // The new photo is now the source of truth.
             uploadedReference = null;
+
+            stage = "response";
 
             // Best-effort cleanup of the replaced photo.
             if (previousReference) {
@@ -639,7 +737,10 @@ router.put(
                 },
             });
         } catch (err) {
-            console.error("UPLOAD PROFILE PHOTO ERROR:", err);
+            console.error(
+                `UPLOAD PROFILE PHOTO ERROR (stage: ${stage}):`,
+                err
+            );
 
             // Do not leave an orphaned object behind when the
             // database update did not complete.
@@ -649,10 +750,12 @@ router.put(
                 );
             }
 
-            res.status(500).json({
+            const failure = describePhotoFailure(stage, err);
+
+            res.status(failure.status).json({
                 success: false,
-                message:
-                    "Failed to save profile photo. Please try again.",
+                code: failure.code,
+                message: failure.message,
             });
         }
     }
