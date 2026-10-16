@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from 'react'
 
 import {
 
-  BookOpen,
 
   Upload,
 
@@ -31,6 +30,7 @@ import {
   ShieldCheck,
 
 } from 'lucide-react'
+import NyayaAIResearchMonogram from '../components/NyayaAIResearchMonogram'
 
 
 
@@ -2540,45 +2540,7 @@ export default function AIResearch() {
 
 
 
-          <div
-
-            style={{
-
-              width: 34,
-
-              height: 34,
-
-              borderRadius: 10,
-
-              background:
-
-                'linear-gradient(135deg, var(--blue), #7C3AED)',
-
-              display:
-
-                'flex',
-
-              alignItems:
-
-                'center',
-
-              justifyContent:
-
-                'center',
-
-            }}
-
-          >
-
-            <BookOpen
-
-              size={15}
-
-              color="white"
-
-            />
-
-          </div>
+          <NyayaAIResearchMonogram size={34} radius={10} />
 
 
 
@@ -3044,75 +3006,28 @@ export default function AIResearch() {
 
 
 
-                <div
-
-                  style={{
-
-                    width: 30,
-
-                    height: 30,
-
-                    borderRadius:
-
-                      '50%',
-
-                    flexShrink: 0,
-
-                    background:
-
-                      msg.role ===
-
-                      'ai'
-
-                        ? 'linear-gradient(135deg, var(--blue), #7C3AED)'
-
-                        : 'linear-gradient(135deg, #059669, #065F46)',
-
-                    display:
-
-                      'flex',
-
-                    alignItems:
-
-                      'center',
-
-                    justifyContent:
-
-                      'center',
-
-                    color:
-
-                      'white',
-
-                    fontSize:
-
-                      '0.62rem',
-
-                    fontWeight:
-
-                      800,
-
-                  }}
-
-                >
-
-                  {msg.role ===
-
-                  'ai' ? (
-
-                    <BookOpen
-
-                      size={13}
-
-                    />
-
-                  ) : (
-
-                    'PS'
-
-                  )}
-
-                </div>
+                {msg.role === 'ai' ? (
+                  <NyayaAIResearchMonogram size={30} radius="50%" />
+                ) : (
+                  <div
+                    style={{
+                      width: 30,
+                      height: 30,
+                      borderRadius: '50%',
+                      flexShrink: 0,
+                      background:
+                        'linear-gradient(135deg, #059669, #065F46)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: 'white',
+                      fontSize: '0.62rem',
+                      fontWeight: 800,
+                    }}
+                  >
+                    PS
+                  </div>
+                )}
 
 
 
@@ -3330,49 +3245,7 @@ export default function AIResearch() {
 
 
 
-              <div
-
-                style={{
-
-                  width: 30,
-
-                  height: 30,
-
-                  borderRadius:
-
-                    '50%',
-
-                  flexShrink: 0,
-
-                  background:
-
-                    'linear-gradient(135deg, var(--blue), #7C3AED)',
-
-                  display:
-
-                    'flex',
-
-                  alignItems:
-
-                    'center',
-
-                  justifyContent:
-
-                    'center',
-
-                }}
-
-              >
-
-                <BookOpen
-
-                  size={13}
-
-                  color="white"
-
-                />
-
-              </div>
+              <NyayaAIResearchMonogram size={30} radius="50%" />
 
 
 
