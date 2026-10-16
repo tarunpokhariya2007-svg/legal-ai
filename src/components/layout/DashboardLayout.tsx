@@ -29,7 +29,8 @@ import {
 } from 'lucide-react'
 
 import BackButton from './BackButton'
-import { getStoredUser, logout } from '../../lib/auth'
+import { getStoredUser, setStoredUser, logout } from '../../lib/auth'
+import { useAuthedPhotoSrc } from '../../lib/profilePhoto'
 
 /*
 |--------------------------------------------------------------------------
@@ -263,6 +264,52 @@ export default function DashboardLayout() {
 
   const savedUser: any =
     getStoredUser() || {}
+
+  // Saved profile photo for the sidebar avatar. Starts from the
+  // stored user, is fetched once from the existing profile API if
+  // missing (e.g. after logout/login), and updates immediately when
+  // the Profile page saves a new photo.
+  const [photoUrl, setPhotoUrl] = useState<string>(
+    savedUser?.photoUrl || ''
+  )
+  const photoSrc = useAuthedPhotoSrc(photoUrl)
+  const [photoBroken, setPhotoBroken] = useState(false)
+
+  useEffect(() => {
+    setPhotoBroken(false)
+  }, [photoSrc])
+
+  useEffect(() => {
+    const onUpdated = (event: Event) => {
+      setPhotoUrl((event as CustomEvent<string>).detail || '')
+    }
+
+    window.addEventListener('profile-photo-updated', onUpdated)
+
+    if (!getStoredUser()?.photoUrl) {
+      fetch(`${API_BASE_URL}/api/profile`, {
+        credentials: 'include',
+      })
+        .then((response) => response.json())
+        .then((data) => {
+          const url = data?.user?.photoUrl
+          const stored = getStoredUser()
+
+          if (url) {
+            setPhotoUrl(url)
+
+            if (stored) {
+              setStoredUser({ ...stored, photoUrl: url })
+            }
+          }
+        })
+        .catch(() => {})
+    }
+
+    return () => {
+      window.removeEventListener('profile-photo-updated', onUpdated)
+    }
+  }, [])
 
   const userName =
     savedUser?.fullName ||
@@ -1173,9 +1220,26 @@ export default function DashboardLayout() {
                 height: 36,
                 fontSize:
                   '0.8rem',
+                background: '#000',
+                color: '#fff',
+                overflow: 'hidden',
               }}
             >
-              {userInitials}
+              {photoSrc && !photoBroken ? (
+                <img
+                  src={photoSrc}
+                  alt={userName}
+                  onError={() => setPhotoBroken(true)}
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
+                    display: 'block',
+                  }}
+                />
+              ) : (
+                userInitials
+              )}
             </div>
 
             <div
