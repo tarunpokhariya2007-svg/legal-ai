@@ -1109,8 +1109,6 @@ export default function LivePhotoCapture({
     setHoldProgress(0)
 
     // ----- Position held: start the randomized challenge -----
-    const sums = alignSumRef.current
-
     baselineRef.current = {
       ear: sums.ear / sums.n,
       mouth: sums.mouth / sums.n,
