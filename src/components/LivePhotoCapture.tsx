@@ -6,15 +6,21 @@ import type { FaceLandmarker } from '@mediapipe/tasks-vision'
 // LIVE PROFILE PHOTO CAPTURE
 // =====================================================
 //
-// - Live camera only (getUserMedia). No file picker / gallery.
-// - On-device face landmark detection (MediaPipe Face
-//   Landmarker). No video frames leave the browser except the
-//   single JPEG the user confirms.
-// - Five guided poses: straight, left, right, up, down.
+// - Live front camera only (getUserMedia). No file picker,
+//   gallery, drag-and-drop or existing-image upload.
+// - On-device MediaPipe Face Landmarker. No video frames leave
+//   the browser; only the single JPEG the user confirms is sent.
+// - Flow: position one forward-facing face -> one short
+//   randomized challenge (blink twice / smile / move closer and
+//   back) verified from landmarks across frames -> capture a
+//   forward-facing portrait -> preview (Retake / Confirm).
 //
-// IMPORTANT: these checks are quality + basic pose guidance.
-// They do NOT verify identity and are NOT spoof-proof
-// liveness detection.
+// IMPORTANT: this is a basic anti-spoofing step. It makes
+// static printed photos and still images on a phone screen
+// harder to pass, but it does NOT reliably stop prerecorded
+// video, virtual cameras or deliberate attacks, and it does NOT
+// verify identity. Stronger protection needs a dedicated
+// server-side liveness service.
 // =====================================================
 
 // The WASM runtime version must match the installed
@@ -30,10 +36,12 @@ const FACE_MODEL_URL =
 // ---------- Tunable thresholds ----------
 const OUTPUT_SIZE = 640 // saved photo is OUTPUT_SIZE x OUTPUT_SIZE
 const JPEG_QUALITY = 0.9
-const DETECT_INTERVAL_MS = 90
+const DETECT_INTERVAL_MS = 80 // position / final-capture stages
+// The challenge stage runs on every animation frame so a quick
+// blink is not missed.
 
-const HOLD_FRAMES_STRAIGHT = 8
-const HOLD_FRAMES_POSE = 5
+const HOLD_FRAMES_ALIGN = 6
+const HOLD_FRAMES_FINAL = 5
 
 const MIN_VIDEO_HEIGHT = 480
 
@@ -43,46 +51,57 @@ const MIN_CONTRAST = 28 // luma std-dev inside the face
 const BACKLIGHT_RATIO = 0.6 // face / whole-frame brightness
 const MIN_SHARPNESS = 22 // Laplacian variance on a 96x96 face crop
 
-const YAW_TURN = 0.1 // nose offset (fraction of face width)
-const YAW_MAX = 0.32
-const PITCH_TILT = 0.07 // nose position change (fraction of eye-chin)
-const PITCH_MAX = 0.3
-const CROSS_AXIS_MAX = 0.12
+const MIN_FACE_HEIGHT = 0.38 // face height / frame side
+const MAX_FACE_HEIGHT = 0.72 // leaves room to move closer
+
+const CHALLENGE_TIMEOUT_MS = 9000
+const FACE_LOST_MS = 1500
+const CHALLENGE_YAW_MAX = 0.22 // keep roughly facing the camera
+
+const BLINK_CLOSED_RATIO = 0.62 // EAR vs. open-eye baseline
+const BLINK_OPEN_RATIO = 0.8
+const BLINKS_REQUIRED = 2
+const SMILE_RATIO = 1.12 // mouth width vs. neutral baseline
+const SMILE_RELAX_RATIO = 1.05
+const SMILE_FRAMES = 3
+const CLOSER_RATIO = 1.15 // face height vs. starting size
+const CLOSER_BACK_RATIO = 1.06
+const CLOSER_FRAMES = 2
 
 // ---------- Types ----------
 type Pt = { x: number; y: number; z?: number }
 
 type Phase = 'loading' | 'capturing' | 'preview' | 'saving' | 'error'
 
-type PoseKey = 'straight' | 'left' | 'right' | 'up' | 'down'
+type Stage = 'align' | 'challenge' | 'final' | 'failed'
 
-const STEPS: { key: PoseKey; label: string; hint: string }[] = [
+type ChallengeKey = 'blink' | 'smile' | 'closer'
+
+interface Challenge {
+  key: ChallengeKey
+  label: string
+  hint: string
+}
+
+const CHALLENGES: Challenge[] = [
   {
-    key: 'straight',
-    label: 'Look straight ahead',
-    hint: 'Face the camera with a neutral expression.',
+    key: 'blink',
+    label: 'Blink twice',
+    hint: 'Close and open your eyes two times.',
   },
   {
-    key: 'left',
-    label: 'Turn your head to your left',
-    hint: 'Slowly turn, keeping your face in view.',
+    key: 'smile',
+    label: 'Smile briefly',
+    hint: 'Show a smile, then relax your face.',
   },
   {
-    key: 'right',
-    label: 'Turn your head to your right',
-    hint: 'Slowly turn, keeping your face in view.',
-  },
-  {
-    key: 'up',
-    label: 'Tilt your head up',
-    hint: 'Lift your chin slightly.',
-  },
-  {
-    key: 'down',
-    label: 'Tilt your head down',
-    hint: 'Lower your chin slightly.',
+    key: 'closer',
+    label: 'Move closer, then back',
+    hint: 'Lean toward the camera, then return to where you started.',
   },
 ]
+
+const STAGE_LABELS = ['Position', 'Challenge', 'Photo']
 
 interface FaceMetrics {
   yaw: number
@@ -107,6 +126,24 @@ interface Props {
   onClose: () => void
   /** Persist the confirmed JPEG. Throw to show an error and allow retry. */
   onSave: (photo: Blob) => Promise<void>
+}
+
+interface ChallengeState {
+  kind: ChallengeKey
+  startedAt: number
+  lastFaceAt: number
+  blinks: number
+  eyesClosed: boolean
+  smileFrames: number
+  smiling: boolean
+  nearFrames: number
+  near: boolean
+}
+
+interface Baseline {
+  ear: number
+  mouth: number
+  height: number
 }
 
 // =====================================================
@@ -346,6 +383,62 @@ function lightingProblem(q: QualityMetrics): string | null {
 }
 
 // =====================================================
+// LIVENESS HELPERS (landmark-based, on-device)
+// =====================================================
+
+function pxDist(a: Pt, b: Pt, vw: number, vh: number): number {
+  return Math.hypot((a.x - b.x) * vw, (a.y - b.y) * vh)
+}
+
+// Eye aspect ratio (average of both eyes). Drops sharply on a blink.
+function eyeAspectRatio(lm: Pt[], vw: number, vh: number): number {
+  const d = (i: number, j: number) => pxDist(lm[i], lm[j], vw, vh)
+
+  const right = (d(160, 144) + d(158, 153)) / (2 * d(33, 133) || 1)
+  const left = (d(385, 380) + d(387, 373)) / (2 * d(362, 263) || 1)
+
+  return (right + left) / 2
+}
+
+// Mouth width relative to the distance between the outer eye
+// corners. Grows when smiling and is independent of camera distance.
+function mouthWidthRatio(lm: Pt[], vw: number, vh: number): number {
+  const eyes = pxDist(lm[33], lm[263], vw, vh)
+
+  return eyes > 1 ? pxDist(lm[61], lm[291], vw, vh) / eyes : 0
+}
+
+function pickChallenge(previous?: ChallengeKey): Challenge {
+  const pool = CHALLENGES.filter((c) => c.key !== previous)
+  const buf = new Uint32Array(1)
+
+  crypto.getRandomValues(buf)
+
+  return pool[buf[0] % pool.length]
+}
+
+function describeCameraError(error: unknown): string {
+  const name = (error as { name?: string })?.name
+
+  if (name === 'NotAllowedError' || name === 'SecurityError') {
+    return 'Camera permission was denied. Allow camera access in your browser settings and try again.'
+  }
+
+  if (name === 'NotFoundError' || name === 'OverconstrainedError') {
+    return 'No camera was found on this device.'
+  }
+
+  if (name === 'NotReadableError') {
+    return 'The camera is in use by another app. Close it and try again.'
+  }
+
+  return (
+    (error as Error)?.message ||
+    'Could not start the camera or face detection. Please try again.'
+  )
+}
+
+// =====================================================
 // COMPONENT
 // =====================================================
 
@@ -355,7 +448,8 @@ export default function LivePhotoCapture({
   onSave,
 }: Props) {
   const [phase, setPhase] = useState<Phase>('loading')
-  const [stepIndex, setStepIndex] = useState(0)
+  const [stage, setStage] = useState<Stage>('align')
+  const [challenge, setChallenge] = useState<Challenge>(CHALLENGES[0])
   const [holdProgress, setHoldProgress] = useState(0)
   const [message, setMessage] = useState('Starting camera…')
   const [poseOk, setPoseOk] = useState(false)
@@ -372,10 +466,14 @@ export default function LivePhotoCapture({
   // Mutable flow state (kept in refs so the animation loop never
   // reads stale React state).
   const runningRef = useRef(false)
-  const stepRef = useRef(0)
+  const stageRef = useRef<Stage>('align')
+  const challengeRef = useRef<Challenge>(CHALLENGES[0])
+  const challengeStateRef = useRef<ChallengeState | null>(null)
   const holdRef = useRef(0)
   const lastDetectRef = useRef(0)
-  const baselineRef = useRef({ yaw: 0, pitch: 0.6, samples: 0 })
+  const lastTimestampRef = useRef(0)
+  const alignSumRef = useRef({ ear: 0, mouth: 0, height: 0, n: 0 })
+  const baselineRef = useRef<Baseline>({ ear: 0, mouth: 0, height: 0 })
   const bestFrameRef = useRef<{
     canvas: HTMLCanvasElement
     sharpness: number
@@ -434,6 +532,7 @@ export default function LivePhotoCapture({
 
     bestFrameRef.current = null
     photoBlobRef.current = null
+    challengeStateRef.current = null
 
     releasePreview()
   }, [stopCamera, releasePreview])
@@ -515,7 +614,7 @@ export default function LivePhotoCapture({
   }, [])
 
   // -----------------------------------------------
-  // DETECTION LOOP
+  // CAPTURE
   // -----------------------------------------------
 
   const finishCapture = useCallback(async () => {
@@ -611,6 +710,245 @@ export default function LivePhotoCapture({
     []
   )
 
+  // -----------------------------------------------
+  // FLOW HELPERS
+  // -----------------------------------------------
+
+  const changeStage = useCallback((next: Stage) => {
+    stageRef.current = next
+    setStage(next)
+  }, [])
+
+  const resetFlow = useCallback(() => {
+    // Always pick a different challenge from the previous attempt.
+    const next = pickChallenge(challengeRef.current.key)
+
+    challengeRef.current = next
+    challengeStateRef.current = null
+    holdRef.current = 0
+    alignSumRef.current = { ear: 0, mouth: 0, height: 0, n: 0 }
+    bestFrameRef.current = null
+    photoBlobRef.current = null
+
+    stageRef.current = 'align'
+
+    setChallenge(next)
+    setStage('align')
+    setHoldProgress(0)
+    setPoseOk(false)
+    setSaveError('')
+    setMessage('Look straight at the camera.')
+  }, [])
+
+  const failChallenge = useCallback(
+    (reason: string) => {
+      holdRef.current = 0
+      challengeStateRef.current = null
+
+      setHoldProgress(0)
+      setPoseOk(false)
+      setMessage(reason)
+
+      changeStage('failed')
+    },
+    [changeStage]
+  )
+
+  const retryChallenge = useCallback(() => {
+    resetFlow()
+  }, [resetFlow])
+
+  // -----------------------------------------------
+  // PER-FRAME CHECKS
+  // -----------------------------------------------
+
+  // Position / quality gate shared by the "align" and "final"
+  // stages. Returns a user-facing problem or the measurements.
+  const checkPosition = (
+    video: HTMLVideoElement,
+    lm: Pt[]
+  ):
+    | { problem: string }
+    | { metrics: FaceMetrics; quality: QualityMetrics } => {
+    const metrics = computeMetrics(lm, video.videoWidth, video.videoHeight)
+
+    if (!metrics) {
+      return { problem: 'Face not clear. Please adjust your position.' }
+    }
+
+    if (!metrics.inside) {
+      return { problem: 'Keep your whole face inside the frame.' }
+    }
+
+    if (
+      Math.abs(metrics.offsetX) > 0.14 ||
+      Math.abs(metrics.offsetY) > 0.14
+    ) {
+      return { problem: 'Centre your face in the frame.' }
+    }
+
+    if (metrics.heightFrac < MIN_FACE_HEIGHT) {
+      return { problem: 'Move closer to the camera.' }
+    }
+
+    if (metrics.heightFrac > MAX_FACE_HEIGHT) {
+      return { problem: 'Move a little further from the camera.' }
+    }
+
+    const work =
+      workCanvasRef.current ||
+      (workCanvasRef.current = document.createElement('canvas'))
+
+    const quality = measureQuality(video, metrics.faceBox, work)
+
+    if (!quality) {
+      return { problem: 'Face not clear. Please adjust your position.' }
+    }
+
+    const light = lightingProblem(quality)
+
+    if (light) {
+      return { problem: light }
+    }
+
+    if (quality.sharpness < MIN_SHARPNESS) {
+      return {
+        problem: 'Image is blurry. Hold still and wipe the camera lens.',
+      }
+    }
+
+    if (
+      Math.abs(metrics.yaw) > 0.08 ||
+      metrics.pitch < 0.38 ||
+      metrics.pitch > 0.8 ||
+      Math.abs(metrics.roll) > 12
+    ) {
+      return {
+        problem: 'Look straight at the camera and keep your head level.',
+      }
+    }
+
+    return { metrics, quality }
+  }
+
+  const runChallengeFrame = (
+    video: HTMLVideoElement,
+    faces: Pt[][],
+    now: number
+  ) => {
+    const c = challengeStateRef.current
+
+    if (!c) {
+      return
+    }
+
+    if (now - c.startedAt > CHALLENGE_TIMEOUT_MS) {
+      const reasons: Record<ChallengeKey, string> = {
+        blink:
+          'We could not detect two blinks in time. Look at the camera and blink clearly.',
+        smile:
+          'We could not detect a smile in time. Try a clear smile, then relax.',
+        closer:
+          'We could not detect the movement in time. Lean in toward the camera, then return.',
+      }
+
+      failChallenge(reasons[c.kind])
+      return
+    }
+
+    if (faces.length === 0) {
+      if (now - c.lastFaceAt > FACE_LOST_MS) {
+        failChallenge(
+          'We lost sight of your face. Keep it in view and try again.'
+        )
+      }
+
+      return
+    }
+
+    if (faces.length > 1) {
+      failChallenge('More than one face detected. Only you should be visible.')
+      return
+    }
+
+    c.lastFaceAt = now
+
+    const lm = faces[0]
+    const vw = video.videoWidth
+    const vh = video.videoHeight
+    const metrics = computeMetrics(lm, vw, vh)
+
+    if (!metrics) {
+      return
+    }
+
+    if (Math.abs(metrics.yaw) > CHALLENGE_YAW_MAX) {
+      setMessage('Keep facing the camera.')
+      return
+    }
+
+    const base = baselineRef.current
+    let passed = false
+
+    if (c.kind === 'blink') {
+      const ear = eyeAspectRatio(lm, vw, vh)
+
+      if (!c.eyesClosed && ear < base.ear * BLINK_CLOSED_RATIO) {
+        c.eyesClosed = true
+      } else if (c.eyesClosed && ear > base.ear * BLINK_OPEN_RATIO) {
+        c.eyesClosed = false
+        c.blinks += 1
+
+        if (c.blinks < BLINKS_REQUIRED) {
+          setMessage(`Blink ${c.blinks} of ${BLINKS_REQUIRED} done. Once more.`)
+        }
+      }
+
+      passed = c.blinks >= BLINKS_REQUIRED
+    } else if (c.kind === 'smile') {
+      const ratio = mouthWidthRatio(lm, vw, vh) / (base.mouth || 1)
+
+      if (!c.smiling) {
+        c.smileFrames = ratio >= SMILE_RATIO ? c.smileFrames + 1 : 0
+
+        if (c.smileFrames >= SMILE_FRAMES) {
+          c.smiling = true
+          setMessage('Good. Now relax your face.')
+        }
+      } else if (ratio <= SMILE_RELAX_RATIO) {
+        passed = true
+      }
+    } else {
+      const ratio = metrics.heightFrac / (base.height || 1)
+
+      if (!c.near) {
+        c.nearFrames = ratio >= CLOSER_RATIO ? c.nearFrames + 1 : 0
+
+        if (c.nearFrames >= CLOSER_FRAMES) {
+          c.near = true
+          setMessage('Now move back to where you started.')
+        }
+      } else if (ratio <= CLOSER_BACK_RATIO) {
+        passed = true
+      }
+    }
+
+    if (!passed) {
+      return
+    }
+
+    // Challenge verified: go on to the forward-facing portrait.
+    challengeStateRef.current = null
+    holdRef.current = 0
+    bestFrameRef.current = null
+
+    setHoldProgress(0)
+    setPoseOk(false)
+    setMessage('Great. Look straight at the camera and hold still.')
+
+    changeStage('final')
+  }
+
   const evaluateFrame = useCallback(() => {
     const video = videoRef.current
     const landmarker = landmarkerRef.current
@@ -625,20 +963,42 @@ export default function LivePhotoCapture({
       return
     }
 
-    if (video.videoHeight < MIN_VIDEO_HEIGHT && video.videoWidth < MIN_VIDEO_HEIGHT) {
+    const current = stageRef.current
+
+    if (current === 'failed') {
+      return
+    }
+
+    if (
+      video.videoHeight < MIN_VIDEO_HEIGHT &&
+      video.videoWidth < MIN_VIDEO_HEIGHT
+    ) {
       setPoseOk(false)
       setMessage('Camera resolution is too low for a clear photo.')
       return
     }
 
-    const result = landmarker.detectForVideo(video, performance.now())
+    const now = performance.now()
 
-    const faces = result.faceLandmarks || []
+    // MediaPipe requires strictly increasing timestamps.
+    if (now <= lastTimestampRef.current) {
+      return
+    }
 
-    const step = STEPS[stepRef.current]
+    lastTimestampRef.current = now
 
+    const result = landmarker.detectForVideo(video, now)
+    const faces = (result.faceLandmarks || []) as Pt[][]
+
+    if (current === 'challenge') {
+      runChallengeFrame(video, faces, now)
+      return
+    }
+
+    // ----- "align" and "final" stages -----
     const fail = (text: string) => {
       holdRef.current = 0
+      alignSumRef.current = { ear: 0, mouth: 0, height: 0, n: 0 }
       setHoldProgress(0)
       setPoseOk(false)
       setMessage(text)
@@ -652,162 +1012,79 @@ export default function LivePhotoCapture({
       return fail('More than one face detected. Only you should be visible.')
     }
 
-    const metrics = computeMetrics(
-      faces[0] as Pt[],
-      video.videoWidth,
-      video.videoHeight
-    )
+    const checked = checkPosition(video, faces[0])
 
-    if (!metrics) {
-      return fail('Face not clear. Please adjust your position.')
+    if ('problem' in checked) {
+      return fail(checked.problem)
     }
 
-    const isStraight = step.key === 'straight'
+    const { metrics, quality } = checked
 
-    // ----- Position / size -----
-    const maxOffset = isStraight ? 0.14 : 0.28
-
-    if (!metrics.inside) {
-      return fail('Keep your whole face inside the frame.')
-    }
-
-    if (
-      Math.abs(metrics.offsetX) > maxOffset ||
-      Math.abs(metrics.offsetY) > maxOffset
-    ) {
-      return fail('Centre your face in the frame.')
-    }
-
-    if (metrics.heightFrac < (isStraight ? 0.4 : 0.32)) {
-      return fail('Move closer to the camera.')
-    }
-
-    if (metrics.heightFrac > 0.85) {
-      return fail('Move a little further from the camera.')
-    }
-
-    // ----- Lighting / sharpness -----
-    const work =
-      workCanvasRef.current ||
-      (workCanvasRef.current = document.createElement('canvas'))
-
-    const quality = measureQuality(video, metrics.faceBox, work)
-
-    if (!quality) {
-      return fail('Face not clear. Please adjust your position.')
-    }
-
-    const light = lightingProblem(quality)
-
-    if (light) {
-      return fail(light)
-    }
-
-    if (isStraight && quality.sharpness < MIN_SHARPNESS) {
-      return fail('Image is blurry. Hold still and wipe the camera lens.')
-    }
-
-    // ----- Pose -----
-    const base = baselineRef.current
-
-    const yawDelta = metrics.yaw - base.yaw
-    const pitchDelta = metrics.pitch - base.pitch
-
-    let poseMatches = false
-    let poseMessage = step.hint
-
-    switch (step.key) {
-      case 'straight':
-        poseMatches =
-          Math.abs(metrics.yaw) <= 0.07 &&
-          metrics.pitch >= 0.38 &&
-          metrics.pitch <= 0.8 &&
-          Math.abs(metrics.roll) <= 12
-
-        if (!poseMatches) {
-          poseMessage = 'Look straight at the camera and keep your head level.'
-        }
-        break
-
-      case 'left':
-        poseMatches =
-          yawDelta >= YAW_TURN &&
-          yawDelta <= YAW_MAX &&
-          Math.abs(pitchDelta) <= CROSS_AXIS_MAX
-        break
-
-      case 'right':
-        poseMatches =
-          yawDelta <= -YAW_TURN &&
-          yawDelta >= -YAW_MAX &&
-          Math.abs(pitchDelta) <= CROSS_AXIS_MAX
-        break
-
-      case 'up':
-        poseMatches =
-          pitchDelta <= -PITCH_TILT &&
-          pitchDelta >= -PITCH_MAX &&
-          Math.abs(yawDelta) <= CROSS_AXIS_MAX
-        break
-
-      case 'down':
-        poseMatches =
-          pitchDelta >= PITCH_TILT &&
-          pitchDelta <= PITCH_MAX &&
-          Math.abs(yawDelta) <= CROSS_AXIS_MAX
-        break
-    }
-
-    if (!poseMatches) {
-      holdRef.current = 0
-      setHoldProgress(0)
-      setPoseOk(false)
-      setMessage(`${step.label}. ${poseMessage}`)
-      return
-    }
-
-    // ----- Pose held -----
     holdRef.current += 1
 
-    if (isStraight) {
-      // Average the neutral pose to use as the baseline for the
-      // other four poses, and keep the sharpest straight frame.
-      const n = base.samples + 1
+    const isAlign = current === 'align'
+    const required = isAlign ? HOLD_FRAMES_ALIGN : HOLD_FRAMES_FINAL
 
-      base.yaw = (base.yaw * base.samples + metrics.yaw) / n
-      base.pitch = (base.pitch * base.samples + metrics.pitch) / n
-      base.samples = n
+    if (isAlign) {
+      // Neutral-face baseline for the challenge checks.
+      const sums = alignSumRef.current
 
+      sums.ear += eyeAspectRatio(faces[0], video.videoWidth, video.videoHeight)
+      sums.mouth += mouthWidthRatio(
+        faces[0],
+        video.videoWidth,
+        video.videoHeight
+      )
+      sums.height += metrics.heightFrac
+      sums.n += 1
+    } else {
       captureCandidate(video, metrics, quality)
     }
 
-    const required = isStraight
-      ? HOLD_FRAMES_STRAIGHT
-      : HOLD_FRAMES_POSE
-
     setPoseOk(true)
-    setMessage('Good. Hold still…')
+    setMessage(isAlign ? 'Good. Hold still…' : 'Hold still…')
     setHoldProgress(Math.min(1, holdRef.current / required))
 
     if (holdRef.current < required) {
       return
     }
 
-    // ----- Step complete -----
     holdRef.current = 0
     setHoldProgress(0)
 
-    if (stepRef.current >= STEPS.length - 1) {
+    if (!isAlign) {
       void finishCapture()
       return
     }
 
-    stepRef.current += 1
+    // ----- Position held: start the randomized challenge -----
+    const sums = alignSumRef.current
 
-    setStepIndex(stepRef.current)
+    baselineRef.current = {
+      ear: sums.ear / sums.n,
+      mouth: sums.mouth / sums.n,
+      height: sums.height / sums.n,
+    }
+
+    const active = challengeRef.current
+
+    challengeStateRef.current = {
+      kind: active.key,
+      startedAt: now,
+      lastFaceAt: now,
+      blinks: 0,
+      eyesClosed: false,
+      smileFrames: 0,
+      smiling: false,
+      nearFrames: 0,
+      near: false,
+    }
+
     setPoseOk(false)
-    setMessage(STEPS[stepRef.current].label)
-  }, [captureCandidate, finishCapture])
+    setMessage(active.hint)
+
+    changeStage('challenge')
+  }, [captureCandidate, finishCapture, changeStage]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const startLoop = useCallback(() => {
     runningRef.current = true
@@ -819,7 +1096,10 @@ export default function LivePhotoCapture({
 
       rafRef.current = requestAnimationFrame(tick)
 
-      if (now - lastDetectRef.current < DETECT_INTERVAL_MS) {
+      const interval =
+        stageRef.current === 'challenge' ? 0 : DETECT_INTERVAL_MS
+
+      if (now - lastDetectRef.current < interval) {
         return
       }
 
@@ -834,41 +1114,6 @@ export default function LivePhotoCapture({
 
     rafRef.current = requestAnimationFrame(tick)
   }, [evaluateFrame])
-
-  const resetFlow = useCallback(() => {
-    stepRef.current = 0
-    holdRef.current = 0
-    baselineRef.current = { yaw: 0, pitch: 0.6, samples: 0 }
-    bestFrameRef.current = null
-    photoBlobRef.current = null
-
-    setStepIndex(0)
-    setHoldProgress(0)
-    setPoseOk(false)
-    setSaveError('')
-    setMessage(STEPS[0].label)
-  }, [])
-
-  const describeCameraError = (error: unknown): string => {
-    const name = (error as { name?: string })?.name
-
-    if (name === 'NotAllowedError' || name === 'SecurityError') {
-      return 'Camera permission was denied. Allow camera access in your browser settings and try again.'
-    }
-
-    if (name === 'NotFoundError' || name === 'OverconstrainedError') {
-      return 'No camera was found on this device.'
-    }
-
-    if (name === 'NotReadableError') {
-      return 'The camera is in use by another app. Close it and try again.'
-    }
-
-    return (
-      (error as Error)?.message ||
-      'Could not start the camera or face detection. Please try again.'
-    )
-  }
 
   // -----------------------------------------------
   // OPEN / CLOSE LIFECYCLE
@@ -895,7 +1140,7 @@ export default function LivePhotoCapture({
         }
 
         setPhase('capturing')
-        setMessage(STEPS[0].label)
+        setMessage('Look straight at the camera.')
 
         startLoop()
       } catch (error) {
@@ -951,7 +1196,7 @@ export default function LivePhotoCapture({
       await startCamera()
 
       setPhase('capturing')
-      setMessage(STEPS[0].label)
+      setMessage('Look straight at the camera.')
 
       startLoop()
     } catch (error) {
@@ -995,9 +1240,30 @@ export default function LivePhotoCapture({
   // RENDER
   // -----------------------------------------------
 
-  const step = STEPS[stepIndex]
   const showVideo = phase === 'loading' || phase === 'capturing'
-  const guideColor = poseOk ? '#10B981' : 'rgba(255,255,255,0.85)'
+  const stageIndex = stage === 'align' ? 0 : stage === 'final' ? 2 : 1
+  const failed = stage === 'failed'
+  const guideColor = failed
+    ? '#DC2626'
+    : poseOk
+      ? '#10B981'
+      : 'rgba(255,255,255,0.85)'
+
+  const title =
+    stage === 'align'
+      ? 'Look straight at the camera'
+      : stage === 'challenge'
+        ? challenge.label
+        : stage === 'final'
+          ? 'Hold still for your photo'
+          : 'Challenge not completed'
+
+  const centered = {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  } as const
 
   return (
     <div
@@ -1067,11 +1333,7 @@ export default function LivePhotoCapture({
         </div>
 
         {/* ---------- CAMERA VIEW ---------- */}
-        <div
-          style={{
-            display: showVideo ? 'block' : 'none',
-          }}
-        >
+        <div style={{ display: showVideo ? 'block' : 'none' }}>
           <div
             style={{
               position: 'relative',
@@ -1139,34 +1401,32 @@ export default function LivePhotoCapture({
             )}
           </div>
 
-          {/* Step progress */}
+          {/* Progress: Position -> Challenge -> Photo */}
           <div
-            style={{
-              display: 'flex',
-              gap: 6,
-              marginTop: 14,
-            }}
-            aria-label={`Step ${stepIndex + 1} of ${STEPS.length}`}
+            style={{ display: 'flex', gap: 6, marginTop: 14 }}
+            aria-label={`Step ${stageIndex + 1} of ${STAGE_LABELS.length}`}
           >
-            {STEPS.map((item, index) => (
+            {STAGE_LABELS.map((label, index) => (
               <div
-                key={item.key}
-                title={item.label}
+                key={label}
+                title={label}
                 style={{
                   flex: 1,
                   height: 6,
                   borderRadius: 3,
                   background:
-                    index < stepIndex
+                    index < stageIndex
                       ? '#10B981'
-                      : index === stepIndex
-                        ? 'var(--blue)'
+                      : index === stageIndex
+                        ? failed
+                          ? '#DC2626'
+                          : 'var(--blue)'
                         : 'var(--border)',
                   position: 'relative',
                   overflow: 'hidden',
                 }}
               >
-                {index === stepIndex && (
+                {index === stageIndex && !failed && (
                   <div
                     style={{
                       position: 'absolute',
@@ -1181,26 +1441,49 @@ export default function LivePhotoCapture({
             ))}
           </div>
 
-          <div
-            style={{
-              marginTop: 12,
-              fontWeight: 600,
-            }}
-          >
-            Step {stepIndex + 1} of {STEPS.length}: {step.label}
+          <div style={{ marginTop: 12, fontWeight: 600 }}>
+            {STAGE_LABELS[stageIndex]}: {title}
           </div>
 
           <div
             aria-live="polite"
+            role={failed ? 'alert' : undefined}
             style={{
               marginTop: 4,
               fontSize: '0.88rem',
-              color: poseOk ? '#059669' : 'var(--text-muted)',
+              color: failed
+                ? '#DC2626'
+                : poseOk
+                  ? '#059669'
+                  : 'var(--text-muted)',
               minHeight: 38,
             }}
           >
             {message}
           </div>
+
+          {failed && (
+            <div style={{ display: 'flex', gap: 10, marginTop: 10 }}>
+              <button
+                type="button"
+                className="btn-ghost"
+                onClick={onClose}
+                style={{ flex: 1 }}
+              >
+                Close
+              </button>
+
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={retryChallenge}
+                style={{ flex: 1, ...centered }}
+              >
+                <RotateCcw size={15} />
+                Try again
+              </button>
+            </div>
+          )}
         </div>
 
         {/* ---------- PREVIEW ---------- */}
@@ -1236,8 +1519,8 @@ export default function LivePhotoCapture({
                 color: 'var(--text-muted)',
               }}
             >
-              Check that your face is clear. Use this photo as your profile
-              picture?
+              Check that your face is clear. Use this photo as your
+              profile picture?
             </p>
 
             {saveError && (
@@ -1253,25 +1536,13 @@ export default function LivePhotoCapture({
               </p>
             )}
 
-            <div
-              style={{
-                display: 'flex',
-                gap: 10,
-                marginTop: 14,
-              }}
-            >
+            <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
               <button
                 type="button"
                 className="btn-ghost"
                 disabled={phase === 'saving'}
                 onClick={handleRetake}
-                style={{
-                  flex: 1,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 6,
-                }}
+                style={{ flex: 1, ...centered }}
               >
                 <RotateCcw size={15} />
                 Retake
@@ -1282,16 +1553,10 @@ export default function LivePhotoCapture({
                 className="btn-primary"
                 disabled={phase === 'saving'}
                 onClick={handleConfirm}
-                style={{
-                  flex: 1,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 6,
-                }}
+                style={{ flex: 1, ...centered }}
               >
                 <Check size={15} />
-                {phase === 'saving' ? 'Saving…' : 'Use this photo'}
+                {phase === 'saving' ? 'Saving…' : 'Confirm'}
               </button>
             </div>
           </div>
@@ -1341,8 +1606,8 @@ export default function LivePhotoCapture({
           }}
         >
           The camera runs on your device and stops when you finish. These
-          checks help capture a clear photo; they do not verify your
-          identity.
+          checks help capture a clear, live photo. They do not verify your
+          identity and cannot guarantee protection against spoofing.
         </p>
       </div>
     </div>
