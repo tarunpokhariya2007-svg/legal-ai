@@ -42,7 +42,9 @@ const DETECT_INTERVAL_MS = 80 // position / ready stages
 // The challenge stage runs on every animation frame so a quick
 // blink is not missed.
 
-const HOLD_FRAMES_ALIGN = 6
+// Consecutive good frames needed before "Start liveness check"
+// is enabled (also used to average the neutral-face baseline).
+const MIN_ALIGN_FRAMES = 3
 // A passed challenge stays valid for this long; after that the
 // user repeats a (new) challenge before capturing.
 const READY_TIMEOUT_MS = 30000
@@ -458,6 +460,7 @@ export default function LivePhotoCapture({
   const [message, setMessage] = useState('Starting camera…')
   const [poseOk, setPoseOk] = useState(false)
   const [captureReady, setCaptureReady] = useState(false)
+  const [startReady, setStartReady] = useState(false)
   const [errorText, setErrorText] = useState('')
   const [saveError, setSaveError] = useState('')
   const [previewUrl, setPreviewUrl] = useState('')
@@ -477,6 +480,7 @@ export default function LivePhotoCapture({
   const holdRef = useRef(0)
   const readySinceRef = useRef(0)
   const captureReadyRef = useRef(false)
+  const startReadyRef = useRef(false)
   const lastGoodRef = useRef<{
     metrics: FaceMetrics
     quality: QualityMetrics
@@ -546,6 +550,7 @@ export default function LivePhotoCapture({
     challengeStateRef.current = null
     lastGoodRef.current = null
     captureReadyRef.current = false
+    startReadyRef.current = false
 
     releasePreview()
   }, [stopCamera, releasePreview])
@@ -744,9 +749,11 @@ export default function LivePhotoCapture({
     photoBlobRef.current = null
     lastGoodRef.current = null
     captureReadyRef.current = false
+    startReadyRef.current = false
 
     stageRef.current = 'align'
     setCaptureReady(false)
+    setStartReady(false)
 
     setChallenge(next)
     setStage('align')
@@ -1062,6 +1069,8 @@ export default function LivePhotoCapture({
     const fail = (text: string) => {
       holdRef.current = 0
       alignSumRef.current = { ear: 0, mouth: 0, height: 0, n: 0 }
+      startReadyRef.current = false
+      setStartReady(false)
       setHoldProgress(0)
       setPoseOk(false)
       setMessage(text)
@@ -1083,8 +1092,6 @@ export default function LivePhotoCapture({
 
     const { metrics } = checked
 
-    holdRef.current += 1
-
     // Neutral-face baseline for the challenge checks.
     const sums = alignSumRef.current
 
@@ -1097,42 +1104,20 @@ export default function LivePhotoCapture({
     sums.height += metrics.heightFrac
     sums.n += 1
 
+    // Position is good. The user decides when to begin the
+    // liveness check; nothing advances automatically.
+    const ready = sums.n >= MIN_ALIGN_FRAMES
+
+    startReadyRef.current = ready
+
+    setStartReady(ready)
     setPoseOk(true)
-    setMessage('Good. Hold still…')
-    setHoldProgress(Math.min(1, holdRef.current / HOLD_FRAMES_ALIGN))
-
-    if (holdRef.current < HOLD_FRAMES_ALIGN) {
-      return
-    }
-
-    holdRef.current = 0
-    setHoldProgress(0)
-
-    // ----- Position held: start the randomized challenge -----
-    baselineRef.current = {
-      ear: sums.ear / sums.n,
-      mouth: sums.mouth / sums.n,
-      height: sums.height / sums.n,
-    }
-
-    const active = challengeRef.current
-
-    challengeStateRef.current = {
-      kind: active.key,
-      startedAt: now,
-      lastFaceAt: now,
-      blinks: 0,
-      eyesClosed: false,
-      smileFrames: 0,
-      smiling: false,
-      nearFrames: 0,
-      near: false,
-    }
-
-    setPoseOk(false)
-    setMessage(active.hint)
-
-    changeStage('challenge')
+    setHoldProgress(Math.min(1, sums.n / MIN_ALIGN_FRAMES))
+    setMessage(
+      ready
+        ? 'Face looks good. Tap "Start liveness check".'
+        : 'Good. Hold still…'
+    )
   }, [changeStage, resetFlow]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const startLoop = useCallback(() => {
@@ -1232,6 +1217,49 @@ export default function LivePhotoCapture({
   // -----------------------------------------------
   // ACTIONS
   // -----------------------------------------------
+
+  // User-started liveness check (needs a good, steady face first).
+  const handleStartChallenge = () => {
+    const sums = alignSumRef.current
+
+    if (
+      stageRef.current !== 'align' ||
+      !startReadyRef.current ||
+      sums.n < MIN_ALIGN_FRAMES
+    ) {
+      return
+    }
+
+    baselineRef.current = {
+      ear: sums.ear / sums.n,
+      mouth: sums.mouth / sums.n,
+      height: sums.height / sums.n,
+    }
+
+    const active = challengeRef.current
+    const now = performance.now()
+
+    challengeStateRef.current = {
+      kind: active.key,
+      startedAt: now,
+      lastFaceAt: now,
+      blinks: 0,
+      eyesClosed: false,
+      smileFrames: 0,
+      smiling: false,
+      nearFrames: 0,
+      near: false,
+    }
+
+    startReadyRef.current = false
+
+    setStartReady(false)
+    setPoseOk(false)
+    setHoldProgress(0)
+    setMessage(active.hint)
+
+    changeStage('challenge')
+  }
 
   // Manual capture: only possible once the liveness challenge has
   // passed and the face is still forward-facing and clear.
@@ -1532,6 +1560,29 @@ export default function LivePhotoCapture({
             {message}
           </div>
 
+          {stage === 'align' && (
+            <button
+              type="button"
+              className="btn-ghost"
+              disabled={!startReady || phase !== 'capturing'}
+              onClick={handleStartChallenge}
+              style={{
+                width: '100%',
+                marginTop: 6,
+                padding: '12px 16px',
+                fontWeight: 600,
+                ...centered,
+                opacity: startReady && phase === 'capturing' ? 1 : 0.45,
+                cursor:
+                  startReady && phase === 'capturing'
+                    ? 'pointer'
+                    : 'not-allowed',
+              }}
+            >
+              Start liveness check
+            </button>
+          )}
+
           <button
             type="button"
             className="btn-primary"
@@ -1566,7 +1617,7 @@ export default function LivePhotoCapture({
                 ? 'Capture Photo unlocks when your face is clear and facing forward.'
                 : stage === 'challenge'
                   ? `Capture Photo unlocks after you complete the challenge: ${challenge.label.toLowerCase()}.`
-                  : 'Capture Photo unlocks after you position your face and pass a quick liveness challenge.'}
+                  : 'Capture Photo unlocks after you start and pass a quick liveness check. Position your face first.'}
             </div>
           )}
 
