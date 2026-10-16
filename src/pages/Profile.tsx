@@ -1005,6 +1005,11 @@ export default function Profile() {
       })
     }
 
+    // Update the sidebar avatar immediately.
+    window.dispatchEvent(
+      new CustomEvent('profile-photo-updated', { detail: photoUrl })
+    )
+
   }
 
 
