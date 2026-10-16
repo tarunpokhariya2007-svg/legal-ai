@@ -45,7 +45,10 @@ const db = require("./db");
 // =====================================================
 
 const { ensureOtpTable } = require("./database/otpModel");
-const { ensureGoogleAuthSupport } = require("./database/userModel");
+const {
+    ensureGoogleAuthSupport,
+    ensureProfilePhotoColumn,
+} = require("./database/userModel");
 const { ensureRefreshTokenTable } = require("./database/refreshTokenModel");
 const { ensurePasswordResetTokenTable } = require("./database/passwordResetTokenModel");
 const { ensureActivityTable } = require("./database/activityModel");
@@ -73,6 +76,13 @@ ensureOtpTable().catch((err) => {
 ensureGoogleAuthSupport().catch((err) => {
     console.error(
         "Failed to ensure Google auth support:",
+        err.message
+    );
+});
+
+ensureProfilePhotoColumn().catch((err) => {
+    console.error(
+        "Failed to ensure users.profile_photo_path column:",
         err.message
     );
 });

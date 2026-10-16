@@ -21,6 +21,66 @@ const API_URL =
   'http://localhost:5001'
 
 // =====================================================
+// ADVOCATE AVATAR
+// Shows the advocate's saved profile photo (returned by
+// /api/lawyers in the same response) and falls back to the
+// initials avatar when there is no photo or it fails to load.
+// =====================================================
+
+function AdvocateAvatar({
+  photoUrl,
+  initials,
+  color,
+  size,
+  fontSize,
+}: {
+  photoUrl: string
+  initials: string
+  color: string
+  size: number
+  fontSize: string
+}) {
+  const [failed, setFailed] = useState(false)
+
+  useEffect(() => {
+    setFailed(false)
+  }, [photoUrl])
+
+  const showPhoto = Boolean(photoUrl) && !failed
+
+  return (
+    <div
+      className="avatar"
+      style={{
+        width: size,
+        height: size,
+        fontSize,
+        overflow: 'hidden',
+        background: `linear-gradient(135deg, ${color}, ${color}88)`,
+      }}
+    >
+      {showPhoto ? (
+        <img
+          src={photoUrl}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          onError={() => setFailed(true)}
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            display: 'block',
+          }}
+        />
+      ) : (
+        initials
+      )}
+    </div>
+  )
+}
+
+// =====================================================
 // ADVOCATE LISTING
 // =====================================================
 
@@ -192,6 +252,11 @@ export default function AdvocateListing() {
                 name,
 
                 initials,
+
+                photoUrl:
+                  lawyer.photo_url
+                    ? `${API_URL}${lawyer.photo_url}`
+                    : '',
 
                 color:
                   '#2563EB',
@@ -934,19 +999,13 @@ export default function AdvocateListing() {
 
                   {/* AVATAR */}
 
-                  <div
-                    className="avatar"
-                    style={{
-                      width: 56,
-                      height: 56,
-                      fontSize:
-                        '1rem',
-                      background:
-                        `linear-gradient(135deg, ${a.color}, ${a.color}88)`,
-                    }}
-                  >
-                    {a.initials}
-                  </div>
+                  <AdvocateAvatar
+                    photoUrl={a.photoUrl}
+                    initials={a.initials}
+                    color={a.color}
+                    size={56}
+                    fontSize="1rem"
+                  />
 
                   {/* NAME */}
 
@@ -1449,22 +1508,13 @@ export default function AdvocateListing() {
                   minWidth: 0,
                 }}
               >
-                <div
-                  className="avatar"
-                  style={{
-                    width: 68,
-                    height: 68,
-                    fontSize:
-                      '1.15rem',
-                    flexShrink: 0,
-                    background:
-                      `linear-gradient(135deg, ${selectedAdvocate.color}, ${selectedAdvocate.color}88)`,
-                  }}
-                >
-                  {
-                    selectedAdvocate.initials
-                  }
-                </div>
+                <AdvocateAvatar
+                  photoUrl={selectedAdvocate.photoUrl}
+                  initials={selectedAdvocate.initials}
+                  color={selectedAdvocate.color}
+                  size={68}
+                  fontSize="1.15rem"
+                />
 
                 <div
                   style={{

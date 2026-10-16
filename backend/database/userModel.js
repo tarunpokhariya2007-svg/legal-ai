@@ -39,6 +39,38 @@ async function ensureGoogleAuthSupport() {
 
 
 // =====================================================
+// ENSURE PROFILE PHOTO COLUMN
+// Adds a nullable users.profile_photo_path column (if
+// missing). It stores a private Supabase Storage reference
+// such as "supabase://profile-photos/12/<uuid>.jpg".
+// Works for both citizens and advocates (both are users).
+// =====================================================
+
+async function ensureProfilePhotoColumn() {
+
+    const [columns] = await db.query(
+        `
+            SELECT COLUMN_NAME
+            FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = 'users'
+              AND COLUMN_NAME = 'profile_photo_path'
+        `
+    );
+
+    if (columns.length === 0) {
+
+        await db.query(
+            `ALTER TABLE users ADD COLUMN profile_photo_path VARCHAR(512) NULL`
+        );
+
+        console.log("Added profile_photo_path column to users table.");
+
+    }
+}
+
+
+// =====================================================
 // CREATE USER
 // =====================================================
 
@@ -283,6 +315,8 @@ async function updateUserProfile(
 module.exports = {
 
     ensureGoogleAuthSupport,
+
+    ensureProfilePhotoColumn,
 
     createUser,
 

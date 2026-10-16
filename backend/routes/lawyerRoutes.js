@@ -1,6 +1,7 @@
 const express = require("express");
 const db = require("../db");
 const authMiddleware = require("../middleware/authMiddleware");
+const { buildProfilePhotoUrl } = require("../utils/profilePhoto");
 
 const router = express.Router();
 
@@ -21,6 +22,7 @@ router.get("/", async (req, res) => {
         u.phone,
         u.role,
         u.created_at,
+        u.profile_photo_path,
 
         l.specialization,
         l.experience,
@@ -40,9 +42,22 @@ router.get("/", async (req, res) => {
       ORDER BY u.created_at DESC
     `);
 
+    // The photo comes from the same joined query (no per-advocate
+    // lookups). The private storage path is never exposed; the
+    // browser receives a backend photo URL instead.
+    const lawyers = rows.map(
+      ({ profile_photo_path, ...lawyer }) => ({
+        ...lawyer,
+        photo_url: buildProfilePhotoUrl(
+          lawyer.id,
+          profile_photo_path
+        ),
+      })
+    );
+
     return res.json({
       success: true,
-      lawyers: rows,
+      lawyers,
     });
 
   } catch (err) {

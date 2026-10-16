@@ -67,6 +67,16 @@ function createDocumentStoragePath(
     );
 }
 
+function createProfilePhotoStoragePath(userId) {
+    // Profile photos live in the same private bucket as documents,
+    // under their own prefix. The backend is the only reader/writer
+    // (via the secret key); the browser never talks to Storage directly.
+    return (
+        `profile-photos/${Number(userId)}/` +
+        `${crypto.randomUUID()}.jpg`
+    );
+}
+
 function toStorageReference(objectPath) {
     return `supabase://${objectPath}`;
 }
@@ -235,6 +245,7 @@ async function deleteDocumentFromStorage(
 
 module.exports = {
     createDocumentStoragePath,
+    createProfilePhotoStoragePath,
     toStorageReference,
     isSupabaseStorageReference,
     uploadDocumentBuffer,

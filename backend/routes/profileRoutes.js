@@ -1,6 +1,22 @@
 const express = require("express");
 const db = require("../db");
 const authMiddleware = require("../middleware/authMiddleware");
+const multer = require("multer");
+const rateLimit = require("express-rate-limit");
+
+const {
+    createProfilePhotoStoragePath,
+    toStorageReference,
+    uploadDocumentBuffer,
+    downloadDocumentBuffer,
+    deleteDocumentFromStorage,
+} = require("../services/supabaseStorageService");
+
+const {
+    MAX_PHOTO_BYTES,
+    buildProfilePhotoUrl,
+    validateProfilePhotoBuffer,
+} = require("../utils/profilePhoto");
 
 const router = express.Router();
 
@@ -27,7 +43,9 @@ router.get("/", authMiddleware, async (req, res) => {
                 l.verified,
                 l.bar_council_no,
                 l.high_court,
-                l.enrollment_year
+                l.enrollment_year,
+
+                u.profile_photo_path
 
             FROM users u
             LEFT JOIN lawyers l
@@ -76,6 +94,11 @@ router.get("/", authMiddleware, async (req, res) => {
                     user.enrollment_year != null
                         ? String(user.enrollment_year)
                         : "",
+
+                photoUrl: buildProfilePhotoUrl(
+                    user.id,
+                    user.profile_photo_path
+                ),
             },
         });
     } catch (err) {
@@ -301,7 +324,9 @@ router.put("/", authMiddleware, async (req, res) => {
                 l.verified,
                 l.bar_council_no,
                 l.high_court,
-                l.enrollment_year
+                l.enrollment_year,
+
+                u.profile_photo_path
 
             FROM users u
             LEFT JOIN lawyers l
@@ -356,6 +381,11 @@ router.put("/", authMiddleware, async (req, res) => {
                     user.enrollment_year != null
                         ? String(user.enrollment_year)
                         : "",
+
+                photoUrl: buildProfilePhotoUrl(
+                    user.id,
+                    user.profile_photo_path
+                ),
             },
         });
     } catch (err) {
@@ -374,6 +404,367 @@ router.put("/", authMiddleware, async (req, res) => {
             message:
                 err.message ||
                 "Failed to update profile",
+        });
+    }
+});
+
+
+// =====================================================
+// PROFILE PHOTO
+// =====================================================
+//
+// The photo bytes live in the existing private Supabase
+// Storage bucket (profile-photos/<userId>/<uuid>.jpg).
+// Only the storage reference is stored in the database
+// (users.profile_photo_path). The browser never receives
+// the storage path or any storage credentials; it loads the
+// image through GET /api/profile/photo/:userId below.
+// =====================================================
+
+const photoUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: {
+        fileSize: MAX_PHOTO_BYTES,
+        files: 1,
+        fields: 0,
+    },
+    fileFilter(req, file, cb) {
+        if (file.mimetype !== "image/jpeg") {
+            const error = new Error(
+                "Photo must be a JPEG image captured from the camera."
+            );
+            error.code = "INVALID_PHOTO_TYPE";
+            return cb(error);
+        }
+
+        cb(null, true);
+    },
+});
+
+// Per-user limit so the endpoint cannot be used to burn
+// storage or bandwidth. Runs after authMiddleware.
+const photoUploadLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: (req) => `profile-photo:${req.user.id}`,
+    message: {
+        success: false,
+        message:
+            "Too many photo uploads. Please try again in a few minutes.",
+    },
+});
+
+function handlePhotoUpload(req, res, next) {
+    photoUpload.single("photo")(req, res, (error) => {
+        if (!error) {
+            return next();
+        }
+
+        if (error.code === "LIMIT_FILE_SIZE") {
+            return res.status(413).json({
+                success: false,
+                message: "Photo is too large. Maximum size is 2 MB.",
+            });
+        }
+
+        return res.status(400).json({
+            success: false,
+            message:
+                error.code === "INVALID_PHOTO_TYPE"
+                    ? error.message
+                    : "Invalid photo upload.",
+        });
+    });
+}
+
+// =====================================================
+// UPLOAD / REPLACE PROFILE PHOTO
+// PUT /api/profile/photo   (multipart/form-data, field "photo")
+//
+// Always acts on the authenticated user (req.user.id from the
+// verified JWT). No user id is accepted from the client, so a
+// user cannot change anybody else's photo. Only
+// users.profile_photo_path is written, so advocate
+// verification and all other profile fields are untouched.
+// =====================================================
+
+router.put(
+    "/photo",
+    authMiddleware,
+    photoUploadLimiter,
+    handlePhotoUpload,
+    async (req, res) => {
+        let uploadedReference = null;
+
+        try {
+            const validation = validateProfilePhotoBuffer(
+                req.file && req.file.buffer
+            );
+
+            if (!validation.ok) {
+                return res.status(validation.status || 400).json({
+                    success: false,
+                    message: validation.message,
+                });
+            }
+
+            const [existingRows] = await db.query(
+                `
+                SELECT id, profile_photo_path
+                FROM users
+                WHERE id = ?
+                LIMIT 1
+                `,
+                [req.user.id]
+            );
+
+            if (!existingRows.length) {
+                return res.status(404).json({
+                    success: false,
+                    message: "User not found",
+                });
+            }
+
+            const previousReference =
+                existingRows[0].profile_photo_path || null;
+
+            const objectPath = createProfilePhotoStoragePath(
+                req.user.id
+            );
+
+            await uploadDocumentBuffer(
+                req.file.buffer,
+                objectPath,
+                "image/jpeg"
+            );
+
+            uploadedReference = toStorageReference(objectPath);
+
+            await db.query(
+                `
+                UPDATE users
+                SET profile_photo_path = ?
+                WHERE id = ?
+                `,
+                [uploadedReference, req.user.id]
+            );
+
+            // The new photo is now the source of truth.
+            uploadedReference = null;
+
+            // Best-effort cleanup of the replaced photo.
+            if (previousReference) {
+                deleteDocumentFromStorage(previousReference).catch(
+                    (cleanupError) => {
+                        console.warn(
+                            "OLD PROFILE PHOTO CLEANUP FAILED:",
+                            cleanupError.message
+                        );
+                    }
+                );
+            }
+
+            const [rows] = await db.query(
+                `
+                SELECT
+                    u.id,
+                    u.full_name,
+                    u.email,
+                    u.phone,
+                    u.role,
+
+                    l.specialization,
+                    l.experience,
+                    l.location,
+                    l.bio,
+                    l.verified,
+                    l.bar_council_no,
+                    l.high_court,
+                    l.enrollment_year,
+
+                    u.profile_photo_path
+
+                FROM users u
+                LEFT JOIN lawyers l
+                    ON l.user_id = u.id
+                WHERE u.id = ?
+                LIMIT 1
+                `,
+                [req.user.id]
+            );
+
+            const user = rows[0];
+
+            res.json({
+                success: true,
+                message: "Profile photo saved successfully.",
+                photoUrl: buildProfilePhotoUrl(
+                    user.id,
+                    user.profile_photo_path
+                ),
+                user: {
+                    id: user.id,
+                    fullName: user.full_name,
+                    email: user.email,
+                    phone: user.phone || "",
+                    role: user.role,
+
+                    city: user.location || "",
+                    bio: user.bio || "",
+
+                    practiceAreas: user.specialization
+                        ? String(user.specialization)
+                            .split(",")
+                            .map((item) => item.trim())
+                            .filter(Boolean)
+                        : [],
+
+                    specialization: user.specialization || "",
+                    experience: user.experience || 0,
+                    verified: Boolean(user.verified),
+
+                    barCouncilNo: user.bar_council_no || "",
+                    highCourt: user.high_court || "",
+                    enrollmentYear:
+                        user.enrollment_year != null
+                            ? String(user.enrollment_year)
+                            : "",
+
+                    photoUrl: buildProfilePhotoUrl(
+                        user.id,
+                        user.profile_photo_path
+                    ),
+                },
+            });
+        } catch (err) {
+            console.error("UPLOAD PROFILE PHOTO ERROR:", err);
+
+            // Do not leave an orphaned object behind when the
+            // database update did not complete.
+            if (uploadedReference) {
+                deleteDocumentFromStorage(uploadedReference).catch(
+                    () => {}
+                );
+            }
+
+            res.status(500).json({
+                success: false,
+                message:
+                    "Failed to save profile photo. Please try again.",
+            });
+        }
+    }
+);
+
+// =====================================================
+// SERVE A PROFILE PHOTO
+// GET /api/profile/photo/:userId
+//
+// - Advocate photos are public (they are shown on the public
+//   Find Advocates listing).
+// - Any other account's photo (citizens) is private: only the
+//   authenticated owner can load it.
+// =====================================================
+
+async function sendPhoto(res, row, requestedVersion, isPublic) {
+    try {
+        const buffer = await downloadDocumentBuffer(
+            row.profile_photo_path
+        );
+
+        const currentUrl = buildProfilePhotoUrl(
+            row.id,
+            row.profile_photo_path
+        );
+
+        const versionMatches =
+            requestedVersion &&
+            currentUrl &&
+            currentUrl.endsWith(`?v=${requestedVersion}`);
+
+        res.set({
+            "Content-Type": "image/jpeg",
+            "Content-Length": buffer.length,
+            "Cache-Control": isPublic
+                ? versionMatches
+                    ? "public, max-age=86400"
+                    : "public, max-age=60"
+                : "private, max-age=300",
+        });
+
+        return res.send(buffer);
+    } catch (err) {
+        if (err.code === "STORAGE_NOT_FOUND") {
+            return res.status(404).json({
+                success: false,
+                message: "Photo not found",
+            });
+        }
+
+        console.error("SERVE PROFILE PHOTO ERROR:", err);
+
+        return res.status(500).json({
+            success: false,
+            message: "Failed to load photo",
+        });
+    }
+}
+
+router.get("/photo/:userId", async (req, res) => {
+    try {
+        const targetId = Number(req.params.userId);
+
+        if (!Number.isInteger(targetId) || targetId <= 0) {
+            return res.status(404).json({
+                success: false,
+                message: "Photo not found",
+            });
+        }
+
+        const [rows] = await db.query(
+            `
+            SELECT id, role, profile_photo_path
+            FROM users
+            WHERE id = ?
+            LIMIT 1
+            `,
+            [targetId]
+        );
+
+        const row = rows[0];
+
+        if (!row || !row.profile_photo_path) {
+            return res.status(404).json({
+                success: false,
+                message: "Photo not found",
+            });
+        }
+
+        const requestedVersion = String(req.query.v || "");
+
+        if (String(row.role).toLowerCase() === "lawyer") {
+            return sendPhoto(res, row, requestedVersion, true);
+        }
+
+        // Private account: require login and ownership.
+        return authMiddleware(req, res, () => {
+            if (Number(req.user.id) !== Number(row.id)) {
+                return res.status(404).json({
+                    success: false,
+                    message: "Photo not found",
+                });
+            }
+
+            return sendPhoto(res, row, requestedVersion, false);
+        });
+    } catch (err) {
+        console.error("GET PROFILE PHOTO ERROR:", err);
+
+        res.status(500).json({
+            success: false,
+            message: "Failed to load photo",
         });
     }
 });

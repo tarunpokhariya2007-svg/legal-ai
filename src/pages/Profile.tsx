@@ -1,6 +1,11 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useLocation } from 'react-router'
-import { isLoggedIn, setStoredUser } from '../lib/auth'
+import { getStoredUser, isLoggedIn, setStoredUser } from '../lib/auth'
+import LivePhotoCapture from '../components/LivePhotoCapture'
+import {
+  uploadProfilePhoto,
+  useAuthedPhotoSrc,
+} from '../lib/profilePhoto'
 import {
   Camera,
   Edit2,
@@ -603,6 +608,10 @@ export default function Profile() {
 
   const [userData, setUserDataState] = useState<any>({})
 
+  // Live camera capture + the saved profile photo.
+  const [photoCaptureOpen, setPhotoCaptureOpen] = useState(false)
+  const savedPhotoSrc = useAuthedPhotoSrc(userData?.photoUrl)
+
 
   // ===================================================
   // LOAD USER
@@ -965,6 +974,36 @@ export default function Profile() {
           ? String(user.enrollment_year)
           : ''
     )
+
+  }
+
+
+  // ===================================================
+  // SAVE LIVE PROFILE PHOTO
+  // ===================================================
+  //
+  // Only the photo reference is merged into state. The other
+  // form fields (which may contain unsaved edits) are not
+  // reset, and the rest of the profile is untouched.
+  // ===================================================
+
+  const handlePhotoSave = async (photo: Blob) => {
+
+    const { photoUrl } = await uploadProfilePhoto(photo)
+
+    setUserDataState((previous: any) => ({
+      ...previous,
+      photoUrl,
+    }))
+
+    const storedUser = getStoredUser()
+
+    if (storedUser) {
+      setStoredUser({
+        ...storedUser,
+        photoUrl,
+      })
+    }
 
   }
 
@@ -1429,6 +1468,9 @@ export default function Profile() {
                 fontSize:
                   '1.8rem',
 
+                overflow:
+                  'hidden',
+
                 background:
                   isAdvocate
                     ? 'linear-gradient(135deg, var(--emerald), #065F46)'
@@ -1436,13 +1478,29 @@ export default function Profile() {
               }}
             >
 
-              {userInitials}
+              {savedPhotoSrc ? (
+                <img
+                  src={savedPhotoSrc}
+                  alt="Your profile photo"
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
+                    display: 'block',
+                  }}
+                />
+              ) : (
+                userInitials
+              )}
 
             </div>
 
 
             <button
               type="button"
+              aria-label="Take a live profile photo"
+              title="Take a live profile photo"
+              onClick={() => setPhotoCaptureOpen(true)}
               style={{
                 position:
                   'absolute',
@@ -1488,6 +1546,12 @@ export default function Profile() {
               />
 
             </button>
+
+            <LivePhotoCapture
+              open={photoCaptureOpen}
+              onClose={() => setPhotoCaptureOpen(false)}
+              onSave={handlePhotoSave}
+            />
 
           </div>
 
