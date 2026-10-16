@@ -3,6 +3,7 @@ import { Link } from 'react-router'
 import { isLoggedIn } from '../lib/auth'
 import jsPDF from 'jspdf'
 import AnimatedMarkdown from '../components/AnimatedMarkdown'
+import NyayaAIMonogram from '../components/NyayaAIMonogram'
 import {
 Send, Mic, Square, Paperclip, RotateCcw, Scale, FileText, Users,
 Clock, ChevronRight, Sparkles, MessageSquare, Plus, X, Volume2, Loader2,
@@ -1454,23 +1455,7 @@ border: '1px solid var(--border)'
       }}
     >
 
-      <div
-        style={{
-          width: 34,
-          height: 34,
-          borderRadius: 10,
-          background:
-            'linear-gradient(135deg, var(--blue), #7C3AED)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        <Scale
-          size={16}
-          color="white"
-        />
-      </div>
+      <NyayaAIMonogram size={34} radius={10} />
 
       <div>
 
@@ -1622,6 +1607,9 @@ border: '1px solid var(--border)'
 
           {/* Avatar */}
 
+          {msg.role === 'ai' ? (
+            <NyayaAIMonogram size={30} radius="50%" />
+          ) : (
           <div
             style={{
               width: 30,
@@ -1629,9 +1617,7 @@ border: '1px solid var(--border)'
               borderRadius: '50%',
               flexShrink: 0,
               background:
-                msg.role === 'ai'
-                  ? 'linear-gradient(135deg, var(--blue), #7C3AED)'
-                  : 'linear-gradient(135deg, #7C3AED, #EC4899)',
+                'linear-gradient(135deg, #7C3AED, #EC4899)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -1640,10 +1626,9 @@ border: '1px solid var(--border)'
               color: 'white',
             }}
           >
-            {msg.role === 'ai'
-              ? <Scale size={13} />
-              : 'G'}
+            G
           </div>
+          )}
 
           <div
             style={{
